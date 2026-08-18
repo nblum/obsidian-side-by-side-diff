@@ -1,112 +1,112 @@
-# Funktionen und Anforderungen
+# Features and requirements
 
-Dieses Dokument beschreibt den umgesetzten Funktionsumfang von **Side-by-Side Diff** und dient als Referenz für
-Weiterentwicklung und Abnahme.
+This document describes the implemented feature scope of **Side-by-Side Diff** and serves as a reference for
+further development and acceptance.
 
-## Ziel
+## Goal
 
-Das Plugin soll zwei Textdateien aus dem aktuellen Obsidian-Vault sicher und nachvollziehbar vergleichen. Änderungen
-werden sichtbar gemacht, können einzeln geprüft und vorgemerkt werden und werden ausschließlich durch eine explizite
-Speicheraktion geschrieben.
+The plugin compares two text files from the current Obsidian vault in a safe, traceable way. Changes are made
+visible, can be reviewed and staged individually, and are written only through an explicit save action.
 
-## Funktionsumfang
+## Feature scope
 
-### Vergleichsansicht
+### Comparison view
 
-- Zwei unterschiedliche Textdateien werden links und rechts synchron dargestellt.
-- Änderungen werden zeilenweise und innerhalb geänderter Zeilen inline hervorgehoben.
-- Bei unterschiedlicher Zeilenanzahl werden auf der kürzeren Seite an der Änderungsposition visuelle Leerzeilen
-  ergänzt, damit die Folgezeilen synchron bleiben.
-- Die Toolbar steht oberhalb des Vergleichs und enthält die Bearbeitungsaktionen.
-- Die Ansicht zeigt in den Dateiköpfen die Dateinamen sowie je nach Kontext `Vergleich`, `Original` oder `Vorschlag`.
-- `Tauschen` vertauscht beide Dateien und kehrt bei Vorschlägen die Richtung der Übernahme um.
-- `Aktualisieren` ist im Datei-Kontextmenü verfügbar und lädt eine geöffnete Vergleichsansicht neu.
-- Die Scrollposition bleibt beim Vormerken, Ignorieren und Speichern einer Änderung erhalten.
+- Two different text files are displayed in sync on the left and right.
+- Changes are highlighted line by line and inline within changed lines.
+- When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
+  the following lines stay in sync.
+- The toolbar sits above the comparison and contains the editing actions.
+- The view shows the file names in the pane headers, along with `Comparison`, `Original`, or `Proposal` depending
+  on context.
+- `Swap` swaps both files and, for proposals, reverses the direction of acceptance.
+- `Refresh` is available in the file context menu and reloads an open comparison view.
+- The scroll position is preserved when staging, ignoring, or saving a change.
 
-### Änderungen übernehmen und ignorieren
+### Accepting and ignoring changes
 
-- `→` übernimmt eine einzelne Änderung zunächst nur in der Ansicht.
-- `×` ignoriert ausschließlich den linken Diff-Anteil; der rechte Inhalt bleibt sichtbar und unverändert.
-- `Änderungen speichern` schreibt vorgemerkte Änderungen in die betroffenen Dateien.
-- Die Schaltfläche zum Speichern ist deaktiviert, wenn keine ungespeicherten Änderungen vorliegen.
-- Erst nach dem expliziten Speichern werden Dateien im Vault verändert.
-- Wenn alle Änderungsvorschläge bearbeitet wurden, erscheint die Meldung `Alle Änderungsvorschläge wurden bearbeitet.`.
+- `→` accepts a single change into the view only, at first.
+- `×` ignores only the left-hand diff part; the right-hand content stays visible and unchanged.
+- `Save changes` writes staged changes to the affected files.
+- The save button is disabled when there are no unsaved changes.
+- Files in the vault are only modified after the explicit save.
+- Once all suggested changes have been processed, the message `All change suggestions have been processed.`
+  appears.
 
-### Editiermodus
+### Edit mode
 
-- Im normalen Diff-Modus kann die rechte Seite über `Bearbeitungsmodus` direkt bearbeitet werden.
-- Die linke Seite bleibt schreibgeschützt.
-- Der Editierbereich ist ein gemeinsames mehrzeiliges Eingabefeld.
-- Mehrzeilige Auswahl, Löschen, Backspace und `Enter` für neue Leerzeilen funktionieren.
-- Die beiden Seiten bleiben während der Bearbeitung zeilenweise ausgerichtet.
-- `Vergleichsmodus` beendet die direkte Bearbeitung.
-- Gespeichert wird über `Änderungen speichern` oder `Strg/Cmd + S`.
-- Beim Schließen mit ungespeicherten Änderungen fragt das Plugin, ob gespeichert werden soll.
-- Die vorhandene Zeilenendungsart der bearbeiteten Datei bleibt beim Speichern erhalten.
+- In normal diff mode, the right-hand side can be edited directly via `Edit mode`.
+- The left-hand side remains read-only.
+- The edit area is a shared multi-line input field.
+- Multi-line selection, deletion, Backspace, and `Enter` for new blank lines work as expected.
+- Both sides stay aligned line by line while editing.
+- `Comparison mode` ends direct editing.
+- Saving happens via `Save changes` or `Ctrl/Cmd + S`.
+- Closing with unsaved changes prompts the plugin to ask whether to save.
+- The edited file's existing line-ending style is preserved when saving.
 
-### Änderungsvorschläge
+### Suggested changes
 
-- `Änderungen vorschlagen` erstellt neben dem aktiven Dokument eine Kopie mit konfiguriertem Suffix und Zeitstempel.
-- Ein Beispielname ist `Dokument_changes_20260817-143000.md`.
-- Eine bereits vorhandene passende Kopie wird bevorzugt geöffnet; dabei wird die neueste Kopie verwendet.
-- Im Vorschlagsmodus steht das Original links und die bearbeitbare Kopie rechts.
-- `Änderungen übernehmen` öffnet die umgedrehte Ansicht mit Kopie links und Original rechts.
-- Vorschläge werden erst nach Prüfung und explizitem Speichern ins Original geschrieben.
+- `Suggest changes` creates a copy next to the active document with a configured suffix and timestamp.
+- An example name is `Document_changes_20260817-143000.md`.
+- An already existing matching copy is preferred and opened; the most recent copy is used.
+- In proposal mode, the original appears on the left and the editable copy on the right.
+- `Accept changes` opens the reversed view with the copy on the left and the original on the right.
+- Proposals are only written to the original after review and an explicit save.
 
-### Weitere Aktionen
+### Other actions
 
-- Identische Dateien zeigen eine eigene Meldung.
-- Aus dieser Meldung kann nach Bestätigung eine der Dateien in Obsidian-Papierkorb verschoben werden. Die Datei wird
-  nicht endgültig gelöscht und kann wiederhergestellt werden.
-- Beim Umbenennen oder Löschen einer verglichenen Datei reagiert die geöffnete Ansicht auf die Vault-Änderung.
-- Bekannte Binärformate werden nicht als Textdateien zur Auswahl angeboten.
+- Identical files show a dedicated message.
+- From that message, one of the files can be moved to the Obsidian trash after confirmation. The file is not
+  permanently deleted and can be restored.
+- When a compared file is renamed or deleted, the open view reacts to the vault change.
+- Known binary formats are not offered as text files for selection.
 
-### Übersetzte Oberfläche
+### Translated interface
 
-- Die sichtbare Plugin-Oberfläche ist auf Deutsch und Englisch verfügbar.
-- Unter **Einstellungen → Side-by-Side Diff → Sprache** stehen `Automatisch`, `Deutsch` und `English` zur Auswahl.
-- `Automatisch` berücksichtigt die Obsidian-Sprache; nicht unterstützte Sprachen verwenden Englisch als Fallback.
-- Übersetzungen liegen getrennt in `locales/de.json` und `locales/en.json`.
+- The visible plugin interface is available in German and English.
+- Under **Settings → Side-by-Side Diff → Language**, `Automatic`, `Deutsch`, and `English` are available.
+- `Automatic` follows the Obsidian language; unsupported languages fall back to English.
+- Translations live separately in `locales/de.json` and `locales/en.json`.
 
-## Zugriffspunkte in Obsidian
+## Access points in Obsidian
 
-| Zugriff | Aktion |
+| Access | Action |
 | --- | --- |
-| Befehlspalette | `Aktuelle Datei mit anderer Datei vergleichen` |
-| Befehlspalette | `Zwei Dateien vergleichen` |
-| Befehlspalette | `Änderungen für aktuelle Datei vorschlagen` |
-| Ribbon-Leiste | `Zwei Dateien vergleichen` |
-| Datei-Kontextmenü | `Mit anderer Datei vergleichen` |
-| Datei-Kontextmenü | `Änderungen vorschlagen` |
-| Datei-Kontextmenü, wenn vorhanden | `Änderungen übernehmen` |
-| Datei-Kontextmenü bei offener Vergleichsansicht | `Aktualisieren` |
+| Command palette | `Compare current file with another file` |
+| Command palette | `Compare two files` |
+| Command palette | `Suggest changes for current file` |
+| Ribbon | `Compare two files` |
+| File context menu | `Compare with another file` |
+| File context menu | `Suggest changes` |
+| File context menu, when available | `Accept changes` |
+| File context menu with an open comparison view | `Refresh` |
 
-## Einstellungen
+## Settings
 
-Unter **Einstellungen → Side-by-Side Diff** stehen folgende Optionen zur Verfügung:
+Under **Settings → Side-by-Side Diff**, the following options are available:
 
-- **Sprache**: Die Plugin-Oberfläche automatisch, auf Deutsch oder auf Englisch anzeigen.
-- **Im linken Hauptmenü anzeigen**: Das Symbol in der linken Ribbon-Leiste ein- oder ausblenden. Befehlspalette und
-  Dokumentmenüs bleiben davon unberührt.
-- **Suffix für Änderungskopien**: Den Text vor dem Zeitstempel der Änderungskopien anpassen. Nicht zulässige
-  Dateinamenzeichen werden automatisch ersetzt.
+- **Language**: Show the plugin interface automatically, in German, or in English.
+- **Show in left ribbon**: Show or hide the icon in the left ribbon. The command palette and document menus are
+  unaffected.
+- **Change-copy suffix**: Adjust the text before the timestamp of change copies. Disallowed file-name characters
+  are replaced automatically.
 
-## Technische Anforderungen
+## Technical requirements
 
-- Obsidian `1.5.0` oder neuer.
-- Vergleichbare Dateien müssen Textdateien im Vault sein.
-- Es werden keine externen Dienste oder zusätzlichen Laufzeitabhängigkeiten benötigt.
-- Jede unterstützte Sprache benötigt eine vollständige Übersetzungsdatei mit demselben Schlüsselbestand wie die anderen
-  Sprachen.
-- Der Speichervorgang muss immer explizit durch die Nutzerin oder den Nutzer ausgelöst werden.
-- Die Diff-Berechnung muss deterministisch bleiben. Für sehr große Vergleiche greift ein indexbasierter Fallback, damit
-  die Berechnung nicht unkontrolliert wächst.
+- Obsidian `1.5.0` or later.
+- Files being compared must be text files in the vault.
+- No external services or additional runtime dependencies are required.
+- Each supported language needs a complete translation file with the same key set as the other languages.
+- The save action must always be explicitly triggered by the user.
+- The diff calculation must stay deterministic. For very large comparisons, an index-based fallback keeps the
+  calculation from growing uncontrollably.
 
-## Abnahmekriterien für Änderungen
+## Acceptance criteria for changes
 
-Eine Änderung am Funktionsumfang gilt als vollständig dokumentiert und geprüft, wenn:
+A change to the feature scope is considered fully documented and reviewed when:
 
-1. der betroffene Ablauf in diesem Dokument aktualisiert ist,
-2. verändertes Verhalten durch Tests oder eine nachvollziehbare manuelle Prüfung abgedeckt ist,
-3. die Regeln zum expliziten Speichern und zur Sichtbarkeit beider Seiten erhalten bleiben,
-4. die Bedienbegriffe in Code, README und dieser Referenz konsistent sind.
+1. the affected flow is updated in this document,
+2. the changed behavior is covered by tests or a traceable manual check,
+3. the rules for explicit saving and the visibility of both sides are preserved,
+4. the terminology in code, README, and this reference is consistent.
