@@ -631,7 +631,7 @@ class SideBySideDiffView extends ItemView {
         }
         const currentContent = await this.app.vault.read(rightFile);
         const editedContent = convertLineEndings(this.serializeRightEditor(this.rightEditorState.editor), currentContent);
-        await this.app.vault.modify(rightFile, editedContent);
+        await this.app.vault.process(rightFile, () => editedContent);
         this.pendingFileContents.delete(rightFile.path);
       }
       if (this.hasPendingChanges() && !await this.writePendingChanges()) {
@@ -664,7 +664,7 @@ class SideBySideDiffView extends ItemView {
         return;
       }
       const editedContent = convertLineEndings(this.serializeRightEditor(this.rightEditorState.editor), currentContent);
-      await this.app.vault.modify(rightFile, editedContent);
+      await this.app.vault.process(rightFile, () => editedContent);
       this.pendingFileContents.delete(rightFile.path);
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
@@ -922,7 +922,7 @@ class SideBySideDiffView extends ItemView {
       if (!(file instanceof TFile)) {
         return false;
       }
-      await this.app.vault.modify(file, content);
+      await this.app.vault.process(file, () => content);
     }
     this.pendingFileContents.clear();
     return true;
@@ -1498,7 +1498,7 @@ class FileDiffSideBySidePlugin extends Plugin {
   /** Shows or hides the plugin icon in Obsidian's left ribbon. */
   updateRibbonVisibility(): void {
     if (this.ribbonIconEl) {
-      this.ribbonIconEl.style.display = this.settings.showRibbonIcon ? "" : "none";
+      this.ribbonIconEl.toggleVisibility(this.settings.showRibbonIcon);
     }
   }
   /** Closes all open diff leaves when the plugin is disabled. */
