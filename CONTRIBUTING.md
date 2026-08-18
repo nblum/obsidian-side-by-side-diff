@@ -6,12 +6,19 @@ Beiträge sollten deshalb klein, nachvollziehbar und auf den Vergleichsworkflow 
 ## Entwicklungsumgebung
 
 - Obsidian `1.5.0` oder neuer für manuelle UI-Prüfungen
-- Node.js mit integriertem `node:test` für die automatisierten Tests
-- keine zusätzlichen Paketabhängigkeiten und kein Build-Schritt
+- Node.js 22.6 oder neuer für `node:test` mit TypeScript-Unterstützung
+- npm für Build, Typecheck, Linting und Tests
+
+Einmalig werden die lokalen Entwicklungsabhängigkeiten installiert:
+
+```bash
+npm install
+```
 
 Die Entwicklung erfolgt direkt im Plugin-Ordner. Für eine manuelle Prüfung muss der Ordner als
 `.obsidian/plugins/side-by-side-diff/` in einem Test-Vault liegen und das Plugin in Obsidian aktiviert sein.
-Nach Änderungen an `main.js` oder `styles.css` die Plugin-Ansicht beziehungsweise Obsidian neu laden.
+Nach Änderungen an `src/` zuerst `npm run build` ausführen; anschließend die Plugin-Ansicht beziehungsweise Obsidian
+neu laden.
 
 ## Vor dem Ändern
 
@@ -23,7 +30,7 @@ Nach Änderungen an `main.js` oder `styles.css` die Plugin-Ansicht beziehungswei
 ## Arbeitsweise
 
 - Verwende bestehende Muster und Benennungen im Plugin.
-- Schreibe kompatiblen JavaScript-Code mit expliziten Annahmen an Modulgrenzen und ohne unnötige globale Zustände.
+- Schreibe TypeScript im Strict-Modus mit expliziten Typen an Modulgrenzen und ohne unnötige globale Zustände.
 - Halte Funktionen klein und verwende frühe Rückgaben, wenn dadurch die Logik klarer wird.
 - Ergänze kurze technische Kommentare an nicht offensichtlichen Stellen; neue Klassen und Funktionen erhalten einen
   kurzen Docblock.
@@ -39,10 +46,13 @@ Nach Änderungen an `main.js` oder `styles.css` die Plugin-Ansicht beziehungswei
 Führe aus dem Plugin-Ordner aus:
 
 ```bash
-node --test --test-isolation=none tests/*.test.js
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
-Die Tests decken die deterministischen Diff- und Synchronisierungsregeln ab, unter anderem:
+Die Tests decken die deterministischen Diff-, Synchronisierungs- und Übersetzungsregeln ab, unter anderem:
 
 - Einfügen, Entfernen und Ersetzen einzelner Zeilen
 - Ignorieren von Änderungen bei sichtbarem rechtem Inhalt

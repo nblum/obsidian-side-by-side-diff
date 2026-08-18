@@ -7,7 +7,16 @@ inline-highlighted changes, and controlled change acceptance.
 
 ![Side-by-Side Diff comparison view](assets/compare-mode.webp)
 
-![Side-by-Side Diff file menu](assets/file-menu.webp)
+## Contents
+
+- [At a glance](#at-a-glance)
+- [Quick start](#quick-start)
+- [Three workflows](#three-workflows)
+- [Edit and save](#edit-and-save)
+- [Installation](#installation)
+- [Development](#development)
+- [Documentation](#documentation)
+- [Tests](#tests)
 
 ## At a glance
 
@@ -21,9 +30,12 @@ inline-highlighted changes, and controlled change acceptance.
 
 ## Quick start
 
-1. Open the command palette and select `Compare current file with another file` or `Compare two files`. The
-   comparison icon in the left ribbon and `Compare with another file` in the active document's menu lead to the
-   same view.
+The comparison icon in the left ribbon and `Compare with another file` in the active document's menu lead to the
+same view as the command palette:
+
+![Side-by-Side Diff file menu](assets/file-menu.webp)
+
+1. Open the command palette and select `Compare current file with another file` or `Compare two files`.
 2. Select the second file if it has not been chosen yet.
 3. Review the synchronized view. Use `→` to stage a change as a proposal, or `×` to ignore the left-hand diff.
 4. Save all staged changes with `Save changes` or `Ctrl/Cmd + S`.
@@ -59,10 +71,9 @@ Changes are never written automatically while typing or clicking a diff action. 
 
 The plugin requires Obsidian `1.5.0` or later.
 
-For a local installation, copy this plugin folder to
-`.obsidian/plugins/side-by-side-diff/`, then open **Settings → Community plugins** and enable
-`Side-by-Side Diff`. Copy the complete plugin folder so that `i18n.js` and the `locales/` directory with its language
-files are included as well.
+For a local installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
+**Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
+`main.js`, `manifest.json`, `styles.css`, and `locales/` directory.
 
 Set the interface language under **Settings → Side-by-Side Diff → Language** to `Automatic`, `Deutsch`, or `English`.
 In automatic mode, the Obsidian language is used when supported; unsupported languages fall back to English.
@@ -72,12 +83,27 @@ In automatic mode, the Obsidian language is used when supported; unsupported lan
 - [Features and requirements](FEATURES.md) – authoritative overview of the current scope and requirements
 - [Contributing](CONTRIBUTING.md) – development workflow, tests, and change checklist
 
-## Tests
+## Development
 
-The deterministic diff and synchronization rules are tested without additional dependencies:
+Install the local development dependencies once, then use the following commands from this directory:
 
 ```bash
-node --test --test-isolation=none tests/*.test.js
+npm install
+npm run dev       # development bundle with inline source maps
+npm run build     # strict typecheck and production bundle
+npm run lint      # strict ESLint checks
+npm test          # TypeScript unit tests
+```
+
+TypeScript source lives in `src/`; `main.js` is the generated Obsidian entry point and must be rebuilt before
+installing the plugin in a vault.
+
+## Tests
+
+The deterministic diff, synchronization rules, and translation tables are tested in TypeScript:
+
+```bash
+npm test
 ```
 
 Run the command from this plugin directory. See [CONTRIBUTING.md](CONTRIBUTING.md) for additional development

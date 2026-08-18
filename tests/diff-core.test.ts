@@ -1,7 +1,6 @@
-const { test } = require("node:test");
-const assert = require("node:assert/strict");
-
-const {
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
 	alignSequences,
 	applyAlignedRowChange,
 	convertLineEndings,
@@ -10,10 +9,11 @@ const {
 	indexDiffRows,
 	serializeEditableLines,
 	splitLines,
-} = require("../diff-core");
+	type IndexedDiffRow,
+} from "../src/diff-core.ts";
 
 /** Builds indexed rows for a pair of test documents. */
-function getRows(leftContent, rightContent) {
+function getRows(leftContent: string, rightContent: string): IndexedDiffRow[] {
 	const leftLines = splitLines(leftContent);
 	const rightLines = splitLines(rightContent);
 	return indexDiffRows(alignSequences(leftLines, rightLines, (left, right) => left === right));
@@ -22,6 +22,7 @@ function getRows(leftContent, rightContent) {
 test("left-only arrow changes are inserted without overwriting the following right line", () => {
 	const rows = getRows("A\nB\nC", "A\nC");
 	const changedRow = rows.find((row) => row.left === "B");
+	assert.ok(changedRow);
 
 	const result = applyAlignedRowChange(["A", "B", "C"], ["A", "C"], changedRow, "left-to-right");
 
@@ -31,6 +32,7 @@ test("left-only arrow changes are inserted without overwriting the following rig
 test("right-only arrow changes remove only the right-side row", () => {
 	const rows = getRows("A\nC", "A\nB\nC");
 	const changedRow = rows.find((row) => row.right === "B");
+	assert.ok(changedRow);
 
 	const result = applyAlignedRowChange(["A", "C"], ["A", "B", "C"], changedRow, "left-to-right");
 
@@ -40,6 +42,7 @@ test("right-only arrow changes remove only the right-side row", () => {
 test("changed rows replace the target line instead of inserting a duplicate", () => {
 	const rows = getRows("A\nB", "A\nX");
 	const changedRow = rows.find((row) => row.left === "B" && row.right === "X");
+	assert.ok(changedRow);
 
 	const result = applyAlignedRowChange(["A", "B"], ["A", "X"], changedRow, "left-to-right");
 
@@ -48,7 +51,10 @@ test("changed rows replace the target line instead of inserting a duplicate", ()
 
 test("ignoring a diff keeps a right-only line visible", () => {
 	const rows = getRows("A", "A\nB");
-	const ignoredRow = getIgnoredDiffRow(rows.find((row) => row.right === "B"));
+	const changedRow = rows.find((row) => row.right === "B");
+	assert.ok(changedRow);
+	const ignoredRow = getIgnoredDiffRow(changedRow);
+	assert.ok(ignoredRow);
 
 	assert.equal(ignoredRow.left, null);
 	assert.equal(ignoredRow.right, "B");

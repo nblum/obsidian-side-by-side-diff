@@ -1,9 +1,8 @@
-const { describe, test } = require("node:test");
-const assert = require("node:assert/strict");
-
-const de = require("../locales/de.json");
-const en = require("../locales/en.json");
-const { createTranslator, resolveLanguage } = require("../i18n");
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
+import de from "../locales/de.json" with { type: "json" };
+import en from "../locales/en.json" with { type: "json" };
+import { createTranslator, resolveLanguage } from "../src/i18n.ts";
 
 describe("UI translations", () => {
 	test("German and English dictionaries contain the same keys", () => {

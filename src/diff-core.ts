@@ -1,7 +1,45 @@
-const MAX_DIFF_CELLS = 1000000;
+export type DiffValue = string | null;
+export type DiffDirection = "left-to-right" | "right-to-left";
+
+export interface DiffRow {
+	left: DiffValue;
+	right: DiffValue;
+	equal: boolean;
+}
+
+export interface IndexedDiffRow extends DiffRow {
+	leftIndex: number;
+	rightIndex: number;
+	leftLineNumber: number | null;
+	rightLineNumber: number | null;
+}
+
+export interface AlignmentPlan {
+	targetCount: number;
+	insertionIndex: number;
+	leftGapCount: number;
+	rightGapCount: number;
+}
+
+export interface EditableLine {
+	value: string;
+	isAlignmentGap?: boolean;
+	rightPresent?: boolean;
+}
+
+const MAX_DIFF_CELLS = 1_000_000;
+
+/** Returns an indexed value and fails explicitly when an invariant is broken. */
+function getRequired<T>(values: ArrayLike<T>, index: number): T {
+	const value = values[index];
+	if (value === undefined) {
+		throw new Error(`Missing diff value at index ${String(index)}.`);
+	}
+	return value;
+}
 
 /** Splits normalized text into displayable lines without a synthetic final line. */
-function splitLines(content) {
+export function splitLines(content: string): string[] {
 	if (content.length === 0) {
 		return [];
 	}
@@ -13,27 +51,27 @@ function splitLines(content) {
 }
 
 /** Reassembles edited lines while preserving the target file's line ending style. */
-function joinLines(lines, originalContent) {
+export function joinLines(lines: string[], originalContent: string): string {
 	if (lines.length === 0) {
 		return "";
 	}
-	const lineEnding = originalContent.match(/\r\n|\r|\n/)?.[0] || "\n";
+	const lineEnding = originalContent.match(/\r\n|\r|\n/)?.[0] ?? "\n";
 	const hasFinalLineEnding = /(?:\r\n|\r|\n)$/.test(originalContent);
 	return lines.join(lineEnding) + (hasFinalLineEnding ? lineEnding : "");
 }
 
 /** Converts normalized editor line breaks to the target file's line ending style. */
-function convertLineEndings(content, originalContent) {
-	const lineEnding = originalContent.match(/\r\n|\r|\n/)?.[0] || "\n";
+export function convertLineEndings(content: string, originalContent: string): string {
+	const lineEnding = originalContent.match(/\r\n|\r|\n/)?.[0] ?? "\n";
 	return content.replace(/\r\n?/g, "\n").replace(/\n/g, lineEnding);
 }
 
 /** Adds source indexes and display line numbers to aligned diff rows. */
-function indexDiffRows(rows) {
+export function indexDiffRows(rows: DiffRow[]): IndexedDiffRow[] {
 	let leftIndex = 0;
 	let rightIndex = 0;
 	return rows.map((row) => {
-		const indexedRow = {
+		const indexedRow: IndexedDiffRow = {
 			...row,
 			leftIndex,
 			rightIndex,
@@ -51,12 +89,12 @@ function indexDiffRows(rows) {
 }
 
 /** Creates a stable key for dismissing one visible diff row. */
-function getDiffRowKey(row) {
+export function getDiffRowKey(row: IndexedDiffRow): string {
 	return JSON.stringify([row.leftIndex, row.rightIndex, row.left, row.right]);
 }
 
 /** Aligns two sequences using a compact longest-common-subsequence diff. */
-function alignSequences(left, right, equals) {
+export function alignSequences(left: string[], right: string[], equals: (left: string, right: string) => boolean): DiffRow[] {
 	if (left.length * right.length > MAX_DIFF_CELLS) {
 		return alignByIndex(left, right, equals);
 	}
@@ -68,32 +106,36 @@ function alignSequences(left, right, equals) {
 
 	for (let leftIndex = left.length - 1; leftIndex >= 0; leftIndex -= 1) {
 		for (let rightIndex = right.length - 1; rightIndex >= 0; rightIndex -= 1) {
-			table[leftIndex][rightIndex] = equals(left[leftIndex], right[rightIndex])
-				? table[leftIndex + 1][rightIndex + 1] + 1
-				: Math.max(table[leftIndex + 1][rightIndex], table[leftIndex][rightIndex + 1]);
+			const currentRow = getRequired(table, leftIndex);
+			const nextRow = getRequired(table, leftIndex + 1);
+			const leftValue = getRequired(left, leftIndex);
+			const rightValue = getRequired(right, rightIndex);
+			currentRow[rightIndex] = equals(leftValue, rightValue)
+				? getRequired(nextRow, rightIndex + 1) + 1
+				: Math.max(getRequired(nextRow, rightIndex), getRequired(currentRow, rightIndex + 1));
 		}
 	}
 
-	const operations = [];
+	const operations: DiffOperation[] = [];
 	let leftIndex = 0;
 	let rightIndex = 0;
 	while (leftIndex < left.length || rightIndex < right.length) {
 		if (
 			leftIndex < left.length &&
 			rightIndex < right.length &&
-			equals(left[leftIndex], right[rightIndex])
+			equals(getRequired(left, leftIndex), getRequired(right, rightIndex))
 		) {
-			operations.push({ kind: "equal", left: left[leftIndex], right: right[rightIndex] });
+			operations.push({ kind: "equal", left: getRequired(left, leftIndex), right: getRequired(right, rightIndex) });
 			leftIndex += 1;
 			rightIndex += 1;
 		} else if (
 			leftIndex < left.length &&
-			(rightIndex >= right.length || table[leftIndex + 1][rightIndex] >= table[leftIndex][rightIndex + 1])
+			(rightIndex >= right.length || getRequired(getRequired(table, leftIndex + 1), rightIndex) >= getRequired(getRequired(table, leftIndex), rightIndex + 1))
 		) {
-			operations.push({ kind: "left", left: left[leftIndex], right: null });
+			operations.push({ kind: "left", left: getRequired(left, leftIndex), right: null });
 			leftIndex += 1;
 		} else {
-			operations.push({ kind: "right", left: null, right: right[rightIndex] });
+			operations.push({ kind: "right", left: null, right: getRequired(right, rightIndex) });
 			rightIndex += 1;
 		}
 	}
@@ -101,13 +143,15 @@ function alignSequences(left, right, equals) {
 	return groupOperations(operations);
 }
 
+type DiffOperation = { kind: "equal" | "left" | "right"; left: DiffValue; right: DiffValue };
+
 /** Provides a predictable index-based fallback for very large files. */
-function alignByIndex(left, right, equals) {
-	const rows = [];
+function alignByIndex(left: string[], right: string[], equals: (left: string, right: string) => boolean): DiffRow[] {
+	const rows: DiffRow[] = [];
 	const rowCount = Math.max(left.length, right.length);
 	for (let index = 0; index < rowCount; index += 1) {
-		const leftValue = index < left.length ? left[index] : null;
-		const rightValue = index < right.length ? right[index] : null;
+		const leftValue = index < left.length ? getRequired(left, index) : null;
+		const rightValue = index < right.length ? getRequired(right, index) : null;
 		rows.push({
 			left: leftValue,
 			right: rightValue,
@@ -118,40 +162,54 @@ function alignByIndex(left, right, equals) {
 }
 
 /** Groups raw insert/delete operations into aligned rows for the two panes. */
-function groupOperations(operations) {
-	const rows = [];
+function groupOperations(operations: DiffOperation[]): DiffRow[] {
+	const rows: DiffRow[] = [];
 	let index = 0;
 	while (index < operations.length) {
 		const operation = operations[index];
+		if (!operation) {
+			break;
+		}
 		if (operation.kind === "equal") {
 			rows.push({ left: operation.left, right: operation.right, equal: true });
 			index += 1;
 			continue;
 		}
 
-		const removed = [];
-		const added = [];
-		while (index < operations.length && operations[index].kind !== "equal") {
-			if (operations[index].kind === "left") {
-				removed.push(operations[index].left);
+		const removed: string[] = [];
+		const added: string[] = [];
+		while (index < operations.length) {
+			const pendingOperation = operations[index];
+			if (!pendingOperation || pendingOperation.kind === "equal") {
+				break;
+			}
+			if (pendingOperation.kind === "left") {
+				removed.push(pendingOperation.left ?? "");
 			} else {
-				added.push(operations[index].right);
+				added.push(pendingOperation.right ?? "");
 			}
 			index += 1;
 		}
 
 		const rowCount = Math.max(removed.length, added.length);
 		for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
-			const leftValue = rowIndex < removed.length ? removed[rowIndex] : null;
-			const rightValue = rowIndex < added.length ? added[rowIndex] : null;
-			rows.push({ left: leftValue, right: rightValue, equal: false });
+			rows.push({
+				left: rowIndex < removed.length ? getRequired(removed, rowIndex) : null,
+				right: rowIndex < added.length ? getRequired(added, rowIndex) : null,
+				equal: false,
+			});
 		}
 	}
 	return rows;
 }
 
 /** Applies one aligned row change to line arrays without overwriting a following line. */
-function applyAlignedRowChange(leftLines, rightLines, row, direction) {
+export function applyAlignedRowChange(
+	leftLines: string[],
+	rightLines: string[],
+	row: IndexedDiffRow,
+	direction: DiffDirection,
+): { leftLines: string[]; rightLines: string[] } {
 	const nextLeftLines = [...leftLines];
 	const nextRightLines = [...rightLines];
 	const leftToRight = direction === "left-to-right";
@@ -174,7 +232,7 @@ function applyAlignedRowChange(leftLines, rightLines, row, direction) {
 }
 
 /** Turns a dismissed row into a neutral row that keeps the right-side content visible. */
-function getIgnoredDiffRow(row) {
+export function getIgnoredDiffRow(row: IndexedDiffRow): IndexedDiffRow | null {
 	if (row.right === null) {
 		return null;
 	}
@@ -182,9 +240,9 @@ function getIgnoredDiffRow(row) {
 }
 
 /** Calculates where compensating blank lines belong when one pane changes length. */
-function getLineSyncPlan(leftCount, rightCount, preferredIndex = null) {
+export function getLineSyncPlan(leftCount: number, rightCount: number, preferredIndex: number | null = null): AlignmentPlan {
 	const targetCount = Math.max(leftCount, rightCount);
-	const requestedIndex = Number.isInteger(preferredIndex)
+	const requestedIndex = preferredIndex !== null && Number.isInteger(preferredIndex)
 		? preferredIndex
 		: Math.min(leftCount, rightCount);
 	return {
@@ -196,23 +254,10 @@ function getLineSyncPlan(leftCount, rightCount, preferredIndex = null) {
 }
 
 /** Serializes editable lines while excluding visual-only alignment gaps. */
-function serializeEditableLines(lines) {
+export function serializeEditableLines(lines: EditableLine[]): string {
 	return lines
-		.filter((line) => !(line.isAlignmentGap && line.value.trim() === ""))
+		.filter((line) => !(line.isAlignmentGap === true && line.value.trim() === ""))
 		.filter((line) => line.value !== "" || line.rightPresent !== false)
 		.map((line) => line.value.replace(/\r\n?/g, "\n").replace(/\u00a0/g, " "))
 		.join("\n");
 }
-
-module.exports = {
-	alignSequences,
-	applyAlignedRowChange,
-	convertLineEndings,
-	getDiffRowKey,
-	getIgnoredDiffRow,
-	getLineSyncPlan,
-	indexDiffRows,
-	joinLines,
-	serializeEditableLines,
-	splitLines,
-};

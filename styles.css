@@ -315,7 +315,7 @@
 .file-diff-sbs-edit-line {
 	display: flex;
 	box-sizing: border-box;
-	min-height: 1.55em;
+	min-height: var(--file-diff-sbs-line-min-height, 1.55em);
 	border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border), transparent 72%);
 	line-height: 1.55;
 }
