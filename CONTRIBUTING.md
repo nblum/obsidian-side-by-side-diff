@@ -40,17 +40,21 @@ files in `src/`, run `npm run build` first, then reload the plugin view or Obsid
 
 ## Project layout
 
-- `src/main.ts` – plugin entry point, views, commands, and settings
+- `src/main.ts` – plugin entry point and commands
+- `src/diff-view.ts` – comparison view and editing behavior
+- `src/modals.ts` – confirmation, file picker, and unsaved-change dialogs
+- `src/settings.ts` – plugin settings and compatibility rendering
 - `src/diff-core.ts` – deterministic diff and line-synchronization logic
 - `src/i18n.ts` – translation loading and language resolution
 - `tests/` – TypeScript unit tests for the modules above
-- `main.js` – generated Obsidian entry point; rebuild with `npm run build` before installing the plugin in a vault
+- `main.js` – generated Obsidian entry point; ignored by Git and rebuilt before local installation or release
 
 ## Tests
 
 Run from the plugin folder:
 
 ```bash
+npm run validate:manifest
 npm run typecheck
 npm run lint
 npm test
@@ -99,6 +103,7 @@ Update the documentation whenever a visible flow, command, setting, or requireme
 - [ ] The change is limited to a clear purpose.
 - [ ] Affected tests were added or adjusted.
 - [ ] `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` all pass.
+- [ ] `npm run validate:manifest` passes and the release tag matches `manifest.json`.
 - [ ] A manual check was performed for UI or save-logic changes.
 - [ ] Terminology and documentation are up to date.
 - [ ] `git diff --check` reports no whitespace errors.

@@ -82,6 +82,7 @@
 	"settings.ribbon.description": "Zeigt das File-Diff-Symbol in der linken Ribbon-Leiste an.",
 	"settings.suffix.name": "Suffix für Änderungskopien",
 	"settings.suffix.description": "Dieser Text steht vor dem Zeitstempel, zum Beispiel _changes_20260817-143000.",
+	"settings.suffix.invalid": "Verwende ein nicht leeres Suffix mit gültigen Dateinamenzeichen.",
 	"settings.language.name": "Sprache",
 	"settings.language.description": "Legt die Sprache der Plugin-Oberfläche fest.",
 	"settings.language.auto": "Automatisch",

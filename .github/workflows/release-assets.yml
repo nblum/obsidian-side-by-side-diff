@@ -1,0 +1,42 @@
+name: Build release assets
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release-assets:
+    name: Build and upload plugin assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node -e "const fs = require('node:fs'); const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8')); if (manifest.version !== process.env.RELEASE_TAG) throw new Error('Release tag must match manifest.json version');"
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload plugin assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" main.js manifest.json styles.css --clobber

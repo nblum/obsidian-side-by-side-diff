@@ -82,6 +82,7 @@
 	"settings.ribbon.description": "Show the File Diff icon in Obsidian's left ribbon.",
 	"settings.suffix.name": "Change-copy suffix",
 	"settings.suffix.description": "Text before the timestamp, for example _changes_20260817-143000.",
+	"settings.suffix.invalid": "Use a non-empty suffix with valid file-name characters.",
 	"settings.language.name": "Language",
 	"settings.language.description": "Choose the language of the plugin interface.",
 	"settings.language.auto": "Automatic",

@@ -14,6 +14,8 @@ inline-highlighted changes, and controlled change acceptance.
 - [Three workflows](#three-workflows)
 - [Edit and save](#edit-and-save)
 - [Installation](#installation)
+- [Privacy and permissions](#privacy-and-permissions)
+- [Releases](#releases)
 - [Development](#development)
 - [Documentation](#documentation)
 - [Tests](#tests)
@@ -75,8 +77,26 @@ For a local installation, copy the plugin folder to `.obsidian/plugins/side-by-s
 **Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
 `main.js`, `manifest.json`, `styles.css`, and `locales/` directory.
 
+The plugin is currently marked as desktop-only because mobile support has not been tested yet.
+
 Set the interface language under **Settings → Side-by-Side Diff → Language** to `Automatic`, `Deutsch`, or `English`.
 In automatic mode, the Obsidian language is used when supported; unsupported languages fall back to English.
+
+## Privacy and permissions
+
+Side-by-Side Diff runs entirely inside the current Obsidian vault.
+
+- It makes no network requests and uses no telemetry, analytics, ads, or external services.
+- It does not require an account or payment.
+- It reads and writes only vault files after an explicit user action, plus its own plugin settings.
+- It does not access files outside the vault.
+
+The source repository contains TypeScript; `main.js` is generated locally and attached to releases.
+
+## Releases
+
+Release tags must exactly match the `version` in `manifest.json` and use the `x.y.z` format. The release workflow
+builds and uploads `main.js`, `manifest.json`, and `styles.css` as release assets.
 
 ## Documentation
 
@@ -91,12 +111,13 @@ Install the local development dependencies once, then use the following commands
 npm install
 npm run dev       # development bundle with inline source maps
 npm run build     # strict typecheck and production bundle
+npm run validate:manifest
 npm run lint      # strict ESLint checks
 npm test          # TypeScript unit tests
 ```
 
-TypeScript source lives in `src/`; `main.js` is the generated Obsidian entry point and must be rebuilt before
-installing the plugin in a vault.
+TypeScript source lives in `src/`; `main.js` is the generated Obsidian entry point and is ignored by Git. Rebuild it
+before installing the plugin in a vault.
 
 ## Tests
 
