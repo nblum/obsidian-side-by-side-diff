@@ -1,7 +1,7 @@
 {
   "id": "side-by-side-diff",
   "name": "Side-by-Side Diff",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.5.0",
   "description": "Compare, review, and selectively merge two text files in a side-by-side view.",
   "author": "Nico Blum",

@@ -93,18 +93,20 @@ export class FileDiffSettingsTab extends PluginSettingTab {
     }
     await this.plugin.saveSettings();
   }
-  /** Renders the language, ribbon visibility, and change-copy settings. */
-  // Keep the legacy renderer because manifest.json supports Obsidian 1.5.0.
+  /** Renders the legacy settings UI for Obsidian versions before declarative settings. */
   override display(): void {
+    this.renderLegacySettings();
+  }
+
+  /** Re-renders legacy controls after a setting changes. */
+  private renderLegacySettings(): void {
     const { containerEl } = this;
     containerEl.empty();
     new Setting(containerEl).setName(this.plugin.translate("settings.language.name")).setDesc(this.plugin.translate("settings.language.description")).addDropdown((dropdown) => {
       dropdown.addOption("auto", this.plugin.translate("settings.language.auto")).addOption("de", this.plugin.translate("settings.language.de")).addOption("en", this.plugin.translate("settings.language.en")).setValue(this.plugin.settings.language).onChange(async (value) => {
         this.plugin.updateLanguage(value);
         await this.plugin.saveSettings();
-        // Keep the legacy renderer because manifest.json supports Obsidian 1.5.0.
-        // eslint-disable-next-line @typescript-eslint/no-deprecated
-        this.display();
+        this.renderLegacySettings();
       });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.ribbon.name")).setDesc(this.plugin.translate("settings.ribbon.description")).addToggle((toggle) => {

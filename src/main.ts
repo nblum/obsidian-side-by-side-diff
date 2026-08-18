@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, moment } from "obsidian";
+import { Notice, Plugin, TFile, moment, requireApiVersion } from "obsidian";
 import type { Command } from "obsidian";
 import { FilePickerModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
@@ -154,10 +154,6 @@ export class FileDiffSideBySidePlugin extends Plugin {
       this.ribbonIconEl.toggleVisibility(this.settings.showRibbonIcon);
     }
   }
-  /** Closes all open diff leaves when the plugin is disabled. */
-  override onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE);
-  }
   /** Starts a comparison with the currently active text file on the left. */
   async compareActiveFile(file: TFile | null = null): Promise<void> {
     const activeFile = file ?? this.app.workspace.getActiveFile();
@@ -252,7 +248,10 @@ export class FileDiffSideBySidePlugin extends Plugin {
         active: true,
         state: { leftPath: leftFile.path, rightPath: rightFile === null ? null : rightFile.path, editRight, mode }
       });
-      await this.app.workspace.revealLeaf(leaf);
+      // Guard the foregrounding API so the declared minimum version remains supported.
+      if (requireApiVersion("1.7.2")) {
+        await this.app.workspace.revealLeaf(leaf);
+      }
     } catch (error) {
       console.error("Side-by-Side Diff konnte die Ansicht nicht \xF6ffnen.", error);
       new Notice(this.translate("notice.viewOpenFailed"));

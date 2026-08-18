@@ -1,4 +1,4 @@
-import { ItemView, Notice, TFile } from "obsidian";
+import { ItemView, Notice, TFile, requireApiVersion } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { alignSequences, applyAlignedRowChange, convertLineEndings, getDiffRowKey, getIgnoredDiffRow, getLineSyncPlan, indexDiffRows, joinLines, serializeEditableLines, splitLines, type DiffDirection, type IndexedDiffRow } from "./diff-core";
 import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
@@ -87,7 +87,7 @@ export class SideBySideDiffView extends ItemView {
     this.plugin = plugin;
     this.registerDomEvent(this.contentEl.ownerDocument, "keydown", (event) => { this.handleGlobalKeydown(event); }, { capture: true });
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
-    this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event as InputEvent); });
+    this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
     this.registerDomEvent(this.contentEl, "keyup", (event) => { this.handleEditKeyup(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
@@ -205,8 +205,8 @@ export class SideBySideDiffView extends ItemView {
     };
   }
   /** Inserts compensating blank lines after the browser has changed the right-side line count. */
-  handleInput(event: InputEvent): void {
-    if (!this.state.editRight) {
+  handleInput(event: Event): void {
+    if (!this.state.editRight || !("inputType" in event) || typeof event.inputType !== "string") {
       return;
     }
     const editor = this.getEditableEditor(event.target);
@@ -518,11 +518,9 @@ export class SideBySideDiffView extends ItemView {
     const newLine = line.cloneNode(false) as HTMLElement;
     newLine.dataset.rightPresent = "true";
     newLine.textContent = "";
-    const lineNumber = line.ownerDocument.createElement("span");
-    lineNumber.className = "file-diff-sbs-line-number file-diff-sbs-edit-line-number";
+    const lineNumber = newLine.createSpan({ cls: "file-diff-sbs-line-number file-diff-sbs-edit-line-number" });
     lineNumber.setAttribute("contenteditable", "false");
-    const newCode = line.ownerDocument.createElement("span");
-    newCode.className = "file-diff-sbs-edit-code";
+    const newCode = newLine.createSpan({ cls: "file-diff-sbs-edit-code" });
     newCode.textContent = after;
     newLine.append(lineNumber, newCode);
     line.after(newLine);
@@ -587,7 +585,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Returns the editable line elements belonging directly to a pane or editor. */
   getEditableLines(parent: HTMLElement): HTMLElement[] {
-    return Array.from(parent.children).filter((child): child is HTMLElement => child instanceof HTMLElement && (child.classList.contains("file-diff-sbs-cell") || child.classList.contains("file-diff-sbs-edit-line")));
+    return Array.from(parent.children).filter((child): child is HTMLElement => child.instanceOf(HTMLElement) && (child.classList.contains("file-diff-sbs-cell") || child.classList.contains("file-diff-sbs-edit-line")));
   }
   /** Finds the read-only left pane belonging to an editable comparison grid. */
   getEditableLeftPane(editor: HTMLElement): HTMLElement | null {
@@ -654,7 +652,7 @@ export class SideBySideDiffView extends ItemView {
   /** Converts browser-generated direct editor nodes into normal editable line elements. */
   normalizeEditableEditor(editor: HTMLElement): void {
     for (const node of Array.from(editor.childNodes)) {
-      if (node instanceof HTMLElement && node.classList.contains("file-diff-sbs-edit-line")) {
+      if (node.instanceOf(HTMLElement) && node.classList.contains("file-diff-sbs-edit-line")) {
         continue;
       }
       const text = node.textContent ?? "";
@@ -1022,7 +1020,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Serializes editable right-side lines without including the line-number gutter. */
   serializeRightEditor(editor: HTMLElement): string {
-    const children = Array.from(editor.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+    const children = Array.from(editor.children).filter((child): child is HTMLElement => child.instanceOf(HTMLElement));
     if (children.length === 0) {
       return (editor.innerText || editor.textContent || "").replace(/\r\n?/g, "\n");
     }
@@ -1056,10 +1054,10 @@ export class SideBySideDiffView extends ItemView {
     const message = parent.createDiv({ cls: "file-diff-sbs-identical-message" });
     message.createEl("strong", { text: this.translate("messages.identical.title") });
     if (this.state.editRight) {
-      message.createEl("span", { text: this.translate("messages.identical.edit") });
+      message.createSpan({ text: this.translate("messages.identical.edit") });
       return;
     }
-    message.createEl("span", { text: this.translate("messages.identical.trash") });
+    message.createSpan({ text: this.translate("messages.identical.trash") });
     const actions = message.createDiv({ cls: "file-diff-sbs-identical-actions" });
     const deleteLeftButton = actions.createEl("button", { text: this.translate("messages.identical.deleteLeft") });
     deleteLeftButton.title = leftFile.path;
@@ -1072,7 +1070,7 @@ export class SideBySideDiffView extends ItemView {
   buildResolvedMessage(parent: HTMLElement): void {
     const message = parent.createDiv({ cls: "file-diff-sbs-identical-message" });
     message.createEl("strong", { text: this.translate("messages.resolved.title") });
-    message.createEl("span", {
+    message.createSpan({
       text: this.hasPendingChanges() ? this.translate("messages.resolved.pending") : this.translate("messages.resolved.none")
     });
   }
@@ -1086,7 +1084,11 @@ export class SideBySideDiffView extends ItemView {
   confirmDeleteIdenticalFile(file: TFile): void {
     new DeleteIdenticalFileModal(this.app, file, async () => {
       try {
-        await this.app.fileManager.trashFile(file);
+        // Use the newer API where available and retain compatibility with Obsidian 1.5.
+        const trashOperation = requireApiVersion("1.6.6")
+          ? this.app.fileManager.trashFile(file)
+          : this.app.vault.trash(file, true);
+        await trashOperation;
         new Notice(this.translate("notice.fileTrashed", { name: file.name }));
         this.leaf.detach();
       } catch (error) {
