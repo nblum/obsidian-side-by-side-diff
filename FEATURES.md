@@ -76,6 +76,7 @@ visible, can be reviewed and staged individually, and are written only through a
 | Command palette | `Compare current file with another file` |
 | Command palette | `Compare two files` |
 | Command palette | `Suggest changes for current file` |
+| Command palette | `Save changes in comparison view` |
 | Ribbon | `Compare two files` |
 | File context menu | `Compare with another file` |
 | File context menu | `Suggest changes` |

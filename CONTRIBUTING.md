@@ -61,6 +61,9 @@ npm test
 npm run build
 ```
 
+The comparison tests use the paired fixtures in `tests/fixtures/` to verify unchanged, changed, removed, and
+added rows as well as inline token highlighting.
+
 These are the same checks that run in CI (`.github/workflows/ci.yml`) on every push and pull request.
 
 The tests cover the deterministic diff, synchronization, and translation rules, including:

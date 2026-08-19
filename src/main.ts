@@ -69,8 +69,19 @@ export class FileDiffSideBySidePlugin extends Plugin {
         id: "propose-changes",
         name: this.translate("commands.proposeChanges"),
         callback: () => { void this.proposeChanges(); }
+      }),
+      this.addCommand({
+        id: "save-comparison",
+        name: this.translate("commands.saveComparison"),
+        hotkeys: [{ modifiers: ["Mod"], key: "S" }],
+        callback: () => { this.saveActiveComparison(); }
       })
     ];
+  }
+  /** Saves changes in the currently active comparison view. */
+  saveActiveComparison(): void {
+    const view = this.app.workspace.getActiveViewOfType(SideBySideDiffView);
+    view?.saveChanges();
   }
   /** Loads persisted plugin settings and applies defaults for new options. */
   async loadSettings(): Promise<void> {
@@ -110,7 +121,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
     const commandNames = [
       this.translate("commands.compareActiveFile"),
       this.translate("commands.compareTwoFiles"),
-      this.translate("commands.proposeChanges")
+      this.translate("commands.proposeChanges"),
+      this.translate("commands.saveComparison")
     ];
     this.commandEntries.forEach((command, index) => {
       const commandName = commandNames[index];
@@ -157,6 +169,14 @@ export class FileDiffSideBySidePlugin extends Plugin {
   /** Starts a comparison with the currently active text file on the left. */
   async compareActiveFile(file: TFile | null = null): Promise<void> {
     const activeFile = file ?? this.app.workspace.getActiveFile();
+    if (activeFile === null) {
+      // Without an active document, let the user choose the first comparison file.
+      const leftFile = await this.pickFile(this.getTextFiles(), this.translate("picker.leftFile"));
+      if (leftFile) {
+        await this.openDiffView(leftFile);
+      }
+      return;
+    }
     if (!isTextFile(activeFile)) {
       new Notice(this.translate("notice.openTextFirst"));
       return;

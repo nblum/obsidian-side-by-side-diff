@@ -4,6 +4,7 @@
 	"commands.compareActiveFile": "Aktuelle Datei mit anderer Datei vergleichen",
 	"commands.compareTwoFiles": "Zwei Dateien vergleichen",
 	"commands.proposeChanges": "Änderungen für aktuelle Datei vorschlagen",
+	"commands.saveComparison": "Änderungen in der Vergleichsansicht speichern",
 	"menu.compareActiveFile": "Mit anderer Datei vergleichen",
 	"menu.proposeChanges": "Änderungen vorschlagen",
 	"menu.acceptChanges": "Änderungen übernehmen",

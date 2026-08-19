@@ -1,6 +1,6 @@
 import { ItemView, Notice, TFile, requireApiVersion } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
-import { alignSequences, applyAlignedRowChange, convertLineEndings, getDiffRowKey, getIgnoredDiffRow, getLineSyncPlan, indexDiffRows, joinLines, serializeEditableLines, splitLines, type DiffDirection, type IndexedDiffRow } from "./diff-core";
+import { alignSequences, applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, indexDiffRows, joinLines, serializeEditableLines, splitLines, type DiffDirection, type IndexedDiffRow } from "./diff-core";
 import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import type { Language } from "./i18n";
@@ -46,24 +46,16 @@ interface DiffViewPlugin {
   translate(key: string, variables?: Record<string, string | number>): string;
 }
 
-/** Splits a line into whitespace and non-whitespace tokens for inline diffing. */
-function tokenizeLine(line: string): string[] {
-  return line.match(/\s+|[^\s]+/g) || [];
-}
 /** Renders token-level differences without injecting HTML strings. */
-function appendInlineDiff(parent: HTMLElement, left: string | null, right: string | null, side: EditableSide): void {
-  if (left === null || right === null) {
-    parent.textContent = side === "left" ? left ?? " " : right ?? " ";
+function appendInlineDiff(parent: HTMLElement, value: string | null, counterpart: string | null, side: EditableSide): void {
+  if (value === null || counterpart === null) {
+    parent.textContent = value ?? " ";
     return;
   }
-  const tokens = alignSequences(tokenizeLine(left), tokenizeLine(right), (a, b) => a === b);
+  const tokens = getInlineDiffTokens(value, counterpart)[side];
   for (const token of tokens) {
-    const value = side === "left" ? token.left : token.right;
-    if (value === null) {
-      continue;
-    }
-    const span = parent.createSpan({ text: value });
-    if (!token.equal) {
+    const span = parent.createSpan({ text: token.value });
+    if (token.changed) {
       span.addClass(`file-diff-sbs-inline-${side}`);
     }
   }
@@ -80,12 +72,28 @@ export class SideBySideDiffView extends ItemView {
   private saveButton: HTMLButtonElement | null = null;
   private editInputSnapshot: EditInputSnapshot | null = null;
   private editSyncFrame: number | null = null;
+  private saveRequestInProgress = false;
 
   /** Initializes the view and subscribes to relevant vault changes. */
   constructor(leaf: WorkspaceLeaf, plugin: DiffViewPlugin) {
     super(leaf);
     this.plugin = plugin;
     this.registerDomEvent(this.contentEl.ownerDocument, "keydown", (event) => { this.handleGlobalKeydown(event); }, { capture: true });
+    const windowRef = this.contentEl.ownerDocument.defaultView;
+    if (windowRef) {
+      this.registerDomEvent(windowRef, "keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+          const comparisonViewActive = this.app.workspace.getActiveViewOfType(SideBySideDiffView) === this;
+          if (!comparisonViewActive) {
+            return;
+          }
+          if (this.saveChanges()) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }
+      }, { capture: true });
+    }
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
     this.registerDomEvent(this.contentEl, "keyup", (event) => { this.handleEditKeyup(event); });
@@ -161,7 +169,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Handles view shortcuts before Obsidian's global key handlers can consume them. */
   handleGlobalKeydown(event: KeyboardEvent): void {
-    if (!(event.target instanceof Node) || !this.contentEl.contains(event.target)) {
+    if (this.app.workspace.getActiveViewOfType(SideBySideDiffView) !== this) {
       return;
     }
     this.handleKeydown(event);
@@ -275,7 +283,7 @@ export class SideBySideDiffView extends ItemView {
     }
     this.editInputSnapshot = null;
   }
-  /** Saves pending diff changes or the editable right side when the user presses Ctrl/Cmd+S. */
+  /** Handles keyboard editing actions inside the comparison view. */
   handleKeydown(event: KeyboardEvent): void {
     if (this.state.editRight && event.key === "Enter" && this.insertEditableLineBreak()) {
       event.preventDefault();
@@ -288,16 +296,26 @@ export class SideBySideDiffView extends ItemView {
         this.scheduleEditablePaneSync(editor);
       }
     }
-    if (!event.ctrlKey && !event.metaKey || event.key.toLowerCase() !== "s") {
-      return;
+  }
+  /** Saves the current comparison changes from the toolbar or a command shortcut. */
+  saveChanges(): boolean {
+    if (this.saveRequestInProgress) {
+      return false;
     }
-    const canSave = this.state.editRight ? this.hasRightEditorChanges() : this.hasPendingChanges();
+    let canSave = false;
+    try {
+      canSave = this.state.editRight ? this.hasRightEditorChanges() : this.hasPendingChanges();
+    } catch (error) {
+      console.error("[Side-by-Side Diff] change detection failed", error);
+      return false;
+    }
     if (!canSave) {
-      return;
+      return false;
     }
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    void (this.state.editRight ? this.saveRightEdits() : this.savePendingChanges());
+    this.saveRequestInProgress = true;
+    const saveOperation = this.state.editRight ? this.saveRightEdits() : this.savePendingChanges();
+    void saveOperation.finally(() => { this.saveRequestInProgress = false; });
+    return true;
   }
   /** Keeps the view in sync when a compared file is renamed. */
   handleRename(file: TAbstractFile, oldPath: string): void {
@@ -999,7 +1017,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Renders one read-only left-side row beside the document editor. */
   buildEditableLeftCell(parent: HTMLElement, row: IndexedDiffRow): void {
-    const rowType = row.equal ? "equal" : row.left === null ? "added" : row.right === null ? "removed" : "changed";
+    const rowType = getDiffRowType(row);
     const cell = parent.createDiv({ cls: `file-diff-sbs-cell file-diff-sbs-${rowType}` });
     const lineNumber = cell.createSpan({ cls: "file-diff-sbs-line-number" });
     lineNumber.textContent = row.left === null ? "" : String(row.leftLineNumber);
@@ -1008,7 +1026,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Renders one editable right-side line inside the shared document editor. */
   buildEditableRightLine(parent: HTMLElement, row: IndexedDiffRow): HTMLElement {
-    const rowType = row.equal ? "equal" : row.left === null ? "added" : row.right === null ? "removed" : "changed";
+    const rowType = getDiffRowType(row);
     const line = parent.createDiv({ cls: `file-diff-sbs-edit-line file-diff-sbs-${rowType}` });
     line.dataset.rightPresent = row.right === null ? "false" : "true";
     const lineNumber = line.createSpan({ cls: "file-diff-sbs-line-number file-diff-sbs-edit-line-number" });
@@ -1100,7 +1118,7 @@ export class SideBySideDiffView extends ItemView {
   /** Renders one aligned pair of lines with line numbers, actions and inline changes. */
   buildRow(parent: HTMLElement, row: IndexedDiffRow, rowIndex: number): void {
     const rowElement = parent.createDiv({ cls: "file-diff-sbs-row" });
-    const rowType = row.equal ? "equal" : row.left === null ? "added" : row.right === null ? "removed" : "changed";
+    const rowType = getDiffRowType(row);
     this.buildCell(rowElement, row.left, row.right, row.leftLineNumber, "left", rowType);
     this.buildActionCell(rowElement, row, rowIndex);
     this.buildCell(rowElement, row.right, row.left, row.rightLineNumber, "right", rowType);
@@ -1130,7 +1148,7 @@ export class SideBySideDiffView extends ItemView {
     const lineNumber = cell.createSpan({ cls: "file-diff-sbs-line-number" });
     lineNumber.textContent = value === null ? "" : String(lineNumberValue);
     const code = cell.createSpan({ cls: "file-diff-sbs-code" });
-    appendInlineDiff(code, side === "left" ? value : counterpart, side === "left" ? counterpart : value, side);
+    appendInlineDiff(code, value, counterpart, side);
   }
   /** Swaps the files while keeping the current diff view open. */
   async swapFiles(): Promise<void> {

@@ -4,6 +4,7 @@
 	"commands.compareActiveFile": "Compare current file with another file",
 	"commands.compareTwoFiles": "Compare two files",
 	"commands.proposeChanges": "Suggest changes for current file",
+	"commands.saveComparison": "Save changes in comparison view",
 	"menu.compareActiveFile": "Compare with another file",
 	"menu.proposeChanges": "Suggest changes",
 	"menu.acceptChanges": "Accept changes",

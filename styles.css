@@ -196,13 +196,13 @@
 	box-sizing: border-box;
 	min-width: 0;
 	min-height: 1.55em;
-	border-bottom: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border), transparent 50%);
 	background: var(--background-secondary);
 	line-height: 1.55;
 }
 
 .file-diff-sbs-cell + .file-diff-sbs-cell {
-	border-left: 1px solid var(--background-modifier-border);
+	border-left: 1px solid color-mix(in srgb, var(--background-modifier-border), transparent 50%);
 }
 
 .file-diff-sbs-action-cell {
@@ -241,7 +241,7 @@
 
 .file-diff-sbs-line-number {
 	display: inline-block;
-	flex: 0 0 3.7rem;
+	flex: 0 0 2.5rem;
 	align-self: flex-start;
 	padding: 0.1rem 0.55rem 0.1rem 0.35rem;
 	color: var(--text-faint);

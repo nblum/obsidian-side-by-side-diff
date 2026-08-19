@@ -7,6 +7,18 @@ export interface DiffRow {
 	equal: boolean;
 }
 
+export type DiffRowType = "equal" | "added" | "removed" | "changed";
+
+export interface InlineDiffToken {
+	value: string;
+	changed: boolean;
+}
+
+export interface InlineDiffTokens {
+	left: InlineDiffToken[];
+	right: InlineDiffToken[];
+}
+
 export interface IndexedDiffRow extends DiffRow {
 	leftIndex: number;
 	rightIndex: number;
@@ -28,6 +40,11 @@ export interface EditableLine {
 }
 
 const MAX_DIFF_CELLS = 1_000_000;
+
+/** Splits one line into whitespace and non-whitespace tokens for inline diffing. */
+function tokenizeLine(line: string): string[] {
+	return line.match(/\s+|[^\s]+/g) || [];
+}
 
 /** Returns an indexed value and fails explicitly when an invariant is broken. */
 function getRequired<T>(values: ArrayLike<T>, index: number): T {
@@ -93,6 +110,20 @@ export function getDiffRowKey(row: IndexedDiffRow): string {
 	return JSON.stringify([row.leftIndex, row.rightIndex, row.left, row.right]);
 }
 
+/** Classifies an aligned row using the same CSS category as the comparison view. */
+export function getDiffRowType(row: DiffRow): DiffRowType {
+	if (row.equal) {
+		return "equal";
+	}
+	if (row.left === null) {
+		return "added";
+	}
+	if (row.right === null) {
+		return "removed";
+	}
+	return "changed";
+}
+
 /** Aligns two sequences using a compact longest-common-subsequence diff. */
 export function alignSequences(left: string[], right: string[], equals: (left: string, right: string) => boolean): DiffRow[] {
 	if (left.length * right.length > MAX_DIFF_CELLS) {
@@ -141,6 +172,15 @@ export function alignSequences(left: string[], right: string[], equals: (left: s
 	}
 
 	return groupOperations(operations);
+}
+
+/** Splits two changed lines into aligned token lists and flags tokens that differ. */
+export function getInlineDiffTokens(left: string, right: string): InlineDiffTokens {
+	const rows = alignSequences(tokenizeLine(left), tokenizeLine(right), (leftToken, rightToken) => leftToken === rightToken);
+	return {
+		left: rows.flatMap((row) => row.left === null ? [] : [{ value: row.left, changed: !row.equal }]),
+		right: rows.flatMap((row) => row.right === null ? [] : [{ value: row.right, changed: !row.equal }]),
+	};
 }
 
 type DiffOperation = { kind: "equal" | "left" | "right"; left: DiffValue; right: DiffValue };

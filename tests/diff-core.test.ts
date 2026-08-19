@@ -1,10 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
 	alignSequences,
 	applyAlignedRowChange,
 	convertLineEndings,
 	getIgnoredDiffRow,
+	getDiffRowType,
+	getInlineDiffTokens,
 	getLineSyncPlan,
 	indexDiffRows,
 	serializeEditableLines,
@@ -100,4 +103,91 @@ test("text entered into an alignment gap is kept when serialized", () => {
 		{ value: "A", rightPresent: true },
 		{ value: "neu", rightPresent: false },
 	]), "A\nneu");
+});
+
+/** Reads a pair of comparison fixtures and returns their aligned rows. */
+async function getFixtureRows(leftFixture = "comparison-left.md", rightFixture = "comparison-right.md"): Promise<IndexedDiffRow[]> {
+	const [leftContent, rightContent] = await Promise.all([
+		readFile(new URL(`./fixtures/${leftFixture}`, import.meta.url), "utf8"),
+		readFile(new URL(`./fixtures/${rightFixture}`, import.meta.url), "utf8"),
+	]);
+	return getRows(leftContent, rightContent);
+}
+
+test("comparison fixture assigns the expected line-marking categories", async () => {
+	const rows = await getFixtureRows();
+
+	assert.deepEqual(rows.map((row) => ({
+		type: getDiffRowType(row),
+		left: row.left,
+		right: row.right,
+	})), [
+		{ type: "equal", left: "Fixture header", right: "Fixture header" },
+		{ type: "equal", left: "Unchanged line", right: "Unchanged line" },
+		{ type: "changed", left: "Status: draft", right: "Status: final" },
+		{ type: "removed", left: "Only on the left", right: null },
+		{ type: "equal", left: "Unchanged middle line", right: "Unchanged middle line" },
+		{ type: "added", left: null, right: "Only on the right" },
+		{ type: "equal", left: "Unchanged final line", right: "Unchanged final line" },
+	]);
+});
+
+test("comparison fixture flags only changed inline tokens", async () => {
+	const rows = await getFixtureRows();
+	const changedRow = rows.find((row) => getDiffRowType(row) === "changed");
+	assert.ok(changedRow);
+	assert.equal(changedRow.left, "Status: draft");
+	assert.equal(changedRow.right, "Status: final");
+
+	const inlineTokens = getInlineDiffTokens(changedRow.left, changedRow.right);
+	assert.deepEqual(inlineTokens.left, [
+		{ value: "Status:", changed: false },
+		{ value: " ", changed: false },
+		{ value: "draft", changed: true },
+	]);
+	assert.deepEqual(inlineTokens.right, [
+		{ value: "Status:", changed: false },
+		{ value: " ", changed: false },
+		{ value: "final", changed: true },
+	]);
+});
+
+test("fixture1 assigns the expected line-marking categories", async () => {
+	const rows = await getFixtureRows("fixture1-left.md", "fixture1-right.md");
+
+	assert.equal(rows.length, 40);
+	assert.deepEqual(rows.filter((row) => getDiffRowType(row) !== "equal").map((row) => ({
+		type: getDiffRowType(row),
+		left: row.left,
+		right: row.right,
+	})), [
+		{
+			type: "changed",
+			left: "Local Obsidian plugin for a clear left/right comparison of two text files, with a synchronized view,",
+			right: "Local Obsidian plugin for a clear right/left comparison of two text files, with a scroll synchronized view,",
+		},
+		{
+			type: "changed",
+			left: "inline-highlighted changes, and controlled change acceptance.",
+			right: "inline-highlighted changes and controlled change acceptance.",
+		},
+		{
+			type: "removed",
+			left: "![Side-by-Side Diff comparison view](assets/compare-mode.webp)",
+			right: null,
+		},
+		{ type: "removed", left: "", right: null },
+		{ type: "changed", left: "- [Three workflows](#three-workflows)", right: "- [Summary](#summary)" },
+		{ type: "removed", left: "- [Edit and save](#edit-and-save)", right: null },
+		{ type: "removed", left: "- [Installation](#installation)", right: null },
+		{ type: "removed", left: "- [Privacy and permissions](#privacy-and-permissions)", right: null },
+		{ type: "removed", left: "- [Releases](#releases)", right: null },
+		{ type: "removed", left: "- [Development](#development)", right: null },
+		{ type: "removed", left: "- [Documentation](#documentation)", right: null },
+		{ type: "removed", left: "- [Tests](#tests)", right: null },
+		{ type: "added", left: null, right: "" },
+		{ type: "added", left: null, right: "## Summary" },
+		{ type: "added", left: null, right: "" },
+		{ type: "added", left: null, right: "Thats the summary" },
+	]);
 });
