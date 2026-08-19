@@ -95,8 +95,8 @@ The source repository contains TypeScript; `main.js` is generated locally and at
 
 ## Releases
 
-Release tags must exactly match the `version` in `manifest.json` and use the `x.y.z` format. The release workflow
-builds and uploads `main.js`, `manifest.json`, and `styles.css` as release assets.
+Release tags must exactly match the `version` in `manifest.json` and use the `x.y.z` format. Pushing such a tag
+automatically creates a GitHub release with generated notes and uploads `main.js`, `manifest.json`, and `styles.css`.
 
 ## Documentation
 

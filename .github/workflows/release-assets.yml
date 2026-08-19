@@ -1,8 +1,9 @@
-name: Build release assets
+name: Build and publish release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '*.*.*'
 
 permissions:
   contents: write
@@ -15,8 +16,6 @@ jobs:
     steps:
       - name: Check out release tag
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -29,14 +28,14 @@ jobs:
 
       - name: Validate release version
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: node -e "const fs = require('node:fs'); const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8')); if (manifest.version !== process.env.RELEASE_TAG) throw new Error('Release tag must match manifest.json version');"
 
       - name: Build production bundle
         run: npm run build
 
-      - name: Upload plugin assets
+      - name: Create GitHub release and upload plugin assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" main.js manifest.json styles.css --clobber
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" main.js manifest.json styles.css --verify-tag --generate-notes --title "Release $RELEASE_TAG"
