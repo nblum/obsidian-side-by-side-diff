@@ -1,0 +1,69 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { clearChangeTargetMetadata, getAutoAdvanceChangeIndex, getChangeKeyboardAction, getChangeRowIndexes, getNextChangeIndex } from "../src/diff-navigation.ts";
+
+test("maps Alt-arrow shortcuts to navigation and change actions", () => {
+	assert.equal(getChangeKeyboardAction("ArrowUp", true, false, false, false), "previous");
+	assert.equal(getChangeKeyboardAction("ArrowDown", true, false, false, false), "next");
+	assert.equal(getChangeKeyboardAction("ArrowLeft", true, false, false, false), "reject");
+	assert.equal(getChangeKeyboardAction("ArrowRight", true, false, false, false), "accept");
+});
+
+test("does not map modified or unmodified arrow shortcuts", () => {
+	assert.equal(getChangeKeyboardAction("ArrowLeft", false, false, false, false), null);
+	assert.equal(getChangeKeyboardAction("ArrowRight", true, true, false, false), null);
+	assert.equal(getChangeKeyboardAction("ArrowRight", true, false, true, false), null);
+	assert.equal(getChangeKeyboardAction("ArrowRight", true, false, false, true), null);
+});
+
+test("clears navigation metadata from a newly split editable line", () => {
+	const attributes: string[] = [];
+	const classes = new Set(["file-diff-sbs-active-change", "file-diff-sbs-edit-line"]);
+	const target = {
+		dataset: { diffRowIndex: "4", diffChange: "true" },
+		classList: { remove: (...names: string[]) => names.forEach((name) => classes.delete(name)) },
+		removeAttribute: (name: string) => { attributes.push(name); },
+	} as unknown as Pick<HTMLElement, "dataset" | "classList" | "removeAttribute">;
+
+	clearChangeTargetMetadata(target);
+
+	assert.equal(target.dataset.diffRowIndex, undefined);
+	assert.equal(target.dataset.diffChange, undefined);
+	assert.deepEqual(attributes, ["aria-current"]);
+	assert.equal(classes.has("file-diff-sbs-active-change"), false);
+	assert.equal(classes.has("file-diff-sbs-edit-line"), true);
+});
+
+test("collects only non-equal rows as navigation targets", () => {
+	assert.deepEqual(getChangeRowIndexes([
+		{ equal: true },
+		{ equal: false },
+		{ equal: true },
+		{ equal: false },
+	]), [1, 3]);
+});
+
+test("navigates forward and backward with wraparound", () => {
+	const changes = [1, 3, 7];
+
+	assert.equal(getNextChangeIndex(changes, null, "next"), 1);
+	assert.equal(getNextChangeIndex(changes, 1, "next"), 3);
+	assert.equal(getNextChangeIndex(changes, 7, "next"), 1);
+	assert.equal(getNextChangeIndex(changes, null, "previous"), 7);
+	assert.equal(getNextChangeIndex(changes, 7, "previous"), 3);
+	assert.equal(getNextChangeIndex(changes, 1, "previous"), 7);
+});
+
+test("continues after a previously selected change was resolved", () => {
+	assert.equal(getNextChangeIndex([2, 5], 3, "next"), 5);
+	assert.equal(getNextChangeIndex([2, 5], 3, "previous"), 2);
+	assert.equal(getNextChangeIndex([], null, "next"), null);
+});
+
+test("auto-advance keeps a shifted row at the resolved index", () => {
+	assert.equal(getAutoAdvanceChangeIndex([5, 9], 5, true), 5);
+	assert.equal(getAutoAdvanceChangeIndex([9], 5, true), 9);
+	assert.equal(getAutoAdvanceChangeIndex([2, 5], 3, true), 5);
+	assert.equal(getAutoAdvanceChangeIndex([5, 9], 5, false), null);
+	assert.equal(getAutoAdvanceChangeIndex([], 5, true), null);
+});

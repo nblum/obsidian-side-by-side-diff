@@ -10,6 +10,7 @@ import {
 	getInlineDiffTokens,
 	getLineSyncPlan,
 	indexDiffRows,
+	joinLines,
 	serializeEditableLines,
 	splitLines,
 	type IndexedDiffRow,
@@ -52,6 +53,29 @@ test("changed rows replace the target line instead of inserting a duplicate", ()
 	assert.deepEqual(result.rightLines, ["A", "B"]);
 });
 
+test("changed rows can be applied from right to left", () => {
+	const rows = getRows("A\nold\nC", "A\nnew\nC");
+	const changedRow = rows.find((row) => row.left === "old" && row.right === "new");
+	assert.ok(changedRow);
+
+	const result = applyAlignedRowChange(["A", "old", "C"], ["A", "new", "C"], changedRow, "right-to-left");
+
+	assert.deepEqual(result.leftLines, ["A", "new", "C"]);
+	assert.deepEqual(result.rightLines, ["A", "new", "C"]);
+});
+
+test("keeps duplicate anchors deterministic when a block changes between them", () => {
+	const rows = getRows("start\nsame\nold\nsame\nend", "start\nsame\nnew\nend");
+
+	assert.deepEqual(rows.map((row) => ({ left: row.left, right: row.right, equal: row.equal })), [
+		{ left: "start", right: "start", equal: true },
+		{ left: "same", right: "same", equal: true },
+		{ left: "old", right: "new", equal: false },
+		{ left: "same", right: null, equal: false },
+		{ left: "end", right: "end", equal: true },
+	]);
+});
+
 test("ignoring a diff keeps a right-only line visible", () => {
 	const rows = getRows("A", "A\nB");
 	const changedRow = rows.find((row) => row.right === "B");
@@ -62,6 +86,22 @@ test("ignoring a diff keeps a right-only line visible", () => {
 	assert.equal(ignoredRow.left, null);
 	assert.equal(ignoredRow.right, "B");
 	assert.equal(ignoredRow.equal, true);
+});
+
+test("ignoring a model row does not retain stale rendering metadata", () => {
+	const rows = getRows("A\nold", "A\nnew");
+	const changedRow = rows.find((row) => row.left === "old");
+	assert.ok(changedRow);
+	const modelRow = Object.assign(changedRow, {
+		type: "changed",
+		leftInlineTokens: [],
+		rightInlineTokens: [],
+	});
+	const ignoredRow = getIgnoredDiffRow(modelRow);
+	assert.ok(ignoredRow);
+	assert.equal(getDiffRowType(ignoredRow), "equal");
+	assert.equal("type" in ignoredRow, false);
+	assert.equal("leftInlineTokens" in ignoredRow, false);
 });
 
 test("line synchronization plans gaps on the shorter right pane at the edit position", () => {
@@ -90,6 +130,12 @@ test("editor line endings preserve trailing blank lines", () => {
 	assert.equal(convertLineEndings("A\n\n", "A\r\n"), "A\r\n\r\n");
 });
 
+test("joining normalized lines preserves the target line-ending style", () => {
+	assert.equal(joinLines(["A", "B"], "A\r\nB\r\n"), "A\r\nB\r\n");
+	assert.equal(joinLines(["A", "B"], "A\rB"), "A\rB");
+	assert.equal(joinLines(["A", "B"], "A\nB"), "A\nB");
+});
+
 test("visual alignment gaps are not written as additional file lines", () => {
 	assert.equal(serializeEditableLines([
 		{ value: "A", rightPresent: true },
@@ -103,6 +149,14 @@ test("text entered into an alignment gap is kept when serialized", () => {
 		{ value: "A", rightPresent: true },
 		{ value: "neu", rightPresent: false },
 	]), "A\nneu");
+});
+
+test("an intentional empty line remains distinct from a visual alignment gap", () => {
+	assert.equal(serializeEditableLines([
+		{ value: "A", rightPresent: true },
+		{ value: "", rightPresent: true },
+		{ value: "B", rightPresent: true },
+	]), "A\n\nB");
 });
 
 /** Reads a pair of comparison fixtures and returns their aligned rows. */
