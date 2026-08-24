@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { captureSaveBaseline, createGuardedSaveTransform, SaveConflictError, hasExternalFileChange } from "../src/save-guard.ts";
+import { captureSaveBaseline, createGuardedSaveTransform, migrateSaveEntry, refreshSaveBaseline, SaveConflictError, hasExternalFileChange } from "../src/save-guard.ts";
 
 test("detects external content changes against the save snapshot", () => {
 	assert.equal(hasExternalFileChange("A\nB", "A\nB"), false);
@@ -15,6 +15,23 @@ test("keeps the first save baseline when a view rerenders", () => {
 	captureSaveBaseline(baselines, "note.md", "after");
 
 	assert.equal(baselines.get("note.md"), "before");
+});
+
+test("refreshes a baseline after the user has been warned about a conflict", () => {
+	const baselines = new Map<string, string>([["note.md", "before"]]);
+
+	refreshSaveBaseline(baselines, "note.md", "external");
+
+	assert.equal(baselines.get("note.md"), "external");
+});
+
+test("migrates path-keyed save state after a rename", () => {
+	const entries = new Map<string, string>([["old.md", "staged"]]);
+
+	migrateSaveEntry(entries, "old.md", "new.md");
+
+	assert.equal(entries.get("old.md"), undefined);
+	assert.equal(entries.get("new.md"), "staged");
 });
 
 test("guards the process transform against an external change", () => {

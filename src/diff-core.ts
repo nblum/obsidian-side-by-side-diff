@@ -110,6 +110,29 @@ export function getDiffRowKey(row: IndexedDiffRow): string {
 	return JSON.stringify([row.leftIndex, row.rightIndex, row.left, row.right]);
 }
 
+/** Swaps the sides encoded in a stable diff-row key when comparison panes are exchanged. */
+export function swapDiffRowKey(key: string): string {
+	try {
+		const parsed: unknown = JSON.parse(key);
+		if (!Array.isArray(parsed) || parsed.length !== 4) {
+			return key;
+		}
+		const parsedValues: unknown[] = parsed as unknown[];
+		const [leftIndex, rightIndex, left, right] = parsedValues;
+		if (
+			typeof leftIndex !== "number" ||
+			typeof rightIndex !== "number" ||
+			(left !== null && typeof left !== "string") ||
+			(right !== null && typeof right !== "string")
+		) {
+			return key;
+		}
+		return JSON.stringify([rightIndex, leftIndex, right, left]);
+	} catch {
+		return key;
+	}
+}
+
 /** Classifies an aligned row using the same CSS category as the comparison view. */
 export function getDiffRowType(row: DiffRow): DiffRowType {
 	if (row.equal) {

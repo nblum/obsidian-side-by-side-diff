@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clearChangeTargetMetadata, getAutoAdvanceChangeIndex, getChangeKeyboardAction, getChangeRowIndexes, getNextChangeIndex } from "../src/diff-navigation.ts";
+import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getChangeRowIndexes, getNextChangeIndex } from "../src/diff-navigation.ts";
 
 test("maps Alt-arrow shortcuts to navigation and change actions", () => {
 	assert.equal(getChangeKeyboardAction("ArrowUp", true, false, false, false), "previous");
@@ -60,10 +60,10 @@ test("continues after a previously selected change was resolved", () => {
 	assert.equal(getNextChangeIndex([], null, "next"), null);
 });
 
-test("auto-advance keeps a shifted row at the resolved index", () => {
-	assert.equal(getAutoAdvanceChangeIndex([5, 9], 5, true), 5);
-	assert.equal(getAutoAdvanceChangeIndex([9], 5, true), 9);
-	assert.equal(getAutoAdvanceChangeIndex([2, 5], 3, true), 5);
-	assert.equal(getAutoAdvanceChangeIndex([5, 9], 5, false), null);
-	assert.equal(getAutoAdvanceChangeIndex([], 5, true), null);
+test("auto-advance follows target order after LCS row realignment", () => {
+	assert.equal(getAutoAdvanceTargetPosition(1, 0, true), 0);
+	assert.equal(getAutoAdvanceTargetPosition(2, 1, true), 1);
+	assert.equal(getAutoAdvanceTargetPosition(0, 0, true), null);
+	assert.equal(getAutoAdvanceTargetPosition(2, null, true), null);
+	assert.equal(getAutoAdvanceTargetPosition(2, 0, false), null);
 });

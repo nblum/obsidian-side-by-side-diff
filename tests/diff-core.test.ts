@@ -13,6 +13,7 @@ import {
 	joinLines,
 	serializeEditableLines,
 	splitLines,
+	swapDiffRowKey,
 	type IndexedDiffRow,
 } from "../src/diff-core.ts";
 
@@ -22,6 +23,11 @@ function getRows(leftContent: string, rightContent: string): IndexedDiffRow[] {
 	const rightLines = splitLines(rightContent);
 	return indexDiffRows(alignSequences(leftLines, rightLines, (left, right) => left === right));
 }
+
+test("swaps both indexes and values in a dismissed row key", () => {
+	assert.equal(swapDiffRowKey(JSON.stringify([2, 4, "left", "right"])), JSON.stringify([4, 2, "right", "left"]));
+	assert.equal(swapDiffRowKey("not-json"), "not-json");
+});
 
 test("left-only arrow changes are inserted without overwriting the following right line", () => {
 	const rows = getRows("A\nB\nC", "A\nC");

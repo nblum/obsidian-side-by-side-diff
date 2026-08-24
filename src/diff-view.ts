@@ -1,10 +1,10 @@
 import { ItemView, Notice, TFile, requireApiVersion } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
-import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
+import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";
-import { clearChangeTargetMetadata, getAutoAdvanceChangeIndex, getChangeKeyboardAction, getNextChangeIndex, type ChangeNavigationDirection } from "./diff-navigation";
+import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, type ChangeNavigationDirection } from "./diff-navigation";
 import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
-import { captureSaveBaseline, createGuardedSaveTransform, SaveConflictError } from "./save-guard";
+import { captureSaveBaseline, createGuardedSaveTransform, migrateSaveEntry, refreshSaveBaseline, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
 import type { Language } from "./i18n";
@@ -45,6 +45,14 @@ interface PendingFile {
   content: string;
 }
 
+type SaveProcessResult = "saved" | "conflict";
+type PendingSaveResult = SaveProcessResult | "unavailable";
+
+interface ChangeActions {
+  accept: () => void;
+  reject: () => void;
+}
+
 interface DiffViewPlugin {
   readonly language: Language;
   readonly settings: { autoAdvanceAfterChange: boolean; recentRightFilePaths: string[] };
@@ -75,6 +83,7 @@ export class SideBySideDiffView extends ItemView {
   private readonly dismissedRows = new Set<string>();
   private readonly pendingFileContents = new Map<string, string>();
   private readonly saveBaselines = new Map<string, string>();
+  private readonly changeActions = new Map<number, ChangeActions>();
   private rightEditorState: RightEditorState | null = null;
   private saveButton: HTMLButtonElement | null = null;
   private editInputSnapshot: EditInputSnapshot | null = null;
@@ -165,7 +174,9 @@ export class SideBySideDiffView extends ItemView {
     if (this.hasUnsavedChanges()) {
       const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this)).waitForChoice();
       if (choice === "save") {
-        await this.saveChangesBeforeClose();
+        if (!await this.saveChangesBeforeClose()) {
+          return;
+        }
       }
     }
     this.disposeRightEditorObserver();
@@ -296,7 +307,7 @@ export class SideBySideDiffView extends ItemView {
   /** Handles keyboard editing actions inside the comparison view. */
   handleKeydown(event: KeyboardEvent): void {
     const changeAction = getChangeKeyboardAction(event.key, event.altKey, event.ctrlKey, event.metaKey, event.shiftKey);
-    if (changeAction === "next" || changeAction === "previous") {
+    if (!this.state.editRight && (changeAction === "next" || changeAction === "previous")) {
       if (this.navigateChange(changeAction)) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -353,6 +364,8 @@ export class SideBySideDiffView extends ItemView {
       this.state.rightPath = file.path;
       changed = true;
     }
+    migrateSaveEntry(this.saveBaselines, oldPath, file.path);
+    migrateSaveEntry(this.pendingFileContents, oldPath, file.path);
     if (changed) {
       void this.renderDiff(this.getScrollPosition());
     }
@@ -363,6 +376,7 @@ export class SideBySideDiffView extends ItemView {
     const token = ++this.renderToken;
     this.previousChangeButton = null;
     this.nextChangeButton = null;
+    this.changeActions.clear();
     this.contentEl.empty();
     this.contentEl.addClass("file-diff-sbs-view");
     const leftPath = this.state.leftPath;
@@ -437,6 +451,9 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Navigates to a changed row and scrolls that row into the visible comparison area. */
   navigateChange(direction: ChangeNavigationDirection): boolean {
+    if (this.state.editRight) {
+      return false;
+    }
     const targets = this.getChangeTargets();
     const nextIndex = getNextChangeIndex(
       [...targets.keys()],
@@ -486,6 +503,11 @@ export class SideBySideDiffView extends ItemView {
     }
     return new Map([...targets.entries()].sort(([left], [right]) => left - right));
   }
+  /** Returns the ordered target position for a row before it is resolved. */
+  getChangeTargetPosition(rowIndex: number): number | null {
+    const position = [...this.getChangeTargets().keys()].indexOf(rowIndex);
+    return position >= 0 ? position : null;
+  }
   /** Opens a file picker for the right-hand pane. */
   selectRightFile(leftFile: TFile): void {
     const files = this.app.vault.getFiles().filter((file) => isTextFile(file) && file.path !== leftFile.path).sort((a, b) => a.path.localeCompare(b.path, this.plugin.language));
@@ -526,7 +548,6 @@ export class SideBySideDiffView extends ItemView {
     if (!await this.prepareForTransition(this.translate("modal.unsaved.editQuestion"))) {
       return;
     }
-    this.dismissedRows.clear();
     await this.setState({ ...this.state, editRight: true }, { history: false });
   }
   /** Leaves editing without discarding unsaved changes in the right-hand rows. */
@@ -547,72 +568,83 @@ export class SideBySideDiffView extends ItemView {
   /** Returns whether editing or diff actions have produced unsaved changes. */
   hasUnsavedChanges(): boolean {
     const editorChanged = this.state.editRight && this.rightEditorState !== null && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue;
-    return editorChanged || this.hasPendingChanges();
+    return editorChanged || this.hasPendingChanges() || this.dismissedRows.size > 0;
   }
   /** Writes all current changes without rebuilding the view during close. */
-  async saveChangesBeforeClose(): Promise<void> {
+  async saveChangesBeforeClose(): Promise<boolean> {
     try {
       if (this.state.editRight && this.rightEditorState) {
         const editor = this.rightEditorState.editor;
         const rightPath = this.state.rightPath;
         if (rightPath === null) {
           new Notice(this.translate("view.rightUnavailable"));
-          return;
+          return false;
         }
         const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
         if (!(rightFile instanceof TFile)) {
           new Notice(this.translate("view.rightUnavailable"));
-          return;
+          return false;
         }
         const saved = await this.processUnchangedFile(rightFile, (currentContent) => {
           return convertLineEndings(this.serializeRightEditor(editor), currentContent);
         });
-        if (!saved) {
-          return;
+        if (saved !== "saved") {
+          return false;
         }
         this.pendingFileContents.delete(rightFile.path);
+        this.rightEditorState.initialValue = this.serializeRightEditor(editor);
       }
-      if (this.hasPendingChanges() && !await this.writePendingChanges()) {
-        new Notice(this.translate("notice.pendingFileUnavailable"));
+      if (this.hasPendingChanges()) {
+        const result = await this.writePendingChanges();
+        if (result === "unavailable") {
+          new Notice(this.translate("notice.pendingFileUnavailable"));
+        }
+        if (result !== "saved") {
+          return false;
+        }
       }
+      return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte \xC4nderungen vor dem Schlie\xDFen nicht speichern.", error);
       new Notice(this.translate("notice.saveFailed"));
+      return false;
     }
   }
   /** Saves all edited right-side rows back to the right-hand vault file. */
-  async saveRightEdits(): Promise<void> {
+  async saveRightEdits(): Promise<boolean> {
     if (!this.hasRightEditorChanges()) {
-      return;
+      return true;
     }
     const scrollPosition = this.getScrollPosition();
     const rightPath = this.state.rightPath;
     if (rightPath === null) {
       new Notice(this.translate("view.rightUnavailable"));
-      return;
+      return false;
     }
     const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
     if (!(rightFile instanceof TFile)) {
       new Notice(this.translate("view.rightUnavailable"));
-      return;
+      return false;
     }
     try {
       const editor = this.rightEditorState?.editor;
       if (!editor) {
-        return;
+        return false;
       }
       const saved = await this.processUnchangedFile(rightFile, (currentContent) => {
         return convertLineEndings(this.serializeRightEditor(editor), currentContent);
       });
-      if (!saved) {
-        return;
+      if (saved !== "saved") {
+        return false;
       }
       this.pendingFileContents.delete(rightFile.path);
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
+      return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte die rechten \xC4nderungen nicht speichern.", error);
       new Notice(this.translate("notice.saveFailed"));
+      return false;
     }
   }
   /** Inserts a real editable line at the current single-line selection. */
@@ -844,21 +876,29 @@ export class SideBySideDiffView extends ItemView {
     return this.pendingFileContents.get(path) ?? storedContent;
   }
   /** Processes a file only when its save snapshot still matches the process input. */
-  async processUnchangedFile(file: TFile, transform: (currentContent: string) => string): Promise<boolean> {
+  async processUnchangedFile(file: TFile, transform: (currentContent: string) => string): Promise<SaveProcessResult> {
+    let observedContent: string | undefined;
     try {
       await this.app.vault.process(
         file,
-        createGuardedSaveTransform(this.saveBaselines.get(file.path), transform),
+        (currentContent) => {
+          observedContent = currentContent;
+          return createGuardedSaveTransform(this.saveBaselines.get(file.path), transform)(currentContent);
+        },
       );
     } catch (error) {
       if (!(error instanceof SaveConflictError)) {
         throw error;
       }
+      if (observedContent !== undefined) {
+        // A second explicit Save retries against the content the user was warned about.
+        refreshSaveBaseline(this.saveBaselines, file.path, observedContent);
+      }
       new Notice(this.translate("notice.externalChange", { name: file.name }));
-      return false;
+      return "conflict";
     }
     this.saveBaselines.delete(file.path);
-    return true;
+    return "saved";
   }
   /** Returns whether the comparison contains changes waiting to be saved. */
   hasPendingChanges(): boolean {
@@ -872,45 +912,51 @@ export class SideBySideDiffView extends ItemView {
     });
   }
   /** Writes pending comparison changes and clears them after all files succeed. */
-  async writePendingChanges(): Promise<boolean> {
+  async writePendingChanges(): Promise<PendingSaveResult> {
     const pendingFiles = this.getPendingFiles();
     if (pendingFiles.some(({ file }) => !(file instanceof TFile))) {
-      return false;
+      return "unavailable";
     }
     for (const pendingFile of pendingFiles) {
       if (!(pendingFile.file instanceof TFile)) {
-        return false;
+        return "unavailable";
       }
-      const saved = await this.processUnchangedFile(pendingFile.file, () => pendingFile.content);
-      if (!saved) {
-        return false;
+      const result = await this.processUnchangedFile(pendingFile.file, () => pendingFile.content);
+      if (result !== "saved") {
+        return result;
       }
       // Remove each successful entry immediately so a later failure remains retryable.
       this.pendingFileContents.delete(pendingFile.file.path);
     }
-    return true;
+    return "saved";
   }
   /** Saves all changes staged through the comparison controls. */
-  async savePendingChanges(): Promise<void> {
+  async savePendingChanges(): Promise<boolean> {
     if (!this.hasPendingChanges()) {
-      return;
+      return true;
     }
     const scrollPosition = this.getScrollPosition();
     try {
-      if (!await this.writePendingChanges()) {
+      const result = await this.writePendingChanges();
+      if (result === "unavailable") {
         new Notice(this.translate("notice.pendingFileUnavailable"));
-        return;
+      }
+      if (result !== "saved") {
+        return false;
       }
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
+      return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte vorgemerkte \xC4nderungen nicht speichern.", error);
       new Notice(this.translate("notice.saveFailed"));
+      return false;
     }
   }
   /** Stages one changed aligned row for saving instead of modifying a file immediately. */
   async applyRowChange(rowIndex: number, direction: DiffDirection): Promise<void> {
     const scrollPosition = this.getScrollPosition();
+    const targetPosition = this.getChangeTargetPosition(rowIndex);
     const leftPath = this.state.leftPath;
     const rightPath = this.state.rightPath;
     if (leftPath === null || rightPath === null) {
@@ -950,7 +996,7 @@ export class SideBySideDiffView extends ItemView {
       this.pendingFileContents.set(targetFile.path, joinLines(targetLines, targetContent));
       new Notice(this.translate("notice.staged"));
       await this.renderDiff(scrollPosition);
-      this.advanceAfterResolvedChange(rowIndex);
+      this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
       console.error("Side-by-Side Diff konnte die \xC4nderung nicht \xFCbernehmen.", error);
       new Notice(this.translate("notice.changeFailed"));
@@ -1218,7 +1264,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Enables navigation buttons only when the rendered comparison has a change. */
   updateChangeNavigationState(): void {
-    const hasChanges = this.contentEl.querySelector("[data-diff-change='true']") !== null;
+    const hasChanges = !this.state.editRight && this.contentEl.querySelector("[data-diff-change='true']") !== null;
     if (this.previousChangeButton) {
       this.previousChangeButton.disabled = !hasChanges;
     }
@@ -1261,11 +1307,7 @@ export class SideBySideDiffView extends ItemView {
   confirmDeleteIdenticalFile(file: TFile): void {
     new DeleteIdenticalFileModal(this.app, file, async () => {
       try {
-        // Use the newer API where available and retain compatibility with Obsidian 1.5.
-        const trashOperation = requireApiVersion("1.6.6")
-          ? this.app.fileManager.trashFile(file)
-          : this.app.vault.trash(file, true);
-        await trashOperation;
+        await this.app.fileManager.trashFile(file);
         new Notice(this.translate("notice.fileTrashed", { name: file.name }));
         this.leaf.detach();
       } catch (error) {
@@ -1316,6 +1358,10 @@ export class SideBySideDiffView extends ItemView {
     dismissButton.title = this.translate("actions.dismiss");
     dismissButton.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft");
     dismissButton.addEventListener("click", () => { void this.dismissRow(row, rowIndex); });
+    this.changeActions.set(rowIndex, {
+      accept: () => { void this.applyRowChange(rowIndex, "left-to-right"); },
+      reject: () => { void this.dismissRow(row, rowIndex); }
+    });
   }
   /** Triggers the existing accept or ignore action for the highlighted row. */
   handleActiveChangeAction(action: "accept" | "reject"): boolean {
@@ -1326,32 +1372,38 @@ export class SideBySideDiffView extends ItemView {
     if (!activeRow) {
       return false;
     }
-    const buttons = activeRow.querySelectorAll<HTMLButtonElement>(".file-diff-sbs-merge-button");
-    const button = buttons[action === "accept" ? 0 : 1];
-    if (!button) {
+    const rowIndex = Number(activeRow.dataset.diffRowIndex);
+    const rowActions = this.changeActions.get(rowIndex);
+    const actionHandler = rowActions?.[action];
+    if (!actionHandler) {
       return false;
     }
-    button.click();
+    actionHandler();
     return true;
   }
   /** Ignores one left-side change while keeping the right-side content visible. */
   async dismissRow(row: IndexedDiffRow, rowIndex: number): Promise<void> {
     const scrollPosition = this.getScrollPosition();
+    const targetPosition = this.getChangeTargetPosition(rowIndex);
     this.dismissedRows.add(getDiffRowKey(row));
     await this.renderDiff(scrollPosition);
-    this.advanceAfterResolvedChange(rowIndex);
+    this.advanceAfterResolvedChange(targetPosition);
   }
   /** Moves to the next open change after accepting or ignoring one when enabled. */
-  advanceAfterResolvedChange(rowIndex: number): void {
-    const nextIndex = getAutoAdvanceChangeIndex(
-      [...this.getChangeTargets().keys()],
-      rowIndex,
+  advanceAfterResolvedChange(resolvedPosition: number | null): void {
+    const targetIndexes = [...this.getChangeTargets().keys()];
+    const nextPosition = getAutoAdvanceTargetPosition(
+      targetIndexes.length,
+      resolvedPosition,
       this.plugin.settings.autoAdvanceAfterChange,
     );
-    if (nextIndex === null) {
+    if (nextPosition === null) {
       return;
     }
-    this.focusChange(nextIndex);
+    const nextIndex = targetIndexes[nextPosition];
+    if (nextIndex !== undefined) {
+      this.focusChange(nextIndex);
+    }
   }
   /** Renders one side of a diff row. */
   buildCell(parent: HTMLElement, value: string | null, counterpart: string | null, lineNumberValue: number | null, side: EditableSide, rowType: EditableRowType, inlineTokens?: InlineDiffToken[]): void {
@@ -1366,7 +1418,11 @@ export class SideBySideDiffView extends ItemView {
     if (!await this.prepareForSwap()) {
       return;
     }
+    const swappedDismissedRows = [...this.dismissedRows].map(swapDiffRowKey);
     this.dismissedRows.clear();
+    for (const rowKey of swappedDismissedRows) {
+      this.dismissedRows.add(rowKey);
+    }
     this.activeChangeRowIndex = null;
     this.saveBaselines.clear();
     const mode = this.state.mode === "accept" ? "proposal" : this.state.mode === "proposal" ? "accept" : "compare";
@@ -1384,20 +1440,20 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Confirms how transient comparison changes should be handled before a view transition. */
   async prepareForTransition(question: string): Promise<boolean> {
-    if (!this.hasUnsavedChanges() && this.dismissedRows.size === 0) {
+    if (!this.hasUnsavedChanges()) {
       return true;
     }
     const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this), question).waitForChoice();
     if (choice === "discard") {
       this.pendingFileContents.clear();
       this.saveBaselines.clear();
+      this.dismissedRows.clear();
       return true;
     }
     if (this.state.editRight) {
-      await this.saveRightEdits();
+      return this.saveRightEdits();
     } else {
-      await this.savePendingChanges();
+      return this.savePendingChanges();
     }
-    return !this.hasUnsavedChanges();
   }
 }

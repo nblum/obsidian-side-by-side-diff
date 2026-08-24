@@ -80,15 +80,14 @@ export function getNextChangeIndex(
 	return changeIndexes[changeIndexes.length - 1] ?? null;
 }
 
-/** Returns the next open change after an action, or no target when auto-advance is disabled. */
-export function getAutoAdvanceChangeIndex(
-	changeIndexes: readonly number[],
-	resolvedIndex: number,
+/** Returns the next target position after removing the resolved target from an ordered list. */
+export function getAutoAdvanceTargetPosition(
+	remainingTargetCount: number,
+	resolvedPosition: number | null,
 	autoAdvance: boolean,
 ): number | null {
-	if (!autoAdvance || changeIndexes.length === 0) {
+	if (!autoAdvance || remainingTargetCount === 0 || resolvedPosition === null) {
 		return null;
 	}
-	// A following added/removed row can shift into the resolved row's old index.
-	return changeIndexes.find((index) => index >= resolvedIndex) ?? changeIndexes[0] ?? null;
+	return resolvedPosition < remainingTargetCount ? resolvedPosition : 0;
 }
