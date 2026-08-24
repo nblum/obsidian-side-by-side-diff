@@ -1,33 +1,10 @@
 import { PluginSettingTab, Setting } from "obsidian";
 import type { App, SettingDefinitionItem } from "obsidian";
 import type FileDiffSideBySidePlugin from "./main";
-import type { LanguagePreference } from "./i18n";
+import { DEFAULT_SETTINGS, isLanguagePreference, sanitizeCopySuffix } from "./settings-model";
 
-export interface PluginSettings {
-  showRibbonIcon: boolean;
-  autoAdvanceAfterChange: boolean;
-  changeCopySuffix: string;
-  language: LanguagePreference;
-  recentRightFilePaths: string[];
-}
-
-export const DEFAULT_SETTINGS: PluginSettings = {
-  showRibbonIcon: true,
-  autoAdvanceAfterChange: true,
-  changeCopySuffix: "_changes_",
-  language: "auto",
-  recentRightFilePaths: []
-};
-
-/** Checks whether a persisted or UI value is a supported language preference. */
-export function isLanguagePreference(value: unknown): value is LanguagePreference {
-  return value === "auto" || value === "de" || value === "en";
-}
-
-/** Replaces path-invalid suffix characters with safe underscores. */
-export function sanitizeCopySuffix(value: string): string {
-  return (value.length > 0 ? value : "_changes_").replace(/[\\/:*?"<>|]/g, "_");
-}
+export { DEFAULT_SETTINGS, isLanguagePreference, normalizePluginSettings, sanitizeCopySuffix } from "./settings-model";
+export type { PluginSettings } from "./settings-model";
 
 /** Renders plugin settings for current and legacy Obsidian versions. */
 export class FileDiffSettingsTab extends PluginSettingTab {

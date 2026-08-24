@@ -3,11 +3,11 @@ import type { Command } from "obsidian";
 import { FilePickerModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
-import { FileDiffSettingsTab, DEFAULT_SETTINGS, isLanguagePreference, sanitizeCopySuffix, type PluginSettings } from "./settings";
+import { FileDiffSettingsTab, DEFAULT_SETTINGS, isLanguagePreference, normalizePluginSettings, sanitizeCopySuffix, type PluginSettings } from "./settings";
 import { createTranslator, resolveLanguage } from "./i18n";
 import type { Language, Translator } from "./i18n";
 import type { ChangeNavigationDirection } from "./diff-navigation";
-import { normalizeRecentFilePaths, rememberRecentFilePath } from "./recent-files";
+import { rememberRecentFilePath } from "./recent-files";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -115,17 +115,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
   /** Loads persisted plugin settings and applies defaults for new options. */
   async loadSettings(): Promise<void> {
     const storedData: unknown = await this.loadData();
-    const storedSettings = typeof storedData === "object" && storedData !== null ? storedData as Record<string, unknown> : {};
-    this.settings = {
-      showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
-      autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
-      changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
-      language: storedSettings.language === "de" || storedSettings.language === "en" || storedSettings.language === "auto" ? storedSettings.language : DEFAULT_SETTINGS.language,
-      recentRightFilePaths: normalizeRecentFilePaths(storedSettings.recentRightFilePaths)
-    };
-    if (!["auto", "de", "en"].includes(this.settings.language)) {
-      this.settings.language = DEFAULT_SETTINGS.language;
-    }
+    this.settings = normalizePluginSettings(storedData);
     this.language = resolveLanguage(this.settings.language, moment.locale());
     this.translator = createTranslator(this.language);
   }

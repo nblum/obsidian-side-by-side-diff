@@ -4,23 +4,19 @@ import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowTyp
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";
 import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, type ChangeNavigationDirection } from "./diff-navigation";
 import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
-import { captureSaveBaseline, createGuardedSaveTransform, migrateSaveEntry, refreshSaveBaseline, SaveConflictError } from "./save-guard";
+import { createGuardedSaveTransform, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
 import { hasEditableLineStructureChanged } from "./edit-sync";
 import { shouldOfferProposalCleanup } from "./proposal-cleanup";
+import { DiffSession } from "./diff-session";
+import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./diff-view-state";
+import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
 import type { Language } from "./i18n";
 
-export type PaneMode = "compare" | "proposal" | "accept";
+export type { PaneMode } from "./diff-view-state";
 type EditableSide = "left" | "right";
 type EditableRowType = "equal" | "added" | "removed" | "changed";
-
-interface DiffViewState {
-  leftPath: string | null;
-  rightPath: string | null;
-  editRight: boolean;
-  mode: PaneMode;
-}
 
 interface ScrollPosition {
   top: number;
@@ -42,14 +38,6 @@ interface RightEditorState {
   observer: MutationObserver;
   resizeObserver: ResizeObserver;
 }
-
-interface PendingFile {
-  file: TFile | null;
-  content: string;
-}
-
-type SaveProcessResult = "saved" | "conflict";
-type PendingSaveResult = SaveProcessResult | "unavailable";
 
 interface ChangeActions {
   accept: () => void;
@@ -81,14 +69,10 @@ function appendInlineDiff(parent: HTMLElement, value: string | null, counterpart
 /** Renders and manages one synchronized side-by-side comparison view. */
 export class SideBySideDiffView extends ItemView {
   private readonly plugin: DiffViewPlugin;
-  state: DiffViewState = { leftPath: null, rightPath: null, editRight: false, mode: "compare" };
+  private readonly session = new DiffSession();
+  private viewState: DiffViewState = { leftPath: null, rightPath: null, editRight: false, mode: "compare" };
   private renderToken = 0;
-  private readonly dismissedRows = new Set<string>();
-  private readonly pendingFileContents = new Map<string, string>();
-  private readonly saveBaselines = new Map<string, string>();
   private readonly changeActions = new Map<number, ChangeActions>();
-  private proposalChangesAccepted = false;
-  private proposalCleanupPromptShown = false;
   private rightEditorState: RightEditorState | null = null;
   private rightEditorDirty = false;
   private saveButton: HTMLButtonElement | null = null;
@@ -99,6 +83,11 @@ export class SideBySideDiffView extends ItemView {
   private activeChangeRowIndex: number | null = null;
   private previousChangeButton: HTMLButtonElement | null = null;
   private nextChangeButton: HTMLButtonElement | null = null;
+
+  /** Exposes the current comparison state without allowing external mutation. */
+  get state(): Readonly<DiffViewState> {
+    return { ...this.viewState };
+  }
 
   /** Initializes the view and subscribes to relevant vault changes. */
   constructor(leaf: WorkspaceLeaf, plugin: DiffViewPlugin) {
@@ -158,14 +147,7 @@ export class SideBySideDiffView extends ItemView {
   /** Stores new paths and redraws the comparison. */
   override async setState(state: unknown, result: ViewStateResult): Promise<void> {
     await super.setState(state, result);
-    const nextState = typeof state === "object" && state !== null ? state as Record<string, unknown> : {};
-    const mode = nextState.mode;
-    this.state = {
-      leftPath: typeof nextState.leftPath === "string" ? nextState.leftPath : null,
-      rightPath: typeof nextState.rightPath === "string" ? nextState.rightPath : null,
-      editRight: nextState.editRight === true,
-      mode: mode === "proposal" || mode === "accept" ? mode : "compare"
-    };
+    this.viewState = parseDiffViewState(state);
     await this.renderDiff();
   }
   /** Renders the initial comparison when the leaf opens. */
@@ -352,16 +334,17 @@ export class SideBySideDiffView extends ItemView {
   /** Keeps the view in sync when a compared file is renamed. */
   handleRename(file: TAbstractFile, oldPath: string): void {
     let changed = false;
-    if (this.state.leftPath === oldPath) {
-      this.state.leftPath = file.path;
+    const nextState = { ...this.viewState };
+    if (nextState.leftPath === oldPath) {
+      nextState.leftPath = file.path;
       changed = true;
     }
-    if (this.state.rightPath === oldPath) {
-      this.state.rightPath = file.path;
+    if (nextState.rightPath === oldPath) {
+      nextState.rightPath = file.path;
       changed = true;
     }
-    migrateSaveEntry(this.saveBaselines, oldPath, file.path);
-    migrateSaveEntry(this.pendingFileContents, oldPath, file.path);
+    this.viewState = nextState;
+    this.session.migratePath(oldPath, file.path);
     if (changed) {
       void this.renderDiff(this.getScrollPosition());
     }
@@ -409,7 +392,7 @@ export class SideBySideDiffView extends ItemView {
       }
       if (this.state.editRight) {
         // Keep the first snapshot so a later rerender cannot hide an external edit.
-        captureSaveBaseline(this.saveBaselines, rightFile.path, storedRightContent);
+        this.session.captureSaveBaseline(rightFile.path, storedRightContent);
       }
       this.buildLayout(leftFile, rightFile, splitLines(leftContent), splitLines(rightContent));
       this.restoreScrollPosition(scrollPosition);
@@ -523,13 +506,9 @@ export class SideBySideDiffView extends ItemView {
   /** Applies the selected right file and redraws the comparison view. */
   async applyRightFile(leftFile: TFile, rightFile: TFile): Promise<void> {
     const nextState: DiffViewState = { leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" };
-    this.state = nextState;
+    this.viewState = nextState;
     this.activeChangeRowIndex = null;
-    this.pendingFileContents.clear();
-    this.saveBaselines.clear();
-    this.dismissedRows.clear();
-    this.proposalChangesAccepted = false;
-    this.proposalCleanupPromptShown = false;
+    this.session.reset();
     void this.plugin.rememberRecentRightFile(rightFile);
     try {
       await this.renderDiff();
@@ -559,14 +538,14 @@ export class SideBySideDiffView extends ItemView {
       return;
     }
     if (this.state.rightPath !== null) {
-      this.saveBaselines.delete(this.state.rightPath);
+      this.session.removeSaveBaseline(this.state.rightPath);
     }
     await this.setState({ ...this.state, editRight: false }, { history: false });
   }
   /** Returns whether editing or diff actions have produced unsaved changes. */
   hasUnsavedChanges(): boolean {
     const editorChanged = this.state.editRight && this.rightEditorState !== null && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue;
-    return editorChanged || this.hasPendingChanges() || this.dismissedRows.size > 0;
+    return editorChanged || this.hasPendingChanges() || this.session.getDismissedRowCount() > 0;
   }
   /** Writes all current changes without rebuilding the view during close. */
   async saveChangesBeforeClose(): Promise<boolean> {
@@ -589,7 +568,7 @@ export class SideBySideDiffView extends ItemView {
         if (saved !== "saved") {
           return false;
         }
-        this.pendingFileContents.delete(rightFile.path);
+        this.session.removePendingChange(rightFile.path);
         this.rightEditorState.initialValue = this.serializeRightEditor(editor);
       }
       if (this.hasPendingChanges()) {
@@ -635,7 +614,7 @@ export class SideBySideDiffView extends ItemView {
       if (saved !== "saved") {
         return false;
       }
-      this.pendingFileContents.delete(rightFile.path);
+      this.session.removePendingChange(rightFile.path);
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
       return true;
@@ -883,17 +862,17 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Returns the currently displayed content, including changes pending for a file. */
   getDisplayedContent(path: string, storedContent: string): string {
-    return this.pendingFileContents.get(path) ?? storedContent;
+    return this.session.getDisplayedContent(path, storedContent);
   }
   /** Processes a file only when its save snapshot still matches the process input. */
-  async processUnchangedFile(file: TFile, transform: (currentContent: string) => string): Promise<SaveProcessResult> {
+  async processUnchangedFile(file: TFile, transform: (currentContent: string) => string): Promise<FileSaveResult> {
     let observedContent: string | undefined;
     try {
       await this.app.vault.process(
         file,
         (currentContent) => {
           observedContent = currentContent;
-          return createGuardedSaveTransform(this.saveBaselines.get(file.path), transform)(currentContent);
+          return createGuardedSaveTransform(this.session.getSaveBaseline(file.path), transform)(currentContent);
         },
       );
     } catch (error) {
@@ -902,43 +881,29 @@ export class SideBySideDiffView extends ItemView {
       }
       if (observedContent !== undefined) {
         // A second explicit Save retries against the content the user was warned about.
-        refreshSaveBaseline(this.saveBaselines, file.path, observedContent);
+        this.session.refreshSaveBaseline(file.path, observedContent);
       }
       new Notice(this.translate("notice.externalChange", { name: file.name }));
       return "conflict";
     }
-    this.saveBaselines.delete(file.path);
+    this.session.removeSaveBaseline(file.path);
     return "saved";
   }
   /** Returns whether the comparison contains changes waiting to be saved. */
   hasPendingChanges(): boolean {
-    return this.pendingFileContents.size > 0;
-  }
-  /** Resolves the vault files represented by pending comparison changes. */
-  getPendingFiles(): PendingFile[] {
-    return Array.from(this.pendingFileContents.entries()).map(([path, content]) => {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      return { file: file instanceof TFile ? file : null, content };
-    });
+    return this.session.hasPendingChanges();
   }
   /** Writes pending comparison changes and clears them after all files succeed. */
   async writePendingChanges(): Promise<PendingSaveResult> {
-    const pendingFiles = this.getPendingFiles();
-    if (pendingFiles.some(({ file }) => !(file instanceof TFile))) {
-      return "unavailable";
-    }
-    for (const pendingFile of pendingFiles) {
-      if (!(pendingFile.file instanceof TFile)) {
-        return "unavailable";
-      }
-      const result = await this.processUnchangedFile(pendingFile.file, () => pendingFile.content);
-      if (result !== "saved") {
-        return result;
-      }
-      // Remove each successful entry immediately so a later failure remains retryable.
-      this.pendingFileContents.delete(pendingFile.file.path);
-    }
-    return "saved";
+    return writePendingChanges(
+      this.session.getPendingChanges(),
+      (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile ? file : null;
+      },
+      (file, content) => this.processUnchangedFile(file, () => content),
+      (path) => { this.session.removePendingChange(path); }
+    );
   }
   /** Saves all changes staged through the comparison controls. */
   async savePendingChanges(promptForProposalCleanup = true): Promise<boolean> {
@@ -1005,12 +970,11 @@ export class SideBySideDiffView extends ItemView {
       const targetContent = leftToRight ? rightContent : leftContent;
       const targetLines = leftToRight ? nextRightLines : nextLeftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
-      captureSaveBaseline(this.saveBaselines, targetFile.path, targetBaseline);
-      this.pendingFileContents.set(targetFile.path, joinLines(targetLines, targetContent));
+      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
       new Notice(this.translate("notice.staged"));
       await this.renderDiff(scrollPosition);
       if (this.state.mode === "accept" && direction === "left-to-right") {
-        this.proposalChangesAccepted = true;
+        this.session.markProposalChangeAccepted();
       }
       this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
@@ -1088,7 +1052,7 @@ export class SideBySideDiffView extends ItemView {
     const root = this.contentEl.createDiv({ cls: "file-diff-sbs-root" });
     const rows = createComparisonModelFromLines(leftLines, rightLines).rows;
     const changedRows = rows.filter((row) => !row.equal);
-    const dismissedCount = changedRows.filter((row) => this.dismissedRows.has(getDiffRowKey(row))).length;
+    const dismissedCount = changedRows.filter((row) => this.session.hasDismissedRow(getDiffRowKey(row))).length;
     const visibleChangedCount = changedRows.length - dismissedCount;
     const summaryParts = [this.translate(
       visibleChangedCount === 1 ? "view.summary.changedOne" : "view.summary.changedMany",
@@ -1180,7 +1144,7 @@ export class SideBySideDiffView extends ItemView {
       if (!row) {
         continue;
       }
-      if (!row.equal && this.dismissedRows.has(getDiffRowKey(row))) {
+      if (!row.equal && this.session.hasDismissedRow(getDiffRowKey(row))) {
         const ignoredRow = getIgnoredDiffRow(row);
         if (!ignoredRow) {
           continue;
@@ -1326,7 +1290,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Opens the proposal-copy cleanup prompt after all accepted changes are saved. */
   maybePromptDeleteChangeCopy(): void {
-    if (this.proposalCleanupPromptShown || !shouldOfferProposalCleanup(this.state.mode, this.proposalChangesAccepted, this.dismissedRows.size, this.hasPendingChanges())) {
+    if (this.session.hasShownProposalCleanupPrompt() || !shouldOfferProposalCleanup(this.state.mode, this.session.hasAcceptedProposalChanges(), this.session.getDismissedRowCount(), this.hasPendingChanges())) {
       return;
     }
     const leftPath = this.state.leftPath;
@@ -1339,7 +1303,7 @@ export class SideBySideDiffView extends ItemView {
     if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile) || !this.isChangeCopyFile(leftFile, rightFile)) {
       return;
     }
-    this.proposalCleanupPromptShown = true;
+    this.session.markProposalCleanupPromptShown();
     this.confirmDeleteChangeCopy(leftFile);
   }
   /** Checks whether the left file is the configured suffix copy of the original. */
@@ -1451,7 +1415,7 @@ export class SideBySideDiffView extends ItemView {
   async dismissRow(row: IndexedDiffRow, rowIndex: number): Promise<void> {
     const scrollPosition = this.getScrollPosition();
     const targetPosition = this.getChangeTargetPosition(rowIndex);
-    this.dismissedRows.add(getDiffRowKey(row));
+    this.session.dismissRow(getDiffRowKey(row));
     await this.renderDiff(scrollPosition);
     this.advanceAfterResolvedChange(targetPosition);
   }
@@ -1484,22 +1448,11 @@ export class SideBySideDiffView extends ItemView {
     if (!await this.prepareForSwap()) {
       return;
     }
-    const swappedDismissedRows = [...this.dismissedRows].map(swapDiffRowKey);
-    this.dismissedRows.clear();
-    for (const rowKey of swappedDismissedRows) {
-      this.dismissedRows.add(rowKey);
-    }
-    this.proposalChangesAccepted = false;
-    this.proposalCleanupPromptShown = false;
+    const swappedDismissedRows = this.session.getDismissedRowKeys().map(swapDiffRowKey);
+    this.session.replaceDismissedRows(swappedDismissedRows);
     this.activeChangeRowIndex = null;
-    this.saveBaselines.clear();
-    const mode = this.state.mode === "accept" ? "proposal" : this.state.mode === "proposal" ? "accept" : "compare";
-    const nextState = {
-      leftPath: this.state.rightPath,
-      rightPath: this.state.leftPath,
-      editRight: false,
-      mode
-    };
+    this.session.clearSaveBaselines();
+    const nextState = swapDiffViewState(this.viewState);
     await this.setState(nextState, { history: false });
   }
   /** Confirms how transient comparison changes should be handled before swapping the panes. */
@@ -1513,9 +1466,7 @@ export class SideBySideDiffView extends ItemView {
     }
     const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this), question).waitForChoice();
     if (choice === "discard") {
-      this.pendingFileContents.clear();
-      this.saveBaselines.clear();
-      this.dismissedRows.clear();
+      this.session.clearTransientChanges();
       return true;
     }
     if (this.state.editRight) {

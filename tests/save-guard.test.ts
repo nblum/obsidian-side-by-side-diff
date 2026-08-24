@@ -45,3 +45,28 @@ test("guards the process transform against an external change", () => {
 	assert.throws(() => transform("external"), SaveConflictError);
 	assert.equal(transformCalls, 1);
 });
+
+test("allows a retry only after the conflict baseline is refreshed", () => {
+	const baselines = new Map<string, string>([["note.md", "before"]]);
+	let transformCalls = 0;
+	const transform = (currentContent: string): string => {
+		transformCalls += 1;
+		return `${currentContent}!`;
+	};
+
+	assert.throws(() => createGuardedSaveTransform(baselines.get("note.md"), transform)("external"), SaveConflictError);
+	refreshSaveBaseline(baselines, "note.md", "external");
+	assert.equal(createGuardedSaveTransform(baselines.get("note.md"), transform)("external"), "external!");
+	assert.equal(transformCalls, 1);
+});
+
+test("does not invoke a save transform without a captured baseline", () => {
+	let transformCalls = 0;
+	const transform = createGuardedSaveTransform(undefined, () => {
+		transformCalls += 1;
+		return "unexpected";
+	});
+
+	assert.throws(() => transform("content"), SaveConflictError);
+	assert.equal(transformCalls, 0);
+});

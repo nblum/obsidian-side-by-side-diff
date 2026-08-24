@@ -15,3 +15,8 @@ test("requests a layout sync when the line count changes", () => {
 test("falls back to syncing unknown input without a beforeinput snapshot", () => {
 	assert.equal(hasEditableLineStructureChanged("insertFromPaste", null, 4), true);
 });
+
+test("does not sync normal text input without a beforeinput snapshot", () => {
+	assert.equal(hasEditableLineStructureChanged("insertText", null, 4), false);
+	assert.equal(hasEditableLineStructureChanged("insertCompositionText", null, 4), false);
+});
