@@ -61,6 +61,7 @@ visible, can be reviewed and staged individually, and are written only through a
 - In proposal mode, the original appears on the left and the editable copy on the right.
 - `Accept changes` opens the reversed view with the copy on the left and the original on the right.
 - Proposals are only written to the original after review and an explicit save.
+- After all proposal changes are accepted and saved, the plugin asks whether the suffix copy should be moved to the trash.
 
 ### Other actions
 

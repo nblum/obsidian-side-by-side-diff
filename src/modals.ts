@@ -45,6 +45,46 @@ export class DeleteIdenticalFileModal extends Modal {
     this.contentEl.empty();
   }
 }
+/** Confirms moving a processed change-copy file to the system trash. */
+export class DeleteChangeCopyModal extends Modal {
+  private readonly file: TFile;
+  private readonly onConfirm: () => Promise<void>;
+  private readonly translate: Translator;
+
+  /** Creates a confirmation modal for a processed change copy. */
+  constructor(app: App, file: TFile, onConfirm: () => Promise<void>, translate: Translator) {
+    super(app);
+    this.file = file;
+    this.onConfirm = onConfirm;
+    this.translate = translate;
+  }
+  /** Renders the warning and the confirm/cancel actions. */
+  override onOpen(): void {
+    this.titleEl.setText(this.translate("modal.deleteChangeCopy.title"));
+    this.contentEl.createEl("p", {
+      text: this.translate("modal.deleteChangeCopy.confirm", { path: this.file.path })
+    });
+    this.contentEl.createEl("p", {
+      text: this.translate("modal.deleteChangeCopy.note"),
+      cls: "file-diff-sbs-delete-note"
+    });
+    const actions = this.contentEl.createDiv({ cls: "file-diff-sbs-delete-actions" });
+    const deleteButton = actions.createEl("button", {
+      text: this.translate("modal.deleteChangeCopy.trash"),
+      cls: "mod-warning"
+    });
+    deleteButton.addEventListener("click", () => {
+      this.close();
+      void this.onConfirm();
+    });
+    const cancelButton = actions.createEl("button", { text: this.translate("modal.cancel") });
+    cancelButton.addEventListener("click", () => { this.close(); });
+  }
+  /** Clears modal content when it closes. */
+  override onClose(): void {
+    this.contentEl.empty();
+  }
+}
 export interface FilePickerModalOptions {
   recentFiles?: TFile[];
   recentLabel?: string;

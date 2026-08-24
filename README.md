@@ -64,7 +64,8 @@ appears on the left and the editable proposal copy on the right.
 
 `Accept changes` appears in the document menu only when a matching change copy exists. The view is reversed so that
 the copy appears on the left and the original on the right. Use `→` to selectively apply reviewed proposals to the
-original.
+original. After all proposals are accepted and saved, the plugin asks whether the suffix copy should be moved to the
+trash; canceling keeps the copy available.
 
 ## Edit and save
 

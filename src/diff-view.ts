@@ -3,11 +3,12 @@ import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";
 import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, type ChangeNavigationDirection } from "./diff-navigation";
-import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
+import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { captureSaveBaseline, createGuardedSaveTransform, migrateSaveEntry, refreshSaveBaseline, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
 import { hasEditableLineStructureChanged } from "./edit-sync";
+import { shouldOfferProposalCleanup } from "./proposal-cleanup";
 import type { Language } from "./i18n";
 
 export type PaneMode = "compare" | "proposal" | "accept";
@@ -57,7 +58,7 @@ interface ChangeActions {
 
 interface DiffViewPlugin {
   readonly language: Language;
-  readonly settings: { autoAdvanceAfterChange: boolean; recentRightFilePaths: string[] };
+  readonly settings: { autoAdvanceAfterChange: boolean; changeCopySuffix: string; recentRightFilePaths: string[] };
   translate(key: string, variables?: Record<string, string | number>): string;
   rememberRecentRightFile(file: TFile): Promise<void>;
 }
@@ -86,6 +87,8 @@ export class SideBySideDiffView extends ItemView {
   private readonly pendingFileContents = new Map<string, string>();
   private readonly saveBaselines = new Map<string, string>();
   private readonly changeActions = new Map<number, ChangeActions>();
+  private proposalChangesAccepted = false;
+  private proposalCleanupPromptShown = false;
   private rightEditorState: RightEditorState | null = null;
   private rightEditorDirty = false;
   private saveButton: HTMLButtonElement | null = null;
@@ -525,6 +528,8 @@ export class SideBySideDiffView extends ItemView {
     this.pendingFileContents.clear();
     this.saveBaselines.clear();
     this.dismissedRows.clear();
+    this.proposalChangesAccepted = false;
+    this.proposalCleanupPromptShown = false;
     void this.plugin.rememberRecentRightFile(rightFile);
     try {
       await this.renderDiff();
@@ -936,7 +941,7 @@ export class SideBySideDiffView extends ItemView {
     return "saved";
   }
   /** Saves all changes staged through the comparison controls. */
-  async savePendingChanges(): Promise<boolean> {
+  async savePendingChanges(promptForProposalCleanup = true): Promise<boolean> {
     if (!this.hasPendingChanges()) {
       return true;
     }
@@ -951,6 +956,9 @@ export class SideBySideDiffView extends ItemView {
       }
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
+      if (promptForProposalCleanup) {
+        this.maybePromptDeleteChangeCopy();
+      }
       return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte vorgemerkte \xC4nderungen nicht speichern.", error);
@@ -1001,6 +1009,9 @@ export class SideBySideDiffView extends ItemView {
       this.pendingFileContents.set(targetFile.path, joinLines(targetLines, targetContent));
       new Notice(this.translate("notice.staged"));
       await this.renderDiff(scrollPosition);
+      if (this.state.mode === "accept" && direction === "left-to-right") {
+        this.proposalChangesAccepted = true;
+      }
       this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
       console.error("Side-by-Side Diff konnte die \xC4nderung nicht \xFCbernehmen.", error);
@@ -1313,6 +1324,32 @@ export class SideBySideDiffView extends ItemView {
       text: this.hasPendingChanges() ? this.translate("messages.resolved.pending") : this.translate("messages.resolved.none")
     });
   }
+  /** Opens the proposal-copy cleanup prompt after all accepted changes are saved. */
+  maybePromptDeleteChangeCopy(): void {
+    if (this.proposalCleanupPromptShown || !shouldOfferProposalCleanup(this.state.mode, this.proposalChangesAccepted, this.dismissedRows.size, this.hasPendingChanges())) {
+      return;
+    }
+    const leftPath = this.state.leftPath;
+    const rightPath = this.state.rightPath;
+    if (leftPath === null || rightPath === null) {
+      return;
+    }
+    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
+    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
+    if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile) || !this.isChangeCopyFile(leftFile, rightFile)) {
+      return;
+    }
+    this.proposalCleanupPromptShown = true;
+    this.confirmDeleteChangeCopy(leftFile);
+  }
+  /** Checks whether the left file is the configured suffix copy of the original. */
+  isChangeCopyFile(file: TFile, originalFile: TFile): boolean {
+    const expectedPrefix = `${originalFile.basename}${this.plugin.settings.changeCopySuffix}`;
+    return file.path !== originalFile.path
+      && file.parent?.path === originalFile.parent?.path
+      && file.extension === originalFile.extension
+      && file.basename.startsWith(expectedPrefix);
+  }
   /** Adds a pane header with side label and vault-relative path. */
   buildFileHeader(parent: HTMLElement, file: TFile, sideLabel: string): void {
     const header = parent.createDiv({ cls: "file-diff-sbs-file-header" });
@@ -1329,6 +1366,19 @@ export class SideBySideDiffView extends ItemView {
       } catch (error) {
         console.error("Side-by-Side Diff konnte die identische Datei nicht verschieben.", error);
         new Notice(this.translate("notice.fileTrashFailed"));
+      }
+    }, this.translate.bind(this)).open();
+  }
+  /** Confirms and performs moving a processed change copy to the system trash. */
+  confirmDeleteChangeCopy(file: TFile): void {
+    new DeleteChangeCopyModal(this.app, file, async () => {
+      try {
+        await this.app.fileManager.trashFile(file);
+        new Notice(this.translate("notice.changeCopyTrashed", { name: file.name }));
+        this.leaf.detach();
+      } catch (error) {
+        console.error("Side-by-Side Diff konnte die Änderungskopie nicht verschieben.", error);
+        new Notice(this.translate("notice.changeCopyTrashFailed"));
       }
     }, this.translate.bind(this)).open();
   }
@@ -1439,6 +1489,8 @@ export class SideBySideDiffView extends ItemView {
     for (const rowKey of swappedDismissedRows) {
       this.dismissedRows.add(rowKey);
     }
+    this.proposalChangesAccepted = false;
+    this.proposalCleanupPromptShown = false;
     this.activeChangeRowIndex = null;
     this.saveBaselines.clear();
     const mode = this.state.mode === "accept" ? "proposal" : this.state.mode === "proposal" ? "accept" : "compare";
@@ -1469,7 +1521,7 @@ export class SideBySideDiffView extends ItemView {
     if (this.state.editRight) {
       return this.saveRightEdits();
     } else {
-      return this.savePendingChanges();
+      return this.savePendingChanges(false);
     }
   }
 }
