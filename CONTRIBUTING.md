@@ -62,18 +62,25 @@ npm run build
 ```
 
 The comparison tests use the paired fixtures in `tests/fixtures/` to verify unchanged, changed, removed, and
-added rows as well as inline token highlighting.
+added rows as well as inline token highlighting. `src/diff-model.ts` exposes the deterministic row model used by the
+view, so line numbers, row types, alignment gaps, and inline tokens can be tested without an Obsidian runtime.
 
 These are the same checks that run in CI (`.github/workflows/ci.yml`) on every push and pull request.
 
 The tests cover the deterministic diff, synchronization, and translation rules, including:
 
 - inserting, removing, and replacing individual lines
+- block changes between duplicate anchor lines and deterministic large-file fallback behavior
+- row types, line numbers, and inline tokens through the comparison model
 - ignoring changes while the right-hand content stays visible
 - alignment with differing line counts
 - preserving line endings and trailing blank lines
+- distinguishing intentional empty lines from visual alignment gaps
 - excluding visual alignment gaps when saving
 - matching keys and placeholders across the German and English translations
+- selecting the next and previous change, including wraparound and resolved-row handling
+- honoring the configurable automatic advance after accepting or ignoring a change
+- protecting pending changes when entering edit mode or swapping panes
 
 ## Manual checklist
 

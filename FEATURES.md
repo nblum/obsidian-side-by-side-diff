@@ -17,9 +17,13 @@ visible, can be reviewed and staged individually, and are written only through a
 - When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
   the following lines stay in sync.
 - The toolbar sits above the comparison and contains the editing actions.
+- `Next change` and `Previous change` navigate through changes and scroll the selected row into view.
+- The same navigation is available with `Alt+ArrowDown` and `Alt+ArrowUp`.
+- After accepting or ignoring a change, the view automatically advances to the next open change by default. This can be disabled in the settings.
 - The view shows the file names in the pane headers, along with `Comparison`, `Original`, or `Proposal` depending
   on context.
-- `Swap` swaps both files and, for proposals, reverses the direction of acceptance.
+- `Swap` swaps both files and, for proposals, reverses the direction of acceptance. Pending changes are saved or
+  discarded only after confirmation.
 - `Refresh` is available in the file context menu and reloads an open comparison view.
 - The scroll position is preserved when staging, ignoring, or saving a change.
 
@@ -27,9 +31,11 @@ visible, can be reviewed and staged individually, and are written only through a
 
 - `→` accepts a single change into the view only, at first.
 - `×` ignores only the left-hand diff part; the right-hand content stays visible and unchanged.
+- With a highlighted change, `Alt+ArrowRight` accepts it and `Alt+ArrowLeft` ignores it.
 - `Save changes` writes staged changes to the affected files.
 - The save button is disabled when there are no unsaved changes.
 - Files in the vault are only modified after the explicit save.
+- Before saving, the current vault content is compared with the captured save snapshot; external changes cancel the save.
 - Once all suggested changes have been processed, the message `All change suggestions have been processed.`
   appears.
 
@@ -37,6 +43,7 @@ visible, can be reviewed and staged individually, and are written only through a
 
 - In normal diff mode, the right-hand side can be edited directly via `Edit mode`.
 - The left-hand side remains read-only.
+- Pending comparison changes are saved or discarded only after confirmation when entering edit mode.
 - The edit area is a shared multi-line input field.
 - Multi-line selection, deletion, Backspace, and `Enter` for new blank lines work as expected.
 - Both sides stay aligned line by line while editing.
@@ -77,6 +84,7 @@ visible, can be reviewed and staged individually, and are written only through a
 | Command palette | `Compare two files` |
 | Command palette | `Suggest changes for current file` |
 | Command palette | `Save changes in comparison view` |
+| Command palette | `Next change` / `Previous change` |
 | Ribbon | `Compare two files` |
 | File context menu | `Compare with another file` |
 | File context menu | `Suggest changes` |
@@ -92,6 +100,8 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
   unaffected.
 - **Change-copy suffix**: Adjust the text before the timestamp of change copies. Disallowed file-name characters
   are replaced automatically.
+- **Automatically go to the next change**: After accepting or ignoring a change, scroll to the next open change;
+  enabled by default.
 
 ## Technical requirements
 

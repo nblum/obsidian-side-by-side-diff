@@ -24,6 +24,8 @@ inline-highlighted changes, and controlled change acceptance.
 
 - compare two text files side by side in sync
 - detect line changes and inline differences within changed lines
+- navigate between changes with `Next change` / `Previous change`, `Alt+ArrowDown` / `Alt+ArrowUp`, and automatic scrolling
+- automatically continue with the next open change after accepting or ignoring one (configurable, enabled by default)
 - accept individual changes on the right or deliberately ignore them
 - edit the right-hand file directly and save changes in one step
 - create change proposals as timestamped copies and later apply them to the original
@@ -40,14 +42,16 @@ same view as the command palette:
 1. Open the command palette and select `Compare current file with another file` or `Compare two files`.
 2. Select the second file if it has not been chosen yet.
 3. Review the synchronized view. Use `→` to stage a change as a proposal, or `×` to ignore the left-hand diff.
-4. Save all staged changes with `Save changes` or `Ctrl/Cmd + S`.
+4. Navigate between changes with the toolbar or `Alt+ArrowDown` / `Alt+ArrowUp`; accept or ignore the highlighted change with `Alt+ArrowRight` / `Alt+ArrowLeft`.
+5. Save all staged changes with `Save changes` or `Ctrl/Cmd + S`.
 
 ## Three workflows
 
 ### Compare
 
 The left and right files are displayed in sync. Line changes and differences within a line are highlighted. Use
-`Swap` to switch the files and their direction.
+`Swap` to switch the files and their direction. If changes are pending, the plugin asks whether to save or discard
+them first.
 
 ### Suggest changes
 
@@ -63,11 +67,13 @@ original.
 
 ## Edit and save
 
-In normal diff mode, use `Edit mode` to make the right-hand side editable. The left-hand file remains read-only.
-Multi-line selection, deletion, Backspace, and `Enter` for new lines are supported.
+In normal diff mode, use `Edit mode` to make the right-hand side editable. The left-hand file remains read-only. If
+comparison changes are pending, the plugin asks whether to save or discard them before entering edit mode. Multi-line
+selection, deletion, Backspace, and `Enter` for new lines are supported.
 
 Changes are never written automatically while typing or clicking a diff action. The file is updated only after using
-`Save changes` or `Ctrl/Cmd + S`. Closing a view with unsaved changes opens a confirmation dialog.
+`Save changes` or `Ctrl/Cmd + S`. Before saving, the plugin checks for external file changes and cancels instead of
+overwriting newer content. Closing a view with unsaved changes opens a confirmation dialog.
 
 ## Installation
 
@@ -101,6 +107,7 @@ automatically creates a GitHub release with generated notes and uploads `main.js
 ## Documentation
 
 - [Features and requirements](FEATURES.md) – authoritative overview of the current scope and requirements
+- [Concept: Review status display](docs/concepts/review-statusanzeige.md) – concept for clearer accepted, ignored, and open change states
 - [Contributing](CONTRIBUTING.md) – development workflow, tests, and change checklist
 
 ## Development
