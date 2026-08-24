@@ -88,7 +88,7 @@ visible, can be reviewed and staged individually, and are written only through a
 | Command palette | `Save changes in comparison view` |
 | Command palette | `Next change` / `Previous change` |
 | Ribbon | `Compare two files` |
-| File context menu | `Compare with another file` |
+| File context menu | `Compare with another file` for any text file, whether open or closed |
 | File context menu | `Suggest changes` |
 | File context menu, when available | `Accept changes` |
 | File context menu with an open comparison view | `Refresh` |

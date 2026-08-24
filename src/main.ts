@@ -36,12 +36,16 @@ export class FileDiffSideBySidePlugin extends Plugin {
     this.addSettingTab(new FileDiffSettingsTab(this.app, this));
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (!(file instanceof TFile) || file.path !== this.app.workspace.getActiveFile()?.path) {
+        if (!isTextFile(file)) {
           return;
         }
         menu.addItem((item) => {
           item.setTitle(this.translate("menu.compareActiveFile")).setIcon(ICON_ID).onClick(() => { void this.compareActiveFile(file); });
         });
+        // Keep proposal and refresh actions scoped to the active document.
+        if (file.path !== this.app.workspace.getActiveFile()?.path) {
+          return;
+        }
         menu.addItem((item) => {
           item.setTitle(this.translate("menu.proposeChanges")).setIcon(ICON_ID).onClick(() => { void this.proposeChanges(file); });
         });
