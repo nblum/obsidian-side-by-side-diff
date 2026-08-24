@@ -1,6 +1,7 @@
 import { Modal, SuggestModal } from "obsidian";
 import type { App, TFile } from "obsidian";
 import type { Translator } from "./i18n";
+import { orderRecentFiles } from "./recent-files";
 
 export type UnsavedChoice = "save" | "discard";
 
@@ -44,30 +45,76 @@ export class DeleteIdenticalFileModal extends Modal {
     this.contentEl.empty();
   }
 }
+export interface FilePickerModalOptions {
+  recentFiles?: TFile[];
+  recentLabel?: string;
+  allFilesLabel?: string;
+}
 /** Selects a text file from the vault for comparison. */
 export class FilePickerModal extends SuggestModal<TFile> {
   private readonly files: TFile[];
   private readonly onChoose: (file: TFile | null) => void;
   private readonly locale: string;
+  private readonly recentFiles: TFile[];
+  private readonly recentFilePaths: Set<string>;
+  private readonly recentLabel: string;
+  private readonly allFilesLabel: string;
+  private recentHeadingInserted = false;
+  private allFilesHeadingInserted = false;
   private finished: boolean;
 
-  /** Creates a picker with the files that are valid for comparison. */
-  constructor(app: App, files: TFile[], onChoose: (file: TFile | null) => void, locale = "de") {
+  /** Configures optional recent-file group labels for the picker. */
+  constructor(
+    app: App,
+    files: TFile[],
+    onChoose: (file: TFile | null) => void,
+    locale = "de",
+    options: FilePickerModalOptions = {},
+  ) {
     super(app);
     this.files = files;
     this.onChoose = onChoose;
     this.locale = locale;
+    this.recentFiles = options.recentFiles ?? [];
+    this.recentFilePaths = new Set(this.recentFiles.map((file) => file.path));
+    this.recentLabel = options.recentLabel ?? "";
+    this.allFilesLabel = options.allFilesLabel ?? "";
     this.finished = false;
   }
+
   /** Filters files by name or path and sorts them deterministically. */
   getSuggestions(query: string): TFile[] {
     const search = query.trim().toLowerCase();
-    return this.files.filter((file) => !search || file.path.toLowerCase().includes(search)).sort((a, b) => a.path.localeCompare(b.path, this.locale));
+    const matches = this.files
+      .filter((file) => !search || file.path.toLowerCase().includes(search))
+      .sort((a, b) => a.path.localeCompare(b.path, this.locale));
+    this.recentHeadingInserted = false;
+    this.allFilesHeadingInserted = false;
+    return orderRecentFiles(matches, this.recentFiles.map((file) => file.path));
   }
   /** Displays both the filename and its vault-relative path. */
   renderSuggestion(file: TFile, element: HTMLElement): void {
+    const isRecent = this.recentFilePaths.has(file.path);
+    if (isRecent && !this.recentHeadingInserted && this.recentLabel) {
+      this.insertGroupHeading(element, this.recentLabel);
+      this.recentHeadingInserted = true;
+    } else if (!isRecent && !this.allFilesHeadingInserted && this.allFilesLabel) {
+      this.insertGroupHeading(element, this.allFilesLabel);
+      this.allFilesHeadingInserted = true;
+    }
+    element.toggleClass("file-diff-sbs-picker-recent-item", isRecent);
     element.createDiv({ text: file.name });
     element.createEl("small", { text: file.path, cls: "file-diff-sbs-picker-path" });
+  }
+  /** Inserts an accessible visual separator before a picker group. */
+  private insertGroupHeading(element: HTMLElement, label: string): void {
+    const heading = this.resultContainerEl.createDiv({
+      text: label,
+      cls: "file-diff-sbs-picker-group-heading"
+    });
+    heading.setAttribute("role", "heading");
+    heading.setAttribute("aria-level", "3");
+    element.before(heading);
   }
   /** Resolves the picker with the selected file. */
   onChooseSuggestion(file: TFile): void {

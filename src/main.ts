@@ -7,6 +7,7 @@ import { FileDiffSettingsTab, DEFAULT_SETTINGS, isLanguagePreference, sanitizeCo
 import { createTranslator, resolveLanguage } from "./i18n";
 import type { Language, Translator } from "./i18n";
 import type { ChangeNavigationDirection } from "./diff-navigation";
+import { normalizeRecentFilePaths, rememberRecentFilePath } from "./recent-files";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -101,6 +102,15 @@ export class FileDiffSideBySidePlugin extends Plugin {
     const view = this.app.workspace.getActiveViewOfType(SideBySideDiffView);
     view?.navigateChange(direction);
   }
+  /** Remembers a selected right-hand file without interrupting the comparison. */
+  async rememberRecentRightFile(file: TFile): Promise<void> {
+    this.settings.recentRightFilePaths = rememberRecentFilePath(this.settings.recentRightFilePaths, file.path);
+    try {
+      await this.saveSettings();
+    } catch (error) {
+      console.error("Side-by-Side Diff konnte die zuletzt verwendete Datei nicht speichern.", error);
+    }
+  }
   /** Loads persisted plugin settings and applies defaults for new options. */
   async loadSettings(): Promise<void> {
     const storedData: unknown = await this.loadData();
@@ -109,7 +119,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
       showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
       autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
       changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
-      language: storedSettings.language === "de" || storedSettings.language === "en" || storedSettings.language === "auto" ? storedSettings.language : DEFAULT_SETTINGS.language
+      language: storedSettings.language === "de" || storedSettings.language === "en" || storedSettings.language === "auto" ? storedSettings.language : DEFAULT_SETTINGS.language,
+      recentRightFilePaths: normalizeRecentFilePaths(storedSettings.recentRightFilePaths)
     };
     if (!["auto", "de", "en"].includes(this.settings.language)) {
       this.settings.language = DEFAULT_SETTINGS.language;

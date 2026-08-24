@@ -13,6 +13,8 @@
 	"menu.refresh": "Refresh",
 	"picker.leftFile": "Select left file",
 	"picker.rightFile": "Select right file",
+	"picker.recentFiles": "Recent files (5)",
+	"picker.allFiles": "All files",
 	"modal.deleteIdentical.title": "Move identical file to trash?",
 	"modal.deleteIdentical.confirm": "Move “{path}” to the trash?",
 	"modal.deleteIdentical.note": "The file will not be permanently deleted and can be restored from the trash.",

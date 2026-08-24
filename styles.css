@@ -49,9 +49,16 @@
 
 .file-diff-sbs-title small,
 .file-diff-sbs-summary,
-.file-diff-sbs-picker-path {
+.file-diff-sbs-picker-path,
+.file-diff-sbs-picker-group-heading {
 	color: var(--text-muted);
 	font-weight: 400;
+}
+
+.file-diff-sbs-picker-group-heading {
+	padding: 0.45rem 0.75rem 0.2rem;
+	border-top: 1px solid var(--background-modifier-border);
+	font-size: var(--font-smaller);
 }
 
 .file-diff-sbs-actions {

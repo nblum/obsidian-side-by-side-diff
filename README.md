@@ -27,6 +27,7 @@ inline-highlighted changes, and controlled change acceptance.
 - navigate between changes with `Next change` / `Previous change`, `Alt+ArrowDown` / `Alt+ArrowUp`, and automatic scrolling
 - automatically continue with the next open change after accepting or ignoring one (configurable, enabled by default)
 - accept individual changes on the right or deliberately ignore them
+- remember the last five right-hand files and show them first in the right-file selector
 - edit the right-hand file directly and save changes in one step
 - create change proposals as timestamped copies and later apply them to the original
 - display the interface automatically in German or English

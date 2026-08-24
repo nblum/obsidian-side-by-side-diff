@@ -6,6 +6,7 @@ import { clearChangeTargetMetadata, getAutoAdvanceChangeIndex, getChangeKeyboard
 import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { captureSaveBaseline, createGuardedSaveTransform, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
+import { getRecentFiles } from "./recent-files";
 import type { Language } from "./i18n";
 
 export type PaneMode = "compare" | "proposal" | "accept";
@@ -46,8 +47,9 @@ interface PendingFile {
 
 interface DiffViewPlugin {
   readonly language: Language;
-  readonly settings: { autoAdvanceAfterChange: boolean };
+  readonly settings: { autoAdvanceAfterChange: boolean; recentRightFilePaths: string[] };
   translate(key: string, variables?: Record<string, string | number>): string;
+  rememberRecentRightFile(file: TFile): Promise<void>;
 }
 
 /** Renders token-level differences without injecting HTML strings. */
@@ -487,11 +489,16 @@ export class SideBySideDiffView extends ItemView {
   /** Opens a file picker for the right-hand pane. */
   selectRightFile(leftFile: TFile): void {
     const files = this.app.vault.getFiles().filter((file) => isTextFile(file) && file.path !== leftFile.path).sort((a, b) => a.path.localeCompare(b.path, this.plugin.language));
+    const recentFiles = getRecentFiles(files, this.plugin.settings.recentRightFilePaths);
     const modal = new FilePickerModal(this.app, files, (rightFile) => {
       if (rightFile) {
         void this.applyRightFile(leftFile, rightFile);
       }
-    }, this.plugin.language);
+    }, this.plugin.language, {
+      recentFiles,
+      recentLabel: this.translate("picker.recentFiles"),
+      allFilesLabel: this.translate("picker.allFiles")
+    });
     modal.setPlaceholder(this.translate("picker.rightFile"));
     modal.open();
   }
@@ -503,6 +510,7 @@ export class SideBySideDiffView extends ItemView {
     this.pendingFileContents.clear();
     this.saveBaselines.clear();
     this.dismissedRows.clear();
+    void this.plugin.rememberRecentRightFile(rightFile);
     try {
       await this.renderDiff();
     } catch (error) {

@@ -13,6 +13,8 @@
 	"menu.refresh": "Aktualisieren",
 	"picker.leftFile": "Linke Datei auswählen",
 	"picker.rightFile": "Rechte Datei auswählen",
+	"picker.recentFiles": "Zuletzt verwendet (5)",
+	"picker.allFiles": "Alle Dateien",
 	"modal.deleteIdentical.title": "Identische Datei löschen?",
 	"modal.deleteIdentical.confirm": "Soll „{path}“ in den Papierkorb verschoben werden?",
 	"modal.deleteIdentical.note": "Die Datei wird nicht endgültig gelöscht und kann aus dem Papierkorb wiederhergestellt werden.",

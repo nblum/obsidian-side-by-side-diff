@@ -8,13 +8,15 @@ export interface PluginSettings {
   autoAdvanceAfterChange: boolean;
   changeCopySuffix: string;
   language: LanguagePreference;
+  recentRightFilePaths: string[];
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   showRibbonIcon: true,
   autoAdvanceAfterChange: true,
   changeCopySuffix: "_changes_",
-  language: "auto"
+  language: "auto",
+  recentRightFilePaths: []
 };
 
 /** Checks whether a persisted or UI value is a supported language preference. */

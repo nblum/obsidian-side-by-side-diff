@@ -26,6 +26,7 @@ visible, can be reviewed and staged individually, and are written only through a
   discarded only after confirmation.
 - `Refresh` is available in the file context menu and reloads an open comparison view.
 - The scroll position is preserved when staging, ignoring, or saving a change.
+- The right-file selector remembers up to five recently selected files and shows them in a separate recent-files group.
 
 ### Accepting and ignoring changes
 
@@ -68,6 +69,7 @@ visible, can be reviewed and staged individually, and are written only through a
   permanently deleted and can be restored.
 - When a compared file is renamed or deleted, the open view reacts to the vault change.
 - Known binary formats are not offered as text files for selection.
+- Deleted or unavailable files are removed from the recent-files display automatically.
 
 ### Translated interface
 
