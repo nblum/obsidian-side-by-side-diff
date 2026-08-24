@@ -2,8 +2,8 @@
   "id": "side-by-side-diff",
   "name": "Side-by-Side Diff",
   "version": "0.4.0",
-  "minAppVersion": "1.5.0",
-  "description": "Compare, review, and selectively merge two text files in a side-by-side view.",
+  "minAppVersion": "1.6.6",
+  "description": "Compare two text files in a side-by-side file diff viewer, review line changes, and selectively accept or reject edits.",
   "author": "Nico Blum",
   "isDesktopOnly": true
 }

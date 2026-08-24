@@ -1,7 +1,7 @@
 # Side-by-Side Diff
 
-Local Obsidian plugin for a clear left/right comparison of two text files, with a synchronized view,
-inline-highlighted changes, and controlled change acceptance.
+Compare two text files in a side-by-side file diff viewer. Review line changes with inline highlighting and
+selectively accept or reject edits; changes are written only when explicitly saved.
 
 > Compare, review, accept: Every change remains visible and is written to the vault only when you save.
 
@@ -78,7 +78,7 @@ overwriting newer content. Closing a view with unsaved changes opens a confirmat
 
 ## Installation
 
-The plugin requires Obsidian `1.5.0` or later.
+The plugin requires Obsidian `1.6.6` or later.
 
 For a local installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
 **Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
@@ -95,7 +95,8 @@ Side-by-Side Diff runs entirely inside the current Obsidian vault.
 
 - It makes no network requests and uses no telemetry, analytics, ads, or external services.
 - It does not require an account or payment.
-- It reads and writes only vault files after an explicit user action, plus its own plugin settings.
+- It enumerates vault file metadata (paths and names) to populate the file selectors and context actions.
+- It reads and writes file contents only after an explicit user action, plus its own plugin settings.
 - It does not access files outside the vault.
 
 The source repository contains TypeScript; `main.js` is generated locally and attached to releases.
@@ -104,6 +105,7 @@ The source repository contains TypeScript; `main.js` is generated locally and at
 
 Release tags must exactly match the `version` in `manifest.json` and use the `x.y.z` format. Pushing such a tag
 automatically creates a GitHub release with generated notes and uploads `main.js`, `manifest.json`, and `styles.css`.
+The release workflow also creates GitHub artifact attestations for these three assets.
 
 ## Documentation
 

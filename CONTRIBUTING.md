@@ -5,7 +5,7 @@ Contributions should therefore stay small, reviewable, and focused on the compar
 
 ## Development environment
 
-- Obsidian `1.5.0` or later for manual UI checks
+- Obsidian `1.6.6` or later for manual UI checks
 - Node.js 22.6 or later for `node:test` with TypeScript support
 - npm for building, type-checking, linting, and testing
 

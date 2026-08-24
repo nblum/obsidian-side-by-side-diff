@@ -79,19 +79,16 @@ export class FileDiffSideBySidePlugin extends Plugin {
       this.addCommand({
         id: "save-comparison",
         name: this.translate("commands.saveComparison"),
-        hotkeys: [{ modifiers: ["Mod"], key: "S" }],
         callback: () => { this.saveActiveComparison(); }
       }),
       this.addCommand({
         id: "next-change",
         name: this.translate("commands.nextChange"),
-        hotkeys: [{ modifiers: ["Alt"], key: "ArrowDown" }],
         callback: () => { this.navigateActiveComparison("next"); }
       }),
       this.addCommand({
         id: "previous-change",
         name: this.translate("commands.previousChange"),
-        hotkeys: [{ modifiers: ["Alt"], key: "ArrowUp" }],
         callback: () => { this.navigateActiveComparison("previous"); }
       })
     ];

@@ -1,4 +1,4 @@
-import { ItemView, Notice, TFile, requireApiVersion } from "obsidian";
+import { ItemView, Notice, TFile } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";

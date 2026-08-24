@@ -107,7 +107,7 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
 
 ## Technical requirements
 
-- Obsidian `1.5.0` or later.
+- Obsidian `1.6.6` or later.
 - Files being compared must be text files in the vault.
 - No external services or additional runtime dependencies are required.
 - Each supported language needs a complete translation file with the same key set as the other languages.
