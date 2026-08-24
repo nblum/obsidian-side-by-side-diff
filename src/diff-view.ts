@@ -7,6 +7,7 @@ import { DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "
 import { captureSaveBaseline, createGuardedSaveTransform, migrateSaveEntry, refreshSaveBaseline, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
+import { hasEditableLineStructureChanged } from "./edit-sync";
 import type { Language } from "./i18n";
 
 export type PaneMode = "compare" | "proposal" | "accept";
@@ -38,6 +39,7 @@ interface RightEditorState {
   editor: HTMLElement;
   initialValue: string;
   observer: MutationObserver;
+  resizeObserver: ResizeObserver;
 }
 
 interface PendingFile {
@@ -85,9 +87,11 @@ export class SideBySideDiffView extends ItemView {
   private readonly saveBaselines = new Map<string, string>();
   private readonly changeActions = new Map<number, ChangeActions>();
   private rightEditorState: RightEditorState | null = null;
+  private rightEditorDirty = false;
   private saveButton: HTMLButtonElement | null = null;
   private editInputSnapshot: EditInputSnapshot | null = null;
   private editSyncFrame: number | null = null;
+  private pendingEditSyncPreferredIndex: number | null = null;
   private saveRequestInProgress = false;
   private activeChangeRowIndex: number | null = null;
   private previousChangeButton: HTMLButtonElement | null = null;
@@ -115,7 +119,6 @@ export class SideBySideDiffView extends ItemView {
     }
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
-    this.registerDomEvent(this.contentEl, "keyup", (event) => { this.handleEditKeyup(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
     this.registerEvent(this.app.vault.on("delete", (file) => { this.refreshForPath(file.path); }));
@@ -242,6 +245,7 @@ export class SideBySideDiffView extends ItemView {
     if (!editor) {
       return;
     }
+    this.rightEditorDirty = true;
     const snapshot = this.editInputSnapshot?.editor === editor ? this.editInputSnapshot : null;
     this.editInputSnapshot = null;
     const leftPane = this.getEditableLeftPane(editor);
@@ -254,18 +258,18 @@ export class SideBySideDiffView extends ItemView {
     if (editedLine !== null && editedCode !== null && editedCode !== undefined && editedCode.textContent.length > 0) {
       editedLine.dataset.rightPresent = "true";
     }
-    const leftCount = this.getEditableLines(leftPane).length;
-    const rightCount = this.getEditableLines(editor).length;
-    if (leftCount !== rightCount) {
-      this.synchronizeEditablePanes(editor, snapshot?.preferredIndex);
-    } else {
-      this.updateEditableLineNumbers(editor);
-      this.synchronizeEditableLineHeights(editor);
+    const leftCount = leftPane.children.length;
+    const rightCount = editor.children.length;
+    if (hasEditableLineStructureChanged(event.inputType, snapshot?.rightCount ?? null, rightCount) || leftCount !== rightCount) {
+      this.scheduleEditablePaneSync(editor, snapshot?.preferredIndex ?? null);
     }
     this.updateSaveButtonState();
   }
   /** Schedules a post-edit alignment pass after the browser has finished changing the DOM. */
-  scheduleEditablePaneSync(editor: HTMLElement): void {
+  scheduleEditablePaneSync(editor: HTMLElement, preferredIndex: number | null = null): void {
+    if (preferredIndex !== null) {
+      this.pendingEditSyncPreferredIndex = preferredIndex;
+    }
     if (this.editSyncFrame !== null) {
       return;
     }
@@ -280,22 +284,15 @@ export class SideBySideDiffView extends ItemView {
       }
       const snapshot = this.editInputSnapshot?.editor === editor ? this.editInputSnapshot : null;
       this.editInputSnapshot = null;
-      this.synchronizeEditablePanes(editor, snapshot?.preferredIndex);
+      const requestedIndex = this.pendingEditSyncPreferredIndex;
+      this.pendingEditSyncPreferredIndex = null;
+      this.synchronizeEditablePanes(editor, requestedIndex ?? snapshot?.preferredIndex ?? null);
     });
-  }
-  /** Schedules a final alignment pass after keyboard-driven editing has completed. */
-  handleEditKeyup(event: KeyboardEvent): void {
-    if (!this.state.editRight) {
-      return;
-    }
-    const editor = this.getEditableEditor(event.target);
-    if (editor) {
-      this.scheduleEditablePaneSync(editor);
-    }
   }
   /** Disconnects the observer used to keep the two editable panes aligned. */
   disposeRightEditorObserver(): void {
     this.rightEditorState?.observer.disconnect();
+    this.rightEditorState?.resizeObserver.disconnect();
     this.rightEditorState = null;
     this.saveButton = null;
     if (this.editSyncFrame !== null) {
@@ -303,6 +300,8 @@ export class SideBySideDiffView extends ItemView {
       this.editSyncFrame = null;
     }
     this.editInputSnapshot = null;
+    this.pendingEditSyncPreferredIndex = null;
+    this.rightEditorDirty = false;
   }
   /** Handles keyboard editing actions inside the comparison view. */
   handleKeydown(event: KeyboardEvent): void {
@@ -325,12 +324,6 @@ export class SideBySideDiffView extends ItemView {
       event.preventDefault();
       event.stopImmediatePropagation();
       return;
-    }
-    if (this.state.editRight && (event.key === "Backspace" || event.key === "Delete")) {
-      const editor = this.getEditableEditor(event.target);
-      if (editor) {
-        this.scheduleEditablePaneSync(editor);
-      }
     }
   }
   /** Saves the current comparison changes from the toolbar or a command shortcut. */
@@ -683,8 +676,9 @@ export class SideBySideDiffView extends ItemView {
     const editor = line.parentElement;
     if (editor) {
       const newLineIndex = this.getEditableLines(editor).indexOf(newLine);
-      this.synchronizeEditablePanes(editor, newLineIndex);
+      this.scheduleEditablePaneSync(editor, newLineIndex);
     }
+    this.rightEditorDirty = true;
     this.setEditableCaret(newCode, 0);
     this.updateSaveButtonState();
     return true;
@@ -772,6 +766,7 @@ export class SideBySideDiffView extends ItemView {
     }
     this.updateEditableLineNumbers(editor);
     this.synchronizeEditableLineHeights(editor);
+    this.observeEditableLineSizes(editor);
   }
   /** Matches paired line heights so wrapped content keeps following rows aligned. */
   synchronizeEditableLineHeights(editor: HTMLElement): void {
@@ -803,6 +798,16 @@ export class SideBySideDiffView extends ItemView {
         leftLine.setCssProps({ "--file-diff-sbs-line-min-height": heightValue });
         rightLine.setCssProps({ "--file-diff-sbs-line-min-height": heightValue });
       }
+    }
+  }
+  /** Observes editable rows so wrapped text realigns only after an actual size change. */
+  observeEditableLineSizes(editor: HTMLElement): void {
+    const resizeObserver = this.rightEditorState?.editor === editor ? this.rightEditorState.resizeObserver : null;
+    if (!resizeObserver) {
+      return;
+    }
+    for (const line of this.getEditableLines(editor)) {
+      resizeObserver.observe(line);
     }
   }
   /** Converts browser-generated direct editor nodes into normal editable line elements. */
@@ -1205,7 +1210,14 @@ export class SideBySideDiffView extends ItemView {
     }
     const observer = new windowRef.MutationObserver(() => { this.scheduleEditablePaneSync(editor); });
     observer.observe(editor, { childList: true, subtree: true });
-    this.rightEditorState = { editor, initialValue: this.serializeRightEditor(editor), observer };
+    const resizeObserver = new windowRef.ResizeObserver(() => {
+      if (this.state.editRight && editor.isConnected) {
+        this.scheduleEditablePaneSync(editor);
+      }
+    });
+    this.rightEditorState = { editor, initialValue: this.serializeRightEditor(editor), observer, resizeObserver };
+    this.observeEditableLineSizes(editor);
+    this.rightEditorDirty = false;
     this.updateSaveButtonState();
   }
   /** Renders one read-only left-side row beside the document editor. */
@@ -1249,16 +1261,20 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Returns whether the editable right side differs from its saved snapshot. */
   hasRightEditorChanges(): boolean {
-    return Boolean(
+    const changed = Boolean(
       this.state.editRight && this.rightEditorState && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue
     );
+    if (!changed) {
+      this.rightEditorDirty = false;
+    }
+    return changed;
   }
   /** Enables or disables the visible save action based on current changes. */
   updateSaveButtonState(): void {
     if (!this.saveButton) {
       return;
     }
-    const hasChanges = this.state.editRight ? this.hasRightEditorChanges() : this.hasPendingChanges();
+    const hasChanges = this.state.editRight ? this.rightEditorDirty : this.hasPendingChanges();
     this.saveButton.disabled = !hasChanges;
     this.saveButton.setAttribute("aria-disabled", String(!hasChanges));
   }
