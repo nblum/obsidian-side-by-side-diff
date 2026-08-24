@@ -6,6 +6,7 @@ import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { FileDiffSettingsTab, DEFAULT_SETTINGS, isLanguagePreference, sanitizeCopySuffix, type PluginSettings } from "./settings";
 import { createTranslator, resolveLanguage } from "./i18n";
 import type { Language, Translator } from "./i18n";
+import type { ChangeNavigationDirection } from "./diff-navigation";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -75,6 +76,18 @@ export class FileDiffSideBySidePlugin extends Plugin {
         name: this.translate("commands.saveComparison"),
         hotkeys: [{ modifiers: ["Mod"], key: "S" }],
         callback: () => { this.saveActiveComparison(); }
+      }),
+      this.addCommand({
+        id: "next-change",
+        name: this.translate("commands.nextChange"),
+        hotkeys: [{ modifiers: ["Alt"], key: "ArrowDown" }],
+        callback: () => { this.navigateActiveComparison("next"); }
+      }),
+      this.addCommand({
+        id: "previous-change",
+        name: this.translate("commands.previousChange"),
+        hotkeys: [{ modifiers: ["Alt"], key: "ArrowUp" }],
+        callback: () => { this.navigateActiveComparison("previous"); }
       })
     ];
   }
@@ -83,12 +96,18 @@ export class FileDiffSideBySidePlugin extends Plugin {
     const view = this.app.workspace.getActiveViewOfType(SideBySideDiffView);
     view?.saveChanges();
   }
+  /** Navigates the currently active comparison to an adjacent changed row. */
+  navigateActiveComparison(direction: ChangeNavigationDirection): void {
+    const view = this.app.workspace.getActiveViewOfType(SideBySideDiffView);
+    view?.navigateChange(direction);
+  }
   /** Loads persisted plugin settings and applies defaults for new options. */
   async loadSettings(): Promise<void> {
     const storedData: unknown = await this.loadData();
     const storedSettings = typeof storedData === "object" && storedData !== null ? storedData as Record<string, unknown> : {};
     this.settings = {
       showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
+      autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
       changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
       language: storedSettings.language === "de" || storedSettings.language === "en" || storedSettings.language === "auto" ? storedSettings.language : DEFAULT_SETTINGS.language
     };
@@ -122,7 +141,9 @@ export class FileDiffSideBySidePlugin extends Plugin {
       this.translate("commands.compareActiveFile"),
       this.translate("commands.compareTwoFiles"),
       this.translate("commands.proposeChanges"),
-      this.translate("commands.saveComparison")
+      this.translate("commands.saveComparison"),
+      this.translate("commands.nextChange"),
+      this.translate("commands.previousChange")
     ];
     this.commandEntries.forEach((command, index) => {
       const commandName = commandNames[index];

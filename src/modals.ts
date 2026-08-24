@@ -87,13 +87,15 @@ export class UnsavedChangesModal extends Modal {
   private resolveChoice: ((choice: UnsavedChoice) => void) | null;
   private finished: boolean;
   private readonly translate: Translator;
+  private readonly question: string;
 
   /** Creates a save-or-discard prompt for pending comparison changes. */
-  constructor(app: App, translate: Translator) {
+  constructor(app: App, translate: Translator, question = translate("modal.unsaved.question")) {
     super(app);
     this.resolveChoice = null;
     this.finished = false;
     this.translate = translate;
+    this.question = question;
   }
   /** Opens the prompt and resolves with the selected close action. */
   waitForChoice(): Promise<UnsavedChoice> {
@@ -105,7 +107,7 @@ export class UnsavedChangesModal extends Modal {
   /** Renders the save and discard actions. */
   override onOpen(): void {
     this.titleEl.setText(this.translate("modal.unsaved.title"));
-    this.contentEl.createEl("p", { text: this.translate("modal.unsaved.question") });
+    this.contentEl.createEl("p", { text: this.question });
     const actions = this.contentEl.createDiv({ cls: "file-diff-sbs-unsaved-actions" });
     const saveButton = actions.createEl("button", { text: this.translate("modal.unsaved.save"), cls: "mod-cta" });
     saveButton.addEventListener("click", () => { this.choose("save"); });
@@ -132,4 +134,3 @@ export class UnsavedChangesModal extends Modal {
     this.contentEl.empty();
   }
 }
-

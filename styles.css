@@ -61,6 +61,11 @@
 	gap: 0.4rem;
 }
 
+.file-diff-sbs-navigation {
+	display: flex;
+	gap: 0.4rem;
+}
+
 .file-diff-sbs-save-action {
 	margin-left: auto;
 }
@@ -189,6 +194,13 @@
 .file-diff-sbs-row {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.file-diff-sbs-active-change {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
 }
 
 .file-diff-sbs-cell {

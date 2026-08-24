@@ -276,7 +276,15 @@ export function getIgnoredDiffRow(row: IndexedDiffRow): IndexedDiffRow | null {
 	if (row.right === null) {
 		return null;
 	}
-	return { ...row, left: null, leftLineNumber: null, equal: true };
+	return {
+		left: null,
+		right: row.right,
+		equal: true,
+		leftIndex: row.leftIndex,
+		rightIndex: row.rightIndex,
+		leftLineNumber: null,
+		rightLineNumber: row.rightLineNumber,
+	};
 }
 
 /** Calculates where compensating blank lines belong when one pane changes length. */

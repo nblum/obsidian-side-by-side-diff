@@ -5,12 +5,14 @@ import type { LanguagePreference } from "./i18n";
 
 export interface PluginSettings {
   showRibbonIcon: boolean;
+  autoAdvanceAfterChange: boolean;
   changeCopySuffix: string;
   language: LanguagePreference;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   showRibbonIcon: true,
+  autoAdvanceAfterChange: true,
   changeCopySuffix: "_changes_",
   language: "auto"
 };
@@ -62,6 +64,15 @@ export class FileDiffSettingsTab extends PluginSettingTab {
         }
       },
       {
+        name: this.plugin.translate("settings.autoAdvance.name"),
+        desc: this.plugin.translate("settings.autoAdvance.description"),
+        control: {
+          type: "toggle",
+          key: "autoAdvanceAfterChange",
+          defaultValue: DEFAULT_SETTINGS.autoAdvanceAfterChange
+        }
+      },
+      {
         name: this.plugin.translate("settings.suffix.name"),
         desc: this.plugin.translate("settings.suffix.description"),
         control: {
@@ -86,6 +97,8 @@ export class FileDiffSettingsTab extends PluginSettingTab {
     } else if (key === "showRibbonIcon" && typeof value === "boolean") {
       this.plugin.settings.showRibbonIcon = value;
       this.plugin.updateRibbonVisibility();
+    } else if (key === "autoAdvanceAfterChange" && typeof value === "boolean") {
+      this.plugin.settings.autoAdvanceAfterChange = value;
     } else if (key === "changeCopySuffix" && typeof value === "string") {
       this.plugin.settings.changeCopySuffix = sanitizeCopySuffix(value) || DEFAULT_SETTINGS.changeCopySuffix;
     } else {
@@ -113,6 +126,12 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       toggle.setValue(this.plugin.settings.showRibbonIcon).onChange(async (value) => {
         this.plugin.settings.showRibbonIcon = value;
         this.plugin.updateRibbonVisibility();
+        await this.plugin.saveSettings();
+      });
+    });
+    new Setting(containerEl).setName(this.plugin.translate("settings.autoAdvance.name")).setDesc(this.plugin.translate("settings.autoAdvance.description")).addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.autoAdvanceAfterChange).onChange(async (value) => {
+        this.plugin.settings.autoAdvanceAfterChange = value;
         await this.plugin.saveSettings();
       });
     });
