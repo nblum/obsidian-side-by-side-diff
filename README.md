@@ -1,6 +1,6 @@
 # Side-by-Side Diff
 
-[![Add to Obsidian](https://img.shields.io/badge/Add_to_Obsidian-7C3AED?logo=obsidian&logoColor=white)](obsidian://show-plugin?id=side-by-side-diff)
+[![Add to Obsidian](assets/add-to-obsidian.svg)](https://community.obsidian.md/plugins/side-by-side-diff)
 [![CI](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/nblum/obsidian-side-by-side-diff?label=release)](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/nblum/obsidian-side-by-side-diff)](LICENSE)
@@ -88,9 +88,8 @@ overwriting newer content. Closing a view with unsaved changes opens a confirmat
 
 The plugin requires Obsidian `1.6.6` or later.
 
-Use the **Add to Obsidian** button above to open the plugin directly in Obsidian. If the browser does not handle the
-`obsidian://` link, open the [official Obsidian plugin page](https://obsidian.md/plugins?id=side-by-side-diff) or
-search for `Side-by-Side Diff` under **Settings → Community plugins → Browse**.
+Use the **Add to Obsidian** button above to open the Side-by-Side Diff community plugin page. To install the plugin,
+search for `Side-by-Side Diff` under **Settings → Community plugins → Browse** in Obsidian.
 
 For a manual installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
 **Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
