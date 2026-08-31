@@ -1,5 +1,11 @@
 # Side-by-Side Diff
 
+[![Add to Obsidian](https://img.shields.io/badge/Add_to_Obsidian-7C3AED?logo=obsidian&logoColor=white)](obsidian://show-plugin?id=side-by-side-diff)
+[![CI](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/nblum/obsidian-side-by-side-diff?label=release)](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/nblum/obsidian-side-by-side-diff)](LICENSE)
+[![Star on GitHub](https://img.shields.io/github/stars/nblum/obsidian-side-by-side-diff?logo=github&label=star)](https://github.com/nblum/obsidian-side-by-side-diff)
+
 Compare two text files in a side-by-side file diff viewer. Review line changes with inline highlighting and
 selectively accept or reject edits; changes are written only when explicitly saved.
 
@@ -14,10 +20,11 @@ selectively accept or reject edits; changes are written only when explicitly sav
 - [Three workflows](#three-workflows)
 - [Edit and save](#edit-and-save)
 - [Installation](#installation)
+- [Feedback and support](#feedback-and-support)
 - [Privacy and permissions](#privacy-and-permissions)
 - [Releases](#releases)
-- [Development](#development)
 - [Documentation](#documentation)
+- [Development](#development)
 - [Tests](#tests)
 
 ## At a glance
@@ -81,7 +88,11 @@ overwriting newer content. Closing a view with unsaved changes opens a confirmat
 
 The plugin requires Obsidian `1.6.6` or later.
 
-For a local installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
+Use the **Add to Obsidian** button above to open the plugin directly in Obsidian. If the browser does not handle the
+`obsidian://` link, open the [official Obsidian plugin page](https://obsidian.md/plugins?id=side-by-side-diff) or
+search for `Side-by-Side Diff` under **Settings → Community plugins → Browse**.
+
+For a manual installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
 **Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
 `main.js`, `manifest.json`, `styles.css`, and `locales/` directory.
 
@@ -89,6 +100,18 @@ The plugin is currently marked as desktop-only because mobile support has not be
 
 Set the interface language under **Settings → Side-by-Side Diff → Language** to `Automatic`, `Deutsch`, or `English`.
 In automatic mode, the Obsidian language is used when supported; unsupported languages fall back to English.
+The About section at the top links to the developer website, the GitHub repository for stars, and the issue page for
+feedback.
+
+## Feedback and support
+
+- [Report a bug or request a feature](https://github.com/nblum/obsidian-side-by-side-diff/issues/new)
+- [View the latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
+- [Read the changelog](CHANGELOG.md)
+- [Visit the developer website](https://blum-nico.de)
+
+If Side-by-Side Diff is useful to you, a [GitHub star](https://github.com/nblum/obsidian-side-by-side-diff) is much
+appreciated.
 
 ## Privacy and permissions
 
