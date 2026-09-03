@@ -9,7 +9,7 @@ import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
 import { hasEditableLineStructureChanged } from "./edit-sync";
 import { shouldOfferProposalCleanup } from "./proposal-cleanup";
-import { DiffSession } from "./diff-session";
+import { DiffSession, hasUnsavedComparisonChanges } from "./diff-session";
 import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./diff-view-state";
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
 import type { Language } from "./i18n";
@@ -545,7 +545,7 @@ export class SideBySideDiffView extends ItemView {
   /** Returns whether editing or diff actions have produced unsaved changes. */
   hasUnsavedChanges(): boolean {
     const editorChanged = this.state.editRight && this.rightEditorState !== null && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue;
-    return editorChanged || this.hasPendingChanges() || this.session.getDismissedRowCount() > 0;
+    return hasUnsavedComparisonChanges(editorChanged, this.hasPendingChanges());
   }
   /** Writes all current changes without rebuilding the view during close. */
   async saveChangesBeforeClose(): Promise<boolean> {

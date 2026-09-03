@@ -8,6 +8,7 @@
 	"commands.nextChange": "Nächste Änderung",
 	"commands.previousChange": "Vorherige Änderung",
 	"menu.compareActiveFile": "Mit anderer Datei vergleichen",
+	"menu.compareSelectedFiles": "Dateien vergleichen",
 	"menu.proposeChanges": "Änderungen vorschlagen",
 	"menu.acceptChanges": "Änderungen übernehmen",
 	"menu.refresh": "Aktualisieren",

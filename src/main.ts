@@ -1,5 +1,5 @@
 import { Notice, Plugin, TFile, moment, requireApiVersion } from "obsidian";
-import type { Command } from "obsidian";
+import type { Command, TAbstractFile } from "obsidian";
 import { FilePickerModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
@@ -57,6 +57,19 @@ export class FileDiffSideBySidePlugin extends Plugin {
         }
         menu.addItem((item) => {
           item.setTitle(this.translate("menu.refresh")).setIcon("refresh-cw").onClick(() => { this.refreshDiffViews(file); });
+        });
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("files-menu", (menu, files) => {
+        const textFiles = files.filter((selectedFile: TAbstractFile) => isTextFile(selectedFile));
+        const firstFile = textFiles[0];
+        const secondFile = textFiles[1];
+        if (textFiles.length !== 2 || !firstFile || !secondFile) {
+          return;
+        }
+        menu.addItem((item) => {
+          item.setTitle(this.translate("menu.compareSelectedFiles")).setIcon(ICON_ID).onClick(() => { void this.openDiffView(firstFile, secondFile); });
         });
       })
     );

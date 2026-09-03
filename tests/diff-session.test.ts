@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DiffSession } from "../src/diff-session.ts";
+import { DiffSession, hasUnsavedComparisonChanges } from "../src/diff-session.ts";
 
 test("keeps staged content and its first save baseline together", () => {
 	const session = new DiffSession();
@@ -67,4 +67,29 @@ test("clears transient decisions without exposing internal collections", () => {
 	session.reset();
 	assert.equal(session.hasAcceptedProposalChanges(), false);
 	assert.equal(session.hasShownProposalCleanupPrompt(), false);
+});
+
+test("does not treat dismissed rows alone as unsaved changes", () => {
+	assert.equal(hasUnsavedComparisonChanges(false, false), false);
+});
+
+test("treats a dirty right editor as unsaved", () => {
+	assert.equal(hasUnsavedComparisonChanges(true, false), true);
+});
+
+test("treats staged pending changes as unsaved", () => {
+	assert.equal(hasUnsavedComparisonChanges(false, true), true);
+});
+
+test("stops reporting unsaved changes once a save clears declines and pending changes", () => {
+	const session = new DiffSession();
+	session.dismissRow("declined-row");
+	session.stageChange("note.md", "accepted", "before");
+	assert.equal(hasUnsavedComparisonChanges(false, session.hasPendingChanges()), true);
+
+	// A save writes the staged content but intentionally leaves declined rows dismissed.
+	session.removePendingChange("note.md");
+
+	assert.equal(session.getDismissedRowCount(), 1);
+	assert.equal(hasUnsavedComparisonChanges(false, session.hasPendingChanges()), false);
 });

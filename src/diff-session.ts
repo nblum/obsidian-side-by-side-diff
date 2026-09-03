@@ -6,6 +6,15 @@ export interface PendingChange {
 	readonly content: string;
 }
 
+/**
+ * Returns whether leaving the comparison would discard real, unwritten data.
+ * Dismissed rows never touch a file, so they must not count as unsaved on their own -
+ * otherwise closing the view keeps prompting to save even after every pending change was written.
+ */
+export function hasUnsavedComparisonChanges(rightEditorChanged: boolean, hasPendingChanges: boolean): boolean {
+	return rightEditorChanged || hasPendingChanges;
+}
+
 /** Encapsulates transient comparison state independently from the Obsidian view. */
 export class DiffSession {
 	private readonly dismissedRowKeys = new Set<string>();

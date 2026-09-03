@@ -8,6 +8,7 @@
 	"commands.nextChange": "Next change",
 	"commands.previousChange": "Previous change",
 	"menu.compareActiveFile": "Compare with another file",
+	"menu.compareSelectedFiles": "Compare files",
 	"menu.proposeChanges": "Suggest changes",
 	"menu.acceptChanges": "Accept changes",
 	"menu.refresh": "Refresh",
