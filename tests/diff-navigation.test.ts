@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getChangeRowIndexes, getNextChangeIndex } from "../src/diff-navigation.ts";
+import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getChangeRowIndexes, getNextChangeIndex, isUndoShortcut } from "../src/diff-navigation.ts";
 
 test("maps Alt-arrow shortcuts to navigation and change actions", () => {
 	assert.equal(getChangeKeyboardAction("ArrowUp", true, false, false, false), "previous");
@@ -58,6 +58,14 @@ test("continues after a previously selected change was resolved", () => {
 	assert.equal(getNextChangeIndex([2, 5], 3, "next"), 5);
 	assert.equal(getNextChangeIndex([2, 5], 3, "previous"), 2);
 	assert.equal(getNextChangeIndex([], null, "next"), null);
+});
+
+test("recognizes Ctrl+Z and Cmd+Z as the undo shortcut", () => {
+	assert.equal(isUndoShortcut("z", true, false, false), true);
+	assert.equal(isUndoShortcut("Z", false, true, false), true);
+	assert.equal(isUndoShortcut("z", true, false, true), false);
+	assert.equal(isUndoShortcut("z", false, false, false), false);
+	assert.equal(isUndoShortcut("y", true, false, false), false);
 });
 
 test("auto-advance follows target order after LCS row realignment", () => {

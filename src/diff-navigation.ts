@@ -33,6 +33,11 @@ export function getChangeKeyboardAction(
 	return null;
 }
 
+/** Returns whether a keyboard event matches the undo shortcut (Ctrl+Z or Cmd+Z, without Shift). */
+export function isUndoShortcut(key: string, ctrlKey: boolean, metaKey: boolean, shiftKey: boolean): boolean {
+	return (ctrlKey || metaKey) && !shiftKey && key.toLowerCase() === "z";
+}
+
 /** Removes navigation metadata copied from an original editable line. */
 export function clearChangeTargetMetadata(element: ChangeTargetElement): void {
 	delete element.dataset.diffRowIndex;

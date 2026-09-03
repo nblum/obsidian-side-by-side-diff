@@ -2,6 +2,23 @@
 
 All notable changes to Side-by-Side Diff are documented here.
 
+## [0.6.0] - 2026-09-03
+
+### Added
+
+- Added a `Compare files` file-explorer context menu action that appears when exactly two text files are selected, opening the comparison view with both files directly.
+- Grouped changed lines that are only separated by blank-line pairs into one visual block, so a paragraph rewritten across several lines reads as one connected change instead of disconnected single-line edits.
+- Added `Accept all` / `Ignore all` controls to change blocks with more than three changed lines, so a whole rewritten block can be resolved at once; the controls disappear once the block is fully resolved.
+- Added an `Undo` toolbar button and `Ctrl/Cmd+Z` to revert the last accept or ignore action, row or whole block, until the next save.
+- Added an About section with links to the developer website, GitHub star, and feedback, plus a locally bundled "Add to Obsidian" icon.
+
+### Fixed
+
+- Stopped re-prompting to save when closing the comparison view after a save that only left ignored (dismissed) changes behind.
+- Fixed `Accept all` silently re-applying a change the user had already ignored individually within the same block.
+- Preserved undo history for ignored changes across `Swap` instead of discarding it silently.
+- Made `Ignore all` a single undo step instead of requiring one undo per row in the block.
+
 ## [0.5.0] - 2026-08-24
 
 ### Added

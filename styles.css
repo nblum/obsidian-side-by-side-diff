@@ -203,6 +203,38 @@
 	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
 }
 
+.file-diff-sbs-group {
+	margin: 0.2rem 0;
+	border: 1px solid color-mix(in srgb, var(--color-yellow), transparent 30%);
+	border-left: 3px solid color-mix(in srgb, var(--color-yellow), transparent 15%);
+	border-radius: var(--radius-s);
+	overflow: hidden;
+}
+
+.file-diff-sbs-group-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.15rem 0.6rem;
+	background: color-mix(in srgb, var(--color-yellow), transparent 85%);
+	border-bottom: 1px solid color-mix(in srgb, var(--color-yellow), transparent 30%);
+	font-size: var(--font-smaller);
+	color: var(--text-muted);
+}
+
+.file-diff-sbs-group-actions {
+	display: flex;
+	gap: 0.3rem;
+}
+
+.file-diff-sbs-group-button {
+	height: 1.5rem;
+	padding: 0 0.5rem;
+	font-size: var(--font-smaller);
+	line-height: 1;
+}
+
 .file-diff-sbs-active-change {
 	position: relative;
 	z-index: 1;

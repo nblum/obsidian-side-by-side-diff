@@ -2,7 +2,7 @@ import { ItemView, Notice, TFile } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";
-import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, type ChangeNavigationDirection } from "./diff-navigation";
+import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, isUndoShortcut, type ChangeNavigationDirection } from "./diff-navigation";
 import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { createGuardedSaveTransform, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
@@ -10,6 +10,7 @@ import { getRecentFiles } from "./recent-files";
 import { hasEditableLineStructureChanged } from "./edit-sync";
 import { shouldOfferProposalCleanup } from "./proposal-cleanup";
 import { DiffSession, hasUnsavedComparisonChanges } from "./diff-session";
+import { countGroupChangedRows, getActionableRowIndexes, groupChangeRows, GROUP_HEADER_THRESHOLD, type ChangeRowGroup } from "./diff-grouping";
 import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./diff-view-state";
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
 import type { Language } from "./i18n";
@@ -290,6 +291,12 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Handles keyboard editing actions inside the comparison view. */
   handleKeydown(event: KeyboardEvent): void {
+    if (!this.state.editRight && isUndoShortcut(event.key, event.ctrlKey, event.metaKey, event.shiftKey) && this.session.canUndo()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void this.undoLastChange();
+      return;
+    }
     const changeAction = getChangeKeyboardAction(event.key, event.altKey, event.ctrlKey, event.metaKey, event.shiftKey);
     if (!this.state.editRight && (changeAction === "next" || changeAction === "previous")) {
       if (this.navigateChange(changeAction)) {
@@ -580,6 +587,7 @@ export class SideBySideDiffView extends ItemView {
           return false;
         }
       }
+      this.session.clearUndoStack();
       return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte \xC4nderungen vor dem Schlie\xDFen nicht speichern.", error);
@@ -919,6 +927,7 @@ export class SideBySideDiffView extends ItemView {
       if (result !== "saved") {
         return false;
       }
+      this.session.clearUndoStack();
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
       if (promptForProposalCleanup) {
@@ -979,6 +988,65 @@ export class SideBySideDiffView extends ItemView {
       this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
       console.error("Side-by-Side Diff konnte die \xC4nderung nicht \xFCbernehmen.", error);
+      new Notice(this.translate("notice.changeFailed"));
+    }
+  }
+  /** Stages every changed row inside a bridged block at once, in the same direction. */
+  async applyGroupChange(startIndex: number, endIndex: number, direction: DiffDirection): Promise<void> {
+    const scrollPosition = this.getScrollPosition();
+    const targetPosition = this.getChangeTargetPosition(startIndex);
+    const leftPath = this.state.leftPath;
+    const rightPath = this.state.rightPath;
+    if (leftPath === null || rightPath === null) {
+      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      return;
+    }
+    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
+    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
+    if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile)) {
+      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      return;
+    }
+    try {
+      const [storedLeftContent, storedRightContent] = await Promise.all([
+        this.app.vault.cachedRead(leftFile),
+        this.app.vault.cachedRead(rightFile)
+      ]);
+      const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
+      const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
+      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent));
+      // Skip rows the user already resolved individually - "Accept all" must not silently
+      // reverse a change they explicitly dismissed.
+      const actionableIndexes = getActionableRowIndexes(rows, startIndex, endIndex, (row) => this.session.hasDismissedRow(getDiffRowKey(row)));
+      if (actionableIndexes.length === 0) {
+        return;
+      }
+      // Apply from the last row to the first so earlier, not-yet-processed row indexes stay valid
+      // while splices from later rows shift everything after them.
+      let leftLines = splitLines(leftContent);
+      let rightLines = splitLines(rightContent);
+      for (let position = actionableIndexes.length - 1; position >= 0; position -= 1) {
+        const rowIndex = actionableIndexes[position];
+        const row = rowIndex === undefined ? undefined : rows[rowIndex];
+        if (!row) {
+          continue;
+        }
+        ({ leftLines, rightLines } = applyAlignedRowChange(leftLines, rightLines, row, direction));
+      }
+      const leftToRight = direction === "left-to-right";
+      const targetFile = leftToRight ? rightFile : leftFile;
+      const targetContent = leftToRight ? rightContent : leftContent;
+      const targetLines = leftToRight ? rightLines : leftLines;
+      const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
+      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
+      new Notice(this.translate("notice.staged"));
+      await this.renderDiff(scrollPosition);
+      if (this.state.mode === "accept" && direction === "left-to-right") {
+        this.session.markProposalChangeAccepted();
+      }
+      this.advanceAfterResolvedChange(targetPosition);
+    } catch (error) {
+      console.error("Side-by-Side Diff konnte den Block nicht \xFCbernehmen.", error);
       new Notice(this.translate("notice.changeFailed"));
     }
   }
@@ -1079,6 +1147,13 @@ export class SideBySideDiffView extends ItemView {
     toolbar.createDiv({ cls: "file-diff-sbs-summary", text: summary });
     const actionToolbar = root.createDiv({ cls: "file-diff-sbs-action-toolbar" });
     const actions = actionToolbar.createDiv({ cls: "file-diff-sbs-actions" });
+    if (!this.state.editRight) {
+      const undoButton = actions.createEl("button", { text: this.translate("actions.undo") });
+      undoButton.title = this.translate("actions.undoTitle");
+      undoButton.setAttribute("aria-keyshortcuts", "Ctrl+Z");
+      undoButton.disabled = !this.session.canUndo();
+      undoButton.addEventListener("click", () => { void this.undoLastChange(); });
+    }
     const navigation = actions.createDiv({ cls: "file-diff-sbs-navigation" });
     const previousChangeButton = navigation.createEl("button", { text: this.translate("actions.previousChange") });
     previousChangeButton.title = this.translate("actions.previousChangeTitle");
@@ -1139,22 +1214,59 @@ export class SideBySideDiffView extends ItemView {
       this.updateChangeNavigationState();
       return;
     }
-    for (let index = 0; index < rows.length; index += 1) {
-      const row = rows[index];
-      if (!row) {
-        continue;
-      }
-      if (!row.equal && this.session.hasDismissedRow(getDiffRowKey(row))) {
-        const ignoredRow = getIgnoredDiffRow(row);
-        if (!ignoredRow) {
-          continue;
+    const blankBridgedGroups = new Map(
+      groupChangeRows(rows).filter((group) => group.bridgesBlankLines).map((group) => [group.startIndex, group])
+    );
+    let index = 0;
+    while (index < rows.length) {
+      const group = blankBridgedGroups.get(index);
+      if (group) {
+        const groupElement = grid.createDiv({ cls: "file-diff-sbs-group" });
+        const unresolvedRowCount = countGroupChangedRows(rows, group, (row) => this.session.hasDismissedRow(getDiffRowKey(row)));
+        if (unresolvedRowCount > GROUP_HEADER_THRESHOLD) {
+          this.buildGroupHeader(groupElement, rows, group, unresolvedRowCount);
         }
-        this.buildRow(grid, ignoredRow, index, false);
+        for (let groupIndex = group.startIndex; groupIndex <= group.endIndex; groupIndex += 1) {
+          this.renderDiffRow(groupElement, rows[groupIndex] ?? null, groupIndex);
+        }
+        index = group.endIndex + 1;
         continue;
       }
-      this.buildRow(grid, row, index, !row.equal);
+      this.renderDiffRow(grid, rows[index] ?? null, index);
+      index += 1;
     }
     this.updateChangeNavigationState();
+  }
+  /** Renders one aligned row, substituting a dismissed change with its ignored, neutral form. */
+  renderDiffRow(parent: HTMLElement, row: ComparisonRowModel | null, rowIndex: number): void {
+    if (!row) {
+      return;
+    }
+    if (!row.equal && this.session.hasDismissedRow(getDiffRowKey(row))) {
+      const ignoredRow = getIgnoredDiffRow(row);
+      if (!ignoredRow) {
+        return;
+      }
+      this.buildRow(parent, ignoredRow, rowIndex, false);
+      return;
+    }
+    this.buildRow(parent, row, rowIndex, !row.equal);
+  }
+  /** Adds a header with block-wide accept/ignore controls above a large bridged change group. */
+  buildGroupHeader(parent: HTMLElement, rows: ComparisonRowModel[], group: ChangeRowGroup, changedRowCount: number): void {
+    const header = parent.createDiv({ cls: "file-diff-sbs-group-header" });
+    header.createSpan({
+      cls: "file-diff-sbs-group-summary",
+      text: this.translate(changedRowCount === 1 ? "view.summary.changedOne" : "view.summary.changedMany", { count: changedRowCount })
+    });
+    const actions = header.createDiv({ cls: "file-diff-sbs-group-actions" });
+    const acceptButton = actions.createEl("button", { text: this.translate("actions.acceptGroup"), cls: "file-diff-sbs-group-button" });
+    acceptButton.title = this.state.mode === "accept" ? this.translate("actions.acceptGroupProposalTitle") : this.translate("actions.acceptGroupTitle");
+    acceptButton.addEventListener("click", () => { void this.applyGroupChange(group.startIndex, group.endIndex, "left-to-right"); });
+    const dismissButton = actions.createEl("button", { text: this.translate("actions.dismissGroup"), cls: "file-diff-sbs-group-button" });
+    dismissButton.title = this.translate("actions.dismissGroupTitle");
+    const groupRows = rows.slice(group.startIndex, group.endIndex + 1);
+    dismissButton.addEventListener("click", () => { void this.dismissGroup(groupRows, group.startIndex); });
   }
   /** Builds the editable right document beside the read-only left diff pane. */
   buildEditableModeLayout(parent: HTMLElement, rows: IndexedDiffRow[]): void {
@@ -1419,6 +1531,25 @@ export class SideBySideDiffView extends ItemView {
     await this.renderDiff(scrollPosition);
     this.advanceAfterResolvedChange(targetPosition);
   }
+  /** Ignores every changed row inside a bridged block at once. */
+  async dismissGroup(rows: readonly IndexedDiffRow[], startIndex: number): Promise<void> {
+    const scrollPosition = this.getScrollPosition();
+    const targetPosition = this.getChangeTargetPosition(startIndex);
+    const rowKeys = rows.filter((row) => !row.equal).map((row) => getDiffRowKey(row));
+    this.session.dismissRows(rowKeys);
+    await this.renderDiff(scrollPosition);
+    this.advanceAfterResolvedChange(targetPosition);
+  }
+  /** Reverses the most recent accept or ignore action, restoring the state right before it. */
+  async undoLastChange(): Promise<void> {
+    if (!this.session.canUndo()) {
+      return;
+    }
+    const scrollPosition = this.getScrollPosition();
+    this.session.undo();
+    await this.renderDiff(scrollPosition);
+    new Notice(this.translate("notice.undone"));
+  }
   /** Moves to the next open change after accepting or ignoring one when enabled. */
   advanceAfterResolvedChange(resolvedPosition: number | null): void {
     const targetIndexes = [...this.getChangeTargets().keys()];
@@ -1450,6 +1581,9 @@ export class SideBySideDiffView extends ItemView {
     }
     const swappedDismissedRows = this.session.getDismissedRowKeys().map(swapDiffRowKey);
     this.session.replaceDismissedRows(swappedDismissedRows);
+    // Keep dismiss-undo entries valid instead of discarding them: their row keys must follow
+    // the same left/right swap as the dismissed-row set itself.
+    this.session.remapUndoDismissKeys(swapDiffRowKey);
     this.activeChangeRowIndex = null;
     this.session.clearSaveBaselines();
     const nextState = swapDiffViewState(this.viewState);

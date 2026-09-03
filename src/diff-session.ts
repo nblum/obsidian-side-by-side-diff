@@ -6,6 +6,11 @@ export interface PendingChange {
 	readonly content: string;
 }
 
+/** Records how to reverse one accept or ignore action, however many rows it touched. */
+type UndoEntry =
+	| { readonly type: "stage"; readonly path: string; readonly previousContent: string | undefined }
+	| { readonly type: "dismiss"; readonly rowKeys: readonly string[] };
+
 /**
  * Returns whether leaving the comparison would discard real, unwritten data.
  * Dismissed rows never touch a file, so they must not count as unsaved on their own -
@@ -20,6 +25,7 @@ export class DiffSession {
 	private readonly dismissedRowKeys = new Set<string>();
 	private readonly pendingContents = new Map<string, string>();
 	private readonly saveBaselines = new Map<string, string>();
+	private readonly undoStack: UndoEntry[] = [];
 	private proposalChangesAccepted = false;
 	private proposalCleanupPromptShown = false;
 
@@ -40,7 +46,18 @@ export class DiffSession {
 
 	/** Marks one diff row as dismissed until the comparison is reset. */
 	public dismissRow(rowKey: string): void {
-		this.dismissedRowKeys.add(rowKey);
+		this.dismissRows([rowKey]);
+	}
+
+	/** Marks several diff rows as dismissed in one undoable step, e.g. for a whole block. */
+	public dismissRows(rowKeys: readonly string[]): void {
+		const newKeys = rowKeys.filter((rowKey) => !this.dismissedRowKeys.has(rowKey));
+		for (const rowKey of newKeys) {
+			this.dismissedRowKeys.add(rowKey);
+		}
+		if (newKeys.length > 0) {
+			this.undoStack.push({ type: "dismiss", rowKeys: newKeys });
+		}
 	}
 
 	/** Replaces dismissed rows after the comparison panes have been exchanged. */
@@ -69,7 +86,49 @@ export class DiffSession {
 	/** Stages content and records the first observed target baseline. */
 	public stageChange(path: string, content: string, baseline: string): void {
 		captureSaveBaseline(this.saveBaselines, path, baseline);
+		this.undoStack.push({ type: "stage", path, previousContent: this.pendingContents.get(path) });
 		this.pendingContents.set(path, content);
+	}
+
+	/** Returns whether an accept or ignore action can be undone. */
+	public canUndo(): boolean {
+		return this.undoStack.length > 0;
+	}
+
+	/** Reverses the most recent accept or ignore action, if any. */
+	public undo(): boolean {
+		const entry = this.undoStack.pop();
+		if (!entry) {
+			return false;
+		}
+		if (entry.type === "stage") {
+			if (entry.previousContent === undefined) {
+				this.pendingContents.delete(entry.path);
+				this.saveBaselines.delete(entry.path);
+			} else {
+				this.pendingContents.set(entry.path, entry.previousContent);
+			}
+		} else {
+			for (const rowKey of entry.rowKeys) {
+				this.dismissedRowKeys.delete(rowKey);
+			}
+		}
+		return true;
+	}
+
+	/** Discards the undo history, e.g. once its actions have been written to disk. */
+	public clearUndoStack(): void {
+		this.undoStack.length = 0;
+	}
+
+	/** Remaps dismiss-entry row keys after the comparison panes are exchanged, keeping undo valid. */
+	public remapUndoDismissKeys(swapRowKey: (rowKey: string) => string): void {
+		for (let index = 0; index < this.undoStack.length; index += 1) {
+			const entry = this.undoStack[index];
+			if (entry?.type === "dismiss") {
+				this.undoStack[index] = { ...entry, rowKeys: entry.rowKeys.map(swapRowKey) };
+			}
+		}
 	}
 
 	/** Removes one successfully saved staged change. */
@@ -106,13 +165,20 @@ export class DiffSession {
 	public migratePath(oldPath: string, newPath: string): void {
 		migrateSaveEntry(this.saveBaselines, oldPath, newPath);
 		migrateSaveEntry(this.pendingContents, oldPath, newPath);
+		for (let index = 0; index < this.undoStack.length; index += 1) {
+			const entry = this.undoStack[index];
+			if (entry?.type === "stage" && entry.path === oldPath) {
+				this.undoStack[index] = { ...entry, path: newPath };
+			}
+		}
 	}
 
-	/** Clears staged changes, baselines, and dismissed rows after a discard. */
+	/** Clears staged changes, baselines, dismissed rows, and undo history after a discard. */
 	public clearTransientChanges(): void {
 		this.pendingContents.clear();
 		this.saveBaselines.clear();
 		this.dismissedRowKeys.clear();
+		this.clearUndoStack();
 	}
 
 	/** Marks that a proposal change was accepted in the current session. */

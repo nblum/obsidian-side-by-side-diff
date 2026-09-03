@@ -30,10 +30,13 @@ selectively accept or reject edits; changes are written only when explicitly sav
 ## At a glance
 
 - compare two text files side by side in sync
+- select two files in the file explorer and choose `Compare files` to open the comparison directly
 - detect line changes and inline differences within changed lines
 - navigate between changes with `Next change` / `Previous change`, `Alt+ArrowDown` / `Alt+ArrowUp`, and automatic scrolling
 - automatically continue with the next open change after accepting or ignoring one (configurable, enabled by default)
 - accept individual changes on the right or deliberately ignore them
+- group changed lines separated only by blank lines into one block, with `Accept all` / `Ignore all` for larger blocks
+- undo the last accept or ignore action with the `Undo` button or `Ctrl/Cmd+Z`, until it is saved
 - remember the last five right-hand files and show them first in the right-file selector
 - edit the right-hand file directly and save changes in one step
 - create change proposals as timestamped copies and later apply them to the original
@@ -46,6 +49,11 @@ The comparison icon in the left ribbon and `Compare with another file` in the ac
 same view as the command palette:
 
 ![Side-by-Side Diff file menu](assets/file-menu.webp)
+
+Selecting two files in the file explorer and choosing `Compare files` from the context menu opens the comparison
+directly with both files:
+
+![Comparing two files selected in the file explorer](assets/comparsion-record1.webp)
 
 1. Open the command palette and select `Compare current file with another file` or `Compare two files`.
 2. Select the second file if it has not been chosen yet.
@@ -60,6 +68,10 @@ same view as the command palette:
 The left and right files are displayed in sync. Line changes and differences within a line are highlighted. Use
 `Swap` to switch the files and their direction. If changes are pending, the plugin asks whether to save or discard
 them first.
+
+Changed lines separated only by blank lines are grouped into one block; a block with more than three changed lines
+gets `Accept all` / `Ignore all` controls to resolve it in one step. `Undo` (button or `Ctrl/Cmd+Z`) reverts the last
+accept or ignore action, single row or whole block, until it is saved.
 
 ### Suggest changes
 

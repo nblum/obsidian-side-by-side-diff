@@ -27,12 +27,28 @@ visible, can be reviewed and staged individually, and are written only through a
 - `Refresh` is available in the file context menu and reloads an open comparison view.
 - The scroll position is preserved when staging, ignoring, or saving a change.
 - The right-file selector remembers up to five recently selected files and shows them in a separate recent-files group.
+- Selecting exactly two text files in the file explorer and choosing `Compare files` from the context menu opens the
+  comparison view with both files directly.
+
+### Grouped change blocks
+
+- Changed rows that are only separated by blank-line pairs are grouped into one visual block instead of being shown
+  as disconnected single-line edits interrupted by lonely blank rows.
+- A block with more than three changed lines shows a header with the number of changed lines and `Accept all` /
+  `Ignore all` controls that act on every changed row in the block at once.
+- The block header disappears once every row in the block has been resolved, whether through the block controls or
+  through individual per-row actions.
+- `Accept all` never re-applies a row the user has already ignored individually within the same block.
 
 ### Accepting and ignoring changes
 
 - `→` accepts a single change into the view only, at first.
 - `×` ignores only the left-hand diff part; the right-hand content stays visible and unchanged.
 - With a highlighted change, `Alt+ArrowRight` accepts it and `Alt+ArrowLeft` ignores it.
+- `Undo` (toolbar button or `Ctrl/Cmd+Z`) reverts the most recent accept or ignore action, whether it touched a
+  single row or a whole block, as long as it has not been written to disk yet.
+- The undo history is cleared once its actions are saved, discarded, or the compared files are changed; undo entries
+  for ignored rows survive `Swap` by remapping to the new left/right orientation.
 - `Save changes` writes staged changes to the affected files.
 - The save button is disabled when there are no unsaved changes.
 - Files in the vault are only modified after the explicit save.
@@ -93,6 +109,7 @@ visible, can be reviewed and staged individually, and are written only through a
 | File context menu | `Suggest changes` |
 | File context menu, when available | `Accept changes` |
 | File context menu with an open comparison view | `Refresh` |
+| File context menu with exactly two text files selected | `Compare files` |
 
 ## Settings
 
