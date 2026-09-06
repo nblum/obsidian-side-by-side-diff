@@ -1221,13 +1221,15 @@ export class SideBySideDiffView extends ItemView {
     while (index < rows.length) {
       const group = blankBridgedGroups.get(index);
       if (group) {
-        const groupElement = grid.createDiv({ cls: "file-diff-sbs-group" });
         const unresolvedRowCount = countGroupChangedRows(rows, group, (row) => this.session.hasDismissedRow(getDiffRowKey(row)));
+        // Once every row in the block is resolved (e.g. via "Ignore all"), stop wrapping it in a
+        // group box - the underlying rows are still !equal, but there is nothing left to act on.
+        const groupParent = unresolvedRowCount > 0 ? grid.createDiv({ cls: "file-diff-sbs-group" }) : grid;
         if (unresolvedRowCount > GROUP_HEADER_THRESHOLD) {
-          this.buildGroupHeader(groupElement, rows, group, unresolvedRowCount);
+          this.buildGroupHeader(groupParent, rows, group, unresolvedRowCount);
         }
         for (let groupIndex = group.startIndex; groupIndex <= group.endIndex; groupIndex += 1) {
-          this.renderDiffRow(groupElement, rows[groupIndex] ?? null, groupIndex);
+          this.renderDiffRow(groupParent, rows[groupIndex] ?? null, groupIndex);
         }
         index = group.endIndex + 1;
         continue;

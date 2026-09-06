@@ -105,3 +105,19 @@ test("getActionableRowIndexes returns an empty list once every row in range is r
 
 	assert.deepEqual(getActionableRowIndexes(rows, 0, 1, () => true), []);
 });
+
+test("a fully dismissed block ('Ignore all') has zero unresolved rows left to box", () => {
+	// The view only wraps a group in its box while countGroupChangedRows reports unresolved rows;
+	// once every row is dismissed (via "Ignore all") or individually resolved, it must report 0 so
+	// no empty, boxed leftover remains behind.
+	const rows = [
+		row("heading", "heading", true),
+		row("p1-old", "p1-new", false),
+		row("", "", true),
+		row("p2-old", "p2-new", false),
+	];
+	const group = groupChangeRows(rows).find((candidate) => candidate.bridgesBlankLines);
+	assert.ok(group);
+
+	assert.equal(countGroupChangedRows(rows, group, () => true), 0);
+});
