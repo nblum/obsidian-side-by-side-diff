@@ -63,6 +63,15 @@ export class FileDiffSettingsTab extends PluginSettingTab {
         }
       },
       {
+        name: this.plugin.translate("settings.headingAlignment.name"),
+        desc: this.plugin.translate("settings.headingAlignment.description"),
+        control: {
+          type: "toggle",
+          key: "alignMarkdownByHeadings",
+          defaultValue: DEFAULT_SETTINGS.alignMarkdownByHeadings
+        }
+      },
+      {
         name: this.plugin.translate("settings.suffix.name"),
         desc: this.plugin.translate("settings.suffix.description"),
         control: {
@@ -89,6 +98,8 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       this.plugin.updateRibbonVisibility();
     } else if (key === "autoAdvanceAfterChange" && typeof value === "boolean") {
       this.plugin.settings.autoAdvanceAfterChange = value;
+    } else if (key === "alignMarkdownByHeadings" && typeof value === "boolean") {
+      this.plugin.settings.alignMarkdownByHeadings = value;
     } else if (key === "changeCopySuffix" && typeof value === "string") {
       this.plugin.settings.changeCopySuffix = sanitizeCopySuffix(value) || DEFAULT_SETTINGS.changeCopySuffix;
     } else {
@@ -126,6 +137,12 @@ export class FileDiffSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName(this.plugin.translate("settings.autoAdvance.name")).setDesc(this.plugin.translate("settings.autoAdvance.description")).addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.autoAdvanceAfterChange).onChange(async (value) => {
         this.plugin.settings.autoAdvanceAfterChange = value;
+        await this.plugin.saveSettings();
+      });
+    });
+    new Setting(containerEl).setName(this.plugin.translate("settings.headingAlignment.name")).setDesc(this.plugin.translate("settings.headingAlignment.description")).addToggle((toggle) => {
+      toggle.setValue(this.plugin.settings.alignMarkdownByHeadings).onChange(async (value) => {
+        this.plugin.settings.alignMarkdownByHeadings = value;
         await this.plugin.saveSettings();
       });
     });

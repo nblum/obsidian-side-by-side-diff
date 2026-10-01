@@ -30,6 +30,23 @@ visible, can be reviewed and staged individually, and are written only through a
 - Selecting exactly two text files in the file explorer and choosing `Compare files` from the context menu opens the
   comparison view with both files directly.
 
+### Markdown heading alignment
+
+- **Align Markdown by headings** is optional and disabled by default. It applies only when both files have the
+  `.md` extension; other comparisons retain ordinary line alignment.
+- Matching ATX headings (`#` through `######`) form ordered, hard boundaries. Each range before, between, and
+  after them is compared independently, so an inserted section does not shift later matching sections.
+- Heading level and text must match exactly, including case and internal whitespace. Surrounding spaces/tabs,
+  up to three leading spaces, and optional closing `#` markers are ignored for matching only; literal syntax
+  differences remain visible changes.
+- Repeated headings are matched deterministically in document order. Added, removed, renamed, or different-level
+  headings remain ordinary changed content between matching anchors.
+- Headings inside backtick or tilde fences are excluded. Setext headings are not parsed as anchors.
+  Markdown container context is not parsed; heading detection uses the supported ATX heading and fenced-code rules
+  on individual lines. Without matching anchors, the ordinary diff is used.
+- Every range retains the existing 1,000,000-cell limit and deterministic index fallback. Heading-sequence alignment
+  uses the same safeguard. Rendering and change actions use the same alignment options and source indexes.
+
 ### Grouped change blocks
 
 - Contiguous changed rows, and rows only separated by blank-line pairs, are grouped into one visual block instead of
@@ -125,6 +142,8 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
   are replaced automatically.
 - **Automatically go to the next change**: After accepting or ignoring a change, scroll to the next open change;
   enabled by default.
+- **Align Markdown by headings**: Use matching ATX headings as section boundaries when both files are Markdown;
+  disabled by default. Refresh or reopen an existing comparison to apply a changed setting.
 
 ## Technical requirements
 
@@ -144,3 +163,7 @@ A change to the feature scope is considered fully documented and reviewed when:
 2. the changed behavior is covered by tests or a traceable manual check,
 3. the rules for explicit saving and the visibility of both sides are preserved,
 4. the terminology in code, README, and this reference is consistent.
+
+Heading alignment must recover later shared sections in a synthetic comparison exceeding 1,000,000 cells, preserve
+the fallback for an oversized individual section, and keep single-row and grouped actions consistent with displayed
+source lines. Disabled and non-Markdown comparisons must retain existing behavior.

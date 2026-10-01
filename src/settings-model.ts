@@ -5,6 +5,7 @@ import { normalizeRecentFilePaths } from "./recent-files.ts";
 export interface PluginSettings {
 	showRibbonIcon: boolean;
 	autoAdvanceAfterChange: boolean;
+	alignMarkdownByHeadings: boolean;
 	changeCopySuffix: string;
 	language: LanguagePreference;
 	recentRightFilePaths: string[];
@@ -15,6 +16,7 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
 	showRibbonIcon: true,
 	autoAdvanceAfterChange: true,
+	alignMarkdownByHeadings: false,
 	changeCopySuffix: "_changes_",
 	language: "auto",
 	recentRightFilePaths: [],
@@ -37,6 +39,7 @@ export function normalizePluginSettings(value: unknown): PluginSettings {
 	return {
 		showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
 		autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
+		alignMarkdownByHeadings: typeof storedSettings.alignMarkdownByHeadings === "boolean" ? storedSettings.alignMarkdownByHeadings : DEFAULT_SETTINGS.alignMarkdownByHeadings,
 		changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
 		language: isLanguagePreference(storedSettings.language) ? storedSettings.language : DEFAULT_SETTINGS.language,
 		recentRightFilePaths: normalizeRecentFilePaths(storedSettings.recentRightFilePaths),

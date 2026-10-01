@@ -159,6 +159,8 @@
 	"settings.ribbon.name": "Im linken Hauptmenü anzeigen",
 	"settings.ribbon.description": "Zeigt das File-Diff-Symbol in der linken Ribbon-Leiste an.",
 	"settings.autoAdvance.name": "Nach Änderung automatisch weiterspringen",
+	"settings.headingAlignment.name": "Markdown anhand von Überschriften ausrichten",
+	"settings.headingAlignment.description": "Übereinstimmende Markdown-Überschriften als Abschnittsanker verwenden, damit Änderungen in einem Abschnitt andere Abschnitte nicht verschieben.",
 	"settings.autoAdvance.description": "Nach dem Akzeptieren oder Ignorieren zur nächsten offenen Änderung scrollen.",
 	"settings.suffix.name": "Suffix für Änderungskopien",
 	"settings.suffix.description": "Dieser Text steht vor dem Zeitstempel, zum Beispiel _changes_20260817-143000.",

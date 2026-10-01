@@ -159,6 +159,8 @@
 	"settings.ribbon.name": "Show in left ribbon",
 	"settings.ribbon.description": "Show the File Diff icon in Obsidian's left ribbon.",
 	"settings.autoAdvance.name": "Automatically go to the next change",
+	"settings.headingAlignment.name": "Align Markdown by headings",
+	"settings.headingAlignment.description": "Use matching Markdown headings as section anchors so changes in one section do not shift unrelated sections.",
 	"settings.autoAdvance.description": "After accepting or ignoring a change, scroll to the next open change.",
 	"settings.suffix.name": "Change-copy suffix",
 	"settings.suffix.description": "Text before the timestamp, for example _changes_20260817-143000.",

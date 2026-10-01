@@ -33,6 +33,7 @@ selectively accept or reject edits; changes are written only when explicitly sav
 - compare two text files side by side in sync
 - select two files in the file explorer and choose `Compare files` to open the comparison directly
 - detect line changes and inline differences within changed lines
+- optionally align Markdown sections by matching headings (enable **Align Markdown by headings** in settings)
 - navigate between changes with `Next change` / `Previous change`, `Alt+ArrowDown` / `Alt+ArrowUp`, and automatic scrolling
 - automatically continue with the next open change after accepting or ignoring one (configurable, enabled by default)
 - accept individual changes on the right or deliberately ignore them

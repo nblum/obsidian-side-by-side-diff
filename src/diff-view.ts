@@ -1,7 +1,7 @@
 import { ItemView, Notice, TFile } from "obsidian";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
-import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonRowModel } from "./diff-model";
+import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model";
 import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, isUndoShortcut, type ChangeNavigationDirection } from "./diff-navigation";
 import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { createGuardedSaveTransform, SaveConflictError } from "./save-guard";
@@ -47,7 +47,7 @@ interface ChangeActions {
 
 interface DiffViewPlugin {
   readonly language: Language;
-  readonly settings: { autoAdvanceAfterChange: boolean; changeCopySuffix: string; recentRightFilePaths: string[] };
+  readonly settings: { autoAdvanceAfterChange: boolean; alignMarkdownByHeadings: boolean; changeCopySuffix: string; recentRightFilePaths: string[] };
   translate(key: string, variables?: Record<string, string | number>): string;
   rememberRecentRightFile(file: TFile): Promise<void>;
 }
@@ -73,6 +73,7 @@ export class SideBySideDiffView extends ItemView {
   private readonly session = new DiffSession();
   private viewState: DiffViewState = { leftPath: null, rightPath: null, editRight: false, mode: "compare" };
   private renderToken = 0;
+  private comparisonOptions: ComparisonOptions = {};
   private readonly changeActions = new Map<number, ChangeActions>();
   private rightEditorState: RightEditorState | null = null;
   private rightEditorDirty = false;
@@ -963,7 +964,7 @@ export class SideBySideDiffView extends ItemView {
       ]);
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
-      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent));
+      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
       const row = rows[rowIndex];
       if (row === undefined || row.equal) {
         return;
@@ -1014,7 +1015,7 @@ export class SideBySideDiffView extends ItemView {
       ]);
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
-      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent));
+      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
       // Skip rows the user already resolved individually - "Accept all" must not silently
       // reverse a change they explicitly dismissed.
       const actionableIndexes = getActionableRowIndexes(rows, startIndex, endIndex, (row) => this.session.hasDismissedRow(getDiffRowKey(row)));
@@ -1118,7 +1119,11 @@ export class SideBySideDiffView extends ItemView {
   buildLayout(leftFile: TFile, rightFile: TFile, leftLines: string[], rightLines: string[]): void {
     const paneLabels = this.getPaneLabels();
     const root = this.contentEl.createDiv({ cls: "file-diff-sbs-root" });
-    const rows = createComparisonModelFromLines(leftLines, rightLines).rows;
+    // Actions reuse these rendered options even if the setting changes before a refresh.
+    this.comparisonOptions = {
+      alignMarkdownByHeadings: this.plugin.settings.alignMarkdownByHeadings && leftFile.extension.toLowerCase() === "md" && rightFile.extension.toLowerCase() === "md"
+    };
+    const rows = createComparisonModelFromLines(leftLines, rightLines, this.comparisonOptions).rows;
     const changedRows = rows.filter((row) => !row.equal);
     const dismissedCount = changedRows.filter((row) => this.session.hasDismissedRow(getDiffRowKey(row))).length;
     const visibleChangedCount = changedRows.length - dismissedCount;
