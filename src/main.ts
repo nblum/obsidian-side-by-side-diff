@@ -8,6 +8,7 @@ import { createTranslator, resolveLanguage } from "./i18n";
 import type { Language, Translator } from "./i18n";
 import type { ChangeNavigationDirection } from "./diff-navigation";
 import { rememberRecentFilePath } from "./recent-files";
+import { validateComparisonProtocolRequest } from "./protocol";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -27,6 +28,9 @@ export class FileDiffSideBySidePlugin extends Plugin {
   override async onload(): Promise<void> {
     await this.loadSettings();
     this.registerView(VIEW_TYPE, (leaf) => new SideBySideDiffView(leaf, this));
+    this.registerObsidianProtocolHandler("side-by-side-diff", (params) => {
+      void this.openProtocolComparison(params);
+    });
     this.ribbonIconEl = this.addRibbonIcon(
       ICON_ID,
       this.translate("ribbon.compareTwoFiles"),
@@ -314,6 +318,26 @@ export class FileDiffSideBySidePlugin extends Plugin {
       modal.setPlaceholder(placeholder);
       modal.open();
     });
+  }
+  /** Opens a comparison requested through obsidian://side-by-side-diff. */
+  async openProtocolComparison(params: Record<string, string>): Promise<void> {
+    const request = validateComparisonProtocolRequest(params, this.app.vault.getName());
+    if (!request.ok) {
+      new Notice(this.translate(`notice.protocol.${request.error}`));
+      return;
+    }
+    const left = this.app.vault.getAbstractFileByPath(request.left);
+    const right = this.app.vault.getAbstractFileByPath(request.right);
+    if (!(left instanceof TFile) || !(right instanceof TFile)) {
+      const missing = !(left instanceof TFile) ? request.left : request.right;
+      new Notice(this.translate("notice.protocol.fileMissing", { path: missing }));
+      return;
+    }
+    if (!isTextFile(left) || !isTextFile(right)) {
+      new Notice(this.translate("notice.protocol.textFilesOnly"));
+      return;
+    }
+    await this.openDiffView(left, right);
   }
   /** Opens the comparison in a new split leaf, optionally awaiting the right file. */
   async openDiffView(leftFile: TFile, rightFile: TFile | null = null, editRight = false, mode: PaneMode = "compare"): Promise<void> {

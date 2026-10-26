@@ -111,4 +111,15 @@ describe("UI translations", () => {
 		assert.equal(translate("notice.fileTrashed", { name: "笔记.md" }), "已将“笔记.md”移至回收站。");
 		assert.equal(translate("modal.introduction.progress", { current: 2, total: 5 }), "第 2 步，共 5 步");
 	});
+
+	test("localizes URI validation notices in Simplified Chinese", () => {
+		const translate = createTranslator("zh-CN");
+		for (const error of ["missingPaths", "sameFile", "wrongVault", "fileMissing", "textFilesOnly"]) {
+			assert.match(translate(`notice.protocol.${error}`, { path: "Drafts/Plan.md" }), /[\u3400-\u9fff]/u);
+		}
+		assert.equal(
+			translate("notice.protocol.fileMissing", { path: "Drafts/Plan.md" }),
+			"在此仓库中找不到“Drafts/Plan.md”。请检查相对于仓库的路径。",
+		);
+	});
 });

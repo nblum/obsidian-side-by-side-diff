@@ -45,6 +45,20 @@ selectively accept or reject edits; changes are written only when explicitly sav
 - display the interface automatically in German, English, Spanish, Brazilian or European Portuguese, French, Italian, Dutch, or Simplified Chinese
 - work entirely locally within the Obsidian vault
 
+## Open a comparison with a URI
+
+The plugin registers `obsidian://side-by-side-diff` to open two existing vault files directly in the comparison
+view. Pass vault-relative paths in `left` and `right`; spaces and other reserved characters should be percent-encoded
+in the URI. Obsidian decodes query values before the plugin receives them. An optional `vault` parameter restricts
+the link to a vault with that exact name.
+
+```text
+obsidian://side-by-side-diff?left=Drafts/Plan%20A.md&right=Archive/Plan%20B.md&vault=Research
+```
+
+The handler reports missing or invalid paths, files outside the current vault, non-text files, identical files, and
+links naming a different vault.
+
 ## Quick start
 
 After an update, the plugin opens its short guided introduction once if you have not seen it yet. It covers the
