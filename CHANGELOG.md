@@ -12,6 +12,7 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Fixed
 
+- Added missing French, Italian, Spanish, Brazilian Portuguese, European Portuguese, and Dutch URI validation messages, restoring strict type checking and translation tests.
 - Added missing Simplified Chinese URI validation messages, restoring translation checks and the production build.
 - Recognize Obsidian's `pt` locale as European Portuguese in automatic language mode instead of Brazilian Portuguese.
 

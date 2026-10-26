@@ -112,6 +112,20 @@ describe("UI translations", () => {
 		assert.equal(translate("modal.introduction.progress", { current: 2, total: 5 }), "第 2 步，共 5 步");
 	});
 
+	test("localizes URI validation notices in every additional European language", () => {
+		const english = createTranslator("en");
+		for (const language of ["fr", "it", "es", "pt-BR", "pt-PT", "nl"] as const) {
+			const translate = createTranslator(language);
+			for (const error of ["missingPaths", "sameFile", "wrongVault", "fileMissing", "textFilesOnly"]) {
+				const key = `notice.protocol.${error}`;
+				const message = translate(key, { path: "Drafts/Plan.md" });
+				assert.notEqual(message, key, `${language}: ${key}`);
+				assert.notEqual(message, english(key, { path: "Drafts/Plan.md" }), `${language}: ${key}`);
+			}
+			assert.ok(translate("notice.protocol.fileMissing", { path: "Drafts/Plan.md" }).includes("Drafts/Plan.md"));
+		}
+	});
+
 	test("localizes URI validation notices in Simplified Chinese", () => {
 		const translate = createTranslator("zh-CN");
 		for (const error of ["missingPaths", "sameFile", "wrongVault", "fileMissing", "textFilesOnly"]) {
