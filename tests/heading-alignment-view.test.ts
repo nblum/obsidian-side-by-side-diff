@@ -113,3 +113,64 @@ test("real single-row and grouped view actions reuse the displayed alignment aft
 	assert.equal(grouped.session.undo(), true);
 	assert.equal(grouped.session.hasPendingChanges(), false);
 });
+
+
+test("editable line numbering settles without retriggering the mutation observer", () => {
+	let mutations = 0;
+	const numbers = ["1", "", "2"].map((initial) => {
+		let value = initial;
+		return {
+			get textContent() { return value; },
+			set textContent(next: string) { value = next; mutations += 1; }
+		};
+	});
+	const lines = numbers.map((number, index) => ({
+		dataset: { rightPresent: index === 1 ? "false" : "true" },
+		querySelector: () => number
+	}));
+	const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
+	Object.assign(view, { getEditableLines: () => lines });
+	const editor = {} as HTMLElement;
+	view.updateEditableLineNumbers(editor);
+	assert.equal(mutations, 0, "unchanged gutters must not schedule another alignment pass");
+
+	// An inserted real line replaces the alignment gap.
+	lines[1]!.dataset.rightPresent = "true";
+	view.updateEditableLineNumbers(editor);
+	assert.deepEqual(numbers.map((number) => number.textContent), ["1", "2", "3"]);
+	assert.equal(mutations, 2);
+	view.updateEditableLineNumbers(editor);
+	assert.equal(mutations, 2, "the next observer pass must settle");
+
+	lines[1]!.dataset.rightPresent = "false";
+	view.updateEditableLineNumbers(editor);
+	assert.deepEqual(numbers.map((number) => number.textContent), ["1", "", "2"]);
+	view.updateEditableLineNumbers(editor);
+	assert.equal(mutations, 4, "cleared gap gutters must also settle");
+});
+
+
+test("edit-mode height measurement preserves scrolling when wrapped rows temporarily shrink", () => {
+	const scroll = { scrollTop: 450, scrollLeft: 12 };
+	const editor = { scrollTop: 0, scrollLeft: 0, getBoundingClientRect: () => ({ height: 120 }) } as HTMLElement;
+	let height = 120;
+	const line = {
+		setCssProps: (props: Record<string, string>) => {
+			const value = props["--file-diff-sbs-line-min-height"];
+			height = value ? Number.parseFloat(value) : 24;
+			// Model Chromium clamping/anchoring the viewport during temporary collapse.
+			if (!value) scroll.scrollTop = 0;
+		},
+		getBoundingClientRect: () => ({ height })
+	};
+	const leftPane = {};
+	const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
+	Object.assign(view, {
+		contentEl: { querySelector: (selector: string) => selector.includes("selection-scroll") ? scroll : editor },
+		getEditableLeftPane: () => leftPane,
+		getEditableLines: () => [line]
+	});
+	view.synchronizeEditableLineHeights(editor);
+	assert.equal(scroll.scrollTop, 450);
+	assert.equal(scroll.scrollLeft, 12);
+});

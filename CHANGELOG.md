@@ -4,6 +4,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve the viewport while measuring wrapped edit-mode rows so temporary layout collapse cannot cause scroll jumps.
+- Stop repeated edit-mode alignment updates that could pull the comparison back down while scrolling upward.
+
 ## [0.9.0] - 2026-10-26
 
 ### Added

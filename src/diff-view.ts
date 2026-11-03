@@ -767,6 +767,7 @@ export class SideBySideDiffView extends ItemView {
     if (!leftPane) {
       return;
     }
+    const scrollPosition = this.getScrollPosition();
     const leftLines = this.getEditableLines(leftPane);
     const rightLines = this.getEditableLines(editor);
     const lineCount = Math.min(leftLines.length, rightLines.length);
@@ -779,19 +780,25 @@ export class SideBySideDiffView extends ItemView {
       leftLine.setCssProps({ "--file-diff-sbs-line-min-height": "" });
       rightLine.setCssProps({ "--file-diff-sbs-line-min-height": "" });
     }
+    // Measure every natural height before applying any paired minimums.
+    const heights = Array.from({ length: lineCount }, (_, index) => Math.max(
+      leftLines[index]?.getBoundingClientRect().height ?? 0,
+      rightLines[index]?.getBoundingClientRect().height ?? 0
+    ));
     for (let index = 0; index < lineCount; index += 1) {
       const leftLine = leftLines[index];
       const rightLine = rightLines[index];
-      if (!leftLine || !rightLine) {
-        continue;
-      }
-      const height = Math.max(leftLine.getBoundingClientRect().height, rightLine.getBoundingClientRect().height);
-      if (height > 0) {
+      const height = heights[index] ?? 0;
+      if (leftLine && rightLine && height > 0) {
         const heightValue = `${height.toString()}px`;
         leftLine.setCssProps({ "--file-diff-sbs-line-min-height": heightValue });
         rightLine.setCssProps({ "--file-diff-sbs-line-min-height": heightValue });
       }
     }
+    // Clearing minimum heights temporarily collapses wrapped rows. Resolve the final
+    // layout before restoring the viewport so scroll anchoring cannot accumulate jumps.
+    editor.getBoundingClientRect();
+    this.restoreScrollPosition(scrollPosition);
   }
   /** Observes editable rows so wrapped text realigns only after an actual size change. */
   observeEditableLineSizes(editor: HTMLElement): void {
@@ -841,12 +848,15 @@ export class SideBySideDiffView extends ItemView {
       if (!numberElement) {
         continue;
       }
-      if (line.dataset.rightPresent === "false") {
-        numberElement.textContent = "";
-        continue;
+      const isGap = line.dataset.rightPresent === "false";
+      if (!isGap) {
+        lineNumber += 1;
       }
-      lineNumber += 1;
-      numberElement.textContent = String(lineNumber);
+      const label = isGap ? "" : String(lineNumber);
+      // Replacing unchanged text retriggers the editor's childList observer indefinitely.
+      if (numberElement.textContent !== label) {
+        numberElement.textContent = label;
+      }
     }
   }
   /** Places the caret at a character offset inside an editable code span. */
