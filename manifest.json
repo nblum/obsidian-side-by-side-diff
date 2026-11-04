@@ -3,7 +3,7 @@
   "name": "Side-by-Side Diff",
   "version": "0.9.0",
   "minAppVersion": "1.6.6",
-  "description": "Compare two text files in a side-by-side file diff viewer, review line changes, and selectively accept or reject edits.",
+  "description": "Compare notes and text files side by side. A Markdown diff viewer for file comparison, highlighting differences, and selectively merging changes.",
   "author": "Nico Blum",
   "isDesktopOnly": true
 }

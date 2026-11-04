@@ -1,120 +1,63 @@
 # Side-by-Side Diff
 
-[![Add to Obsidian](assets/add-to-obsidian.svg)](https://community.obsidian.md/plugins/side-by-side-diff)
 [![CI](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nblum/obsidian-side-by-side-diff/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/nblum/obsidian-side-by-side-diff?label=release)](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/nblum/obsidian-side-by-side-diff)](LICENSE)
 [![Star on GitHub](https://img.shields.io/github/stars/nblum/obsidian-side-by-side-diff?logo=github&label=star)](https://github.com/nblum/obsidian-side-by-side-diff)
 
-Compare two text files in a side-by-side file diff viewer. Review line changes with inline highlighting and
-selectively accept or reject edits; changes are written only when explicitly saved.
+A Markdown diff viewer for Obsidian: compare two notes or text files side by side, see exactly what changed,
+and choose which changes to keep. Use it to review a revised draft, compare versions of a note, or merge selected edits into an original.
 
-> Compare, review, accept: Every change remains visible and is written to the vault only when you save.
+- **See the differences:** synchronized panes, a line-by-line diff, and inline highlighting within changed lines.
+- **Choose what to keep:** accept or ignore individual changes or whole blocks.
+- **Edit and save deliberately:** edit the right-hand file directly; changes are written only when you save.
+- **Review a separate draft:** create a proposal copy and later merge selected changes back into the original.
+- **Compare external Markdown:** drop a `.md` file from your computer without importing it into your vault.
+
+Works locally, without an account or network requests. Requires **Obsidian 1.6.6 or later on desktop**.
 
 ![Side-by-Side Diff comparison view](assets/compare-mode.webp)
 
-## Contents
+## Get started
 
-- [At a glance](#at-a-glance)
-- [Quick start](#quick-start)
-- [Keyboard shortcuts](#keyboard-shortcuts)
-- [Three workflows](#three-workflows)
-- [Edit and save](#edit-and-save)
-- [Installation](#installation)
-- [Feedback and support](#feedback-and-support)
-- [Privacy and permissions](#privacy-and-permissions)
-- [Releases](#releases)
-- [Documentation](#documentation)
-- [Development](#development)
-- [Tests](#tests)
+1. [Add to Obsidian](obsidian://show-plugin?id=side-by-side-diff), or search for `Side-by-Side Diff`
+   under **Settings → Community plugins → Browse**. Install and enable the plugin.
+2. Select two text files in Obsidian's file explorer, right-click, and choose `Compare files`.
+3. Review the highlighted differences. Use `→` to stage a change from the **left file into the right file**,
+   or `×` to ignore it and keep the right-hand content for that change.
+4. Click `Save changes` or press `Ctrl/Cmd+S` to write your staged changes.
 
-## At a glance
-
-- compare two text files side by side in sync
-- select two files in the file explorer and choose `Compare files` to open the comparison directly
-- detect line changes and inline differences within changed lines
-- optionally align Markdown sections by matching headings (enable **Align Markdown by headings** in settings)
-- navigate between changes with `Next change` / `Previous change`, `Alt+ArrowDown` / `Alt+ArrowUp`, and automatic scrolling
-- automatically continue with the next open change after accepting or ignoring one (configurable, enabled by default)
-- accept individual changes on the right or deliberately ignore them
-- group contiguous changed lines, or lines separated only by blank lines, into one block, with `Accept all` / `Ignore all` for larger blocks
-- undo the last accept or ignore action with the `Undo` button or `Ctrl/Cmd+Z`, until it is saved
-- remember the last five right-hand files and show them first in the right-file selector
-- edit the right-hand file directly and save changes in one step
-- create change proposals as timestamped copies and later apply them to the original
-- display the interface automatically in German, English, Spanish, Brazilian or European Portuguese, French, Italian, Dutch, or Simplified Chinese
-- compare a dropped external Markdown file with a vault note, without importing it
-- work entirely locally
-
-## Open a comparison with a URI
-
-The plugin registers `obsidian://side-by-side-diff` to open two existing vault files directly in the comparison
-view. Pass vault-relative paths in `left` and `right`; spaces and other reserved characters should be percent-encoded
-in the URI. Obsidian decodes query values before the plugin receives them. An optional `vault` parameter restricts
-the link to a vault with that exact name.
-
-```text
-obsidian://side-by-side-diff?left=Drafts/Plan%20A.md&right=Archive/Plan%20B.md&vault=Research
-```
-
-The handler reports missing or invalid paths, files outside the current vault, non-text files, identical files, and
-links naming a different vault.
-
-## Quick start
-
-After an update, the plugin opens its short guided introduction once if you have not seen it yet. It covers the
-comparison entry points, file selection, keyboard navigation, change groups, feedback, documentation, and a closing
-thank-you note.
-Open it again from **Settings → Side-by-Side Diff → Introduction** or through the `Show introduction` command.
-
-The comparison icon in the left ribbon and `Compare with another file` in the active document's menu lead to the
-same view as the command palette:
-
-![Side-by-Side Diff file menu](assets/file-menu.webp)
-
-Selecting two files in the file explorer and choosing `Compare files` from the context menu opens the comparison
-directly with both files:
+Use `Swap` before reviewing if you want to reverse the direction. Accepting a change does not save it immediately.
 
 ![Comparing two files selected in the file explorer](assets/comparsion-record1.webp)
 
-1. Open the command palette and select `Compare current file with another file` or `Compare two files`.
-2. Select the second file if it has not been chosen yet.
-3. Review the synchronized view. Use `→` to stage a change as a proposal, or `×` to ignore the left-hand diff.
-4. Navigate between changes with the toolbar or `Alt+ArrowDown` / `Alt+ArrowUp`; accept or ignore the highlighted change with `Alt+ArrowRight` / `Alt+ArrowLeft`.
-5. Save all staged changes with `Save changes` or `Ctrl/Cmd + S`.
+## In this guide
 
-## Compare external Markdown
+- [Other ways to open a comparison](#other-ways-to-open-a-comparison)
+- [Compare, suggest, and accept changes](#compare-suggest-and-accept-changes)
+- [Edit and save](#edit-and-save)
+- [Compare external Markdown](#compare-external-markdown)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Settings and language](#settings-and-language)
+- [Open a comparison with a link](#open-a-comparison-with-a-link)
+- [Manual installation](#manual-installation)
+- [Privacy and permissions](#privacy-and-permissions)
+- [Feedback and support](#feedback-and-support)
+- [Documentation and development](#documentation-and-development)
 
-Open a comparison with a vault note, then drag one `.md` file from your computer into the comparison view.
-The dropped file opens on the **right**, replacing the previous right-hand file; the left-hand note stays in place.
-You can also drop a vault file onto the **Drop files** card below **Select right file** to select it on the right.
+## Other ways to open a comparison
 
-Review and accept changes as usual, or use `Edit mode` to edit the external file directly.
-**Saving writes to the external file on your computer**, without importing it into the vault.
-Existing line endings are preserved. If the file has changed or been deleted, saving is canceled so you can
-review its current contents. If it changes before you accept a suggestion, the comparison refreshes for another review.
+With a note open, choose `Compare with another file` from its document menu, then select the other file.
+You can also use the comparison icon in the left ribbon or the command palette commands
+`Compare current file with another file` and `Compare two files`.
+The right-file selector lists your five most recently selected right-hand files first.
 
-Drop the file again after reopening the view; external file contents and paths are not stored between sessions.
-If Obsidian cannot provide access to the dropped file's location, you can compare a read-only snapshot but cannot
-edit or save it. You cannot compare a file with itself, including through a shortcut to the same file.
-External files are never offered for trash actions.
+![Side-by-Side Diff file menu](assets/file-menu.webp)
 
-## Keyboard shortcuts
+For a walkthrough, open **Settings → Side-by-Side Diff → Introduction** or run `Show introduction` from the
+command palette. The introduction also opens once after an update if you have not seen it yet.
 
-The following shortcuts are available while a comparison view has focus:
-
-![Keyboard shortcuts for the comparison view](assets/keyboard-shortcuts.webp)
-
-| Shortcut | Action |
-| --- | --- |
-| `Alt+ArrowDown` | Go to the next change |
-| `Alt+ArrowUp` | Go to the previous change |
-| `Alt+ArrowRight` | Accept the highlighted change |
-| `Alt+ArrowLeft` | Ignore the highlighted change |
-| `Ctrl/Cmd+Z` | Undo the most recent accept or ignore action, until saving |
-| `Ctrl/Cmd+S` | Save staged changes |
-
-## Three workflows
+## Compare, suggest, and accept changes
 
 ### Compare
 
@@ -149,35 +92,67 @@ Changes are never written automatically while typing or clicking a diff action. 
 `Save changes` or `Ctrl/Cmd + S`. Before saving, the plugin checks for external file changes and cancels instead of
 overwriting newer content. Closing a view with unsaved changes opens a confirmation dialog.
 
-## Installation
+## Compare external Markdown
 
-The plugin requires Obsidian `1.6.6` or later.
+Open a comparison with a vault note, then drag one `.md` file from your computer into the comparison view.
+The dropped file opens on the **right**, replacing the previous right-hand file; the left-hand note stays in place.
+You can also drop a vault file onto the **Drop files** card below **Select right file** to select it on the right.
 
-Use the **Add to Obsidian** button above to open the Side-by-Side Diff community plugin page. To install the plugin,
-search for `Side-by-Side Diff` under **Settings → Community plugins → Browse** in Obsidian.
+Review and accept changes as usual, or use `Edit mode` to edit the external file directly.
+**Saving writes to the external file on your computer**, without importing it into the vault.
+Existing line endings are preserved. If the file has changed or been deleted, saving is canceled so you can
+review its current contents. If it changes before you accept a suggestion, the comparison refreshes for another review.
 
-For a manual installation, copy the plugin folder to `.obsidian/plugins/side-by-side-diff/`, then open
-**Settings → Community plugins** and enable `Side-by-Side Diff`. The release folder must contain the generated
-`main.js`, `manifest.json`, `styles.css`, and `locales/` directory.
+Drop the file again after reopening the view; external file contents and paths are not stored between sessions.
+If Obsidian cannot provide access to the dropped file's location, you can compare a read-only snapshot but cannot
+edit or save it. You cannot compare a file with itself, including through a shortcut to the same file.
+External files are never offered for trash actions.
 
-The plugin is currently marked as desktop-only because mobile support has not been tested yet.
+## Keyboard shortcuts
 
-Set the interface language under **Settings → Side-by-Side Diff → Language** to `Automatic`, `Deutsch`, `English`,
-`Español`, `Português (Brasil)`, `Português (Portugal)`, `Français`, `Italiano`, `Nederlands`, or `简体中文`. In automatic mode, supported Obsidian languages are used;
-unsupported languages fall back to English.
-Simplified Chinese is detected for `zh`, `zh-CN`, `zh-SG`, and `zh-Hans` locales; Traditional Chinese locales fall back to English.
-The About section at the top links to the developer website, the GitHub repository for stars, and the issue page for
-feedback.
+The following shortcuts are available while a comparison view has focus:
 
-## Feedback and support
+![Keyboard shortcuts for the comparison view](assets/keyboard-shortcuts.webp)
 
-- [Report a bug or request a feature](https://github.com/nblum/obsidian-side-by-side-diff/issues/new)
-- [View the latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
-- [Read the changelog](CHANGELOG.md)
-- [Visit the developer website](https://blum-nico.de)
+| Shortcut | Action |
+| --- | --- |
+| `Alt+ArrowDown` | Go to the next change |
+| `Alt+ArrowUp` | Go to the previous change |
+| `Alt+ArrowRight` | Accept the highlighted change |
+| `Alt+ArrowLeft` | Ignore the highlighted change |
+| `Ctrl/Cmd+Z` | Undo the most recent accept or ignore action, until saving |
+| `Ctrl/Cmd+S` | Save staged changes |
 
-If Side-by-Side Diff is useful to you, a [GitHub star](https://github.com/nblum/obsidian-side-by-side-diff) is much
-appreciated.
+## Settings and language
+
+- **Markdown sections:** enable **Align Markdown by headings** to keep matching sections aligned when reviewing
+  two `.md` files. This is off by default.
+- **Review navigation:** after accepting or ignoring a change, the view moves to the next open change automatically.
+  You can disable this in settings.
+- **Interface language:** choose a language under **Settings → Side-by-Side Diff → Language**.
+  Supported languages are English, German, French, Italian, Spanish, Brazilian Portuguese, European Portuguese,
+  Dutch, and Simplified Chinese. `Automatic` follows your Obsidian language, with English as the fallback.
+  Traditional Chinese currently falls back to English.
+
+## Open a comparison with a link
+
+Create a link to open two existing vault files directly in the comparison view. Use paths relative to your vault
+in `left` and `right`, replacing spaces with `%20`. For other reserved characters, use percent-encoding as well.
+Add `vault` to open the link only in a vault with that exact name:
+
+```text
+obsidian://side-by-side-diff?left=Drafts/Plan%20A.md&right=Archive/Plan%20B.md&vault=Research
+```
+
+The handler reports missing or invalid paths, files outside the current vault, non-text files, identical files, and
+links naming a different vault.
+
+## Manual installation
+
+Download the plugin files from the [latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
+and place them in `.obsidian/plugins/side-by-side-diff/` in your vault. The folder must contain
+`main.js`, `manifest.json`, `styles.css`, and the `locales/` directory.
+Then open **Settings → Community plugins** and enable `Side-by-Side Diff`.
 
 ## Privacy and permissions
 
@@ -190,43 +165,22 @@ Side-by-Side Diff runs locally in Obsidian.
 - It accesses external Markdown files only after you explicitly drop them into the comparison view. External
   paths stay in memory. It writes those files only through an explicit save action.
 
-The source repository contains TypeScript; `main.js` is generated locally and attached to releases.
+## Feedback and support
 
-## Releases
+- [Report a bug or request a feature](https://github.com/nblum/obsidian-side-by-side-diff/issues/new)
+- [View the latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
+- [Read the changelog](CHANGELOG.md)
+- [Visit the developer website](https://blum-nico.de)
 
-Release tags must exactly match the `version` in `manifest.json` and use the `x.y.z` format. Pushing such a tag
-automatically creates a GitHub release with generated notes and uploads `main.js`, `manifest.json`, and `styles.css`.
-The release workflow also creates GitHub artifact attestations for these three assets.
+If Side-by-Side Diff is useful to you, a [GitHub star](https://github.com/nblum/obsidian-side-by-side-diff) is much
+appreciated.
 
-## Documentation
+## Documentation and development
 
-- [Features and requirements](FEATURES.md) – authoritative overview of the current scope and requirements
-- [Concept: Review status display](docs/concepts/review-statusanzeige.md) – concept for clearer accepted, ignored, and open change states
-- [Contributing](CONTRIBUTING.md) – development workflow, tests, and change checklist
+- [Full feature reference](FEATURES.md) – supported behavior and detailed requirements
+- [Contributing](CONTRIBUTING.md) – development setup, build commands, tests, and validation
+- [Changelog](CHANGELOG.md) – changes by release
+- [Review status concept](docs/concepts/review-statusanzeige.md) – proposed improvements to review states
 
-## Development
-
-Install the local development dependencies once, then use the following commands from this directory:
-
-```bash
-npm install
-npm run dev       # development bundle with inline source maps
-npm run build     # strict typecheck and production bundle
-npm run validate:manifest
-npm run lint      # strict ESLint checks
-npm test          # TypeScript unit tests
-```
-
-TypeScript source lives in `src/`; `main.js` is the generated Obsidian entry point and is ignored by Git. Rebuild it
-before installing the plugin in a vault.
-
-## Tests
-
-The deterministic diff, synchronization rules, and translation tables are tested in TypeScript:
-
-```bash
-npm test
-```
-
-Run the command from this plugin directory. See [CONTRIBUTING.md](CONTRIBUTING.md) for additional development
-guidance.
+The plugin source is TypeScript. Build and test instructions, project structure, and contribution guidance live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
