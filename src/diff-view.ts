@@ -1,4 +1,5 @@
-import { ItemView, Notice, TFile } from "obsidian";
+import { FileSystemAdapter, ItemView, Notice, TFile } from "obsidian";
+import { join } from "node:path";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model";
@@ -7,6 +8,8 @@ import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, Unsav
 import { createGuardedSaveTransform, SaveConflictError } from "./save-guard";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
 import { getRecentFiles } from "./recent-files";
+import { parseDroppedVaultLink } from "./dropped-vault-link";
+import { getDroppedFilePath, getPhysicalFileIdentity, getVaultRelativePath, readExternalMarkdown, processExternalMarkdown, type ExternalMarkdown } from "./external-markdown";
 import { hasEditableLineStructureChanged } from "./edit-sync";
 import { shouldOfferProposalCleanup } from "./proposal-cleanup";
 import { DiffSession, hasUnsavedComparisonChanges } from "./diff-session";
@@ -16,6 +19,13 @@ import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from
 import type { Language } from "./i18n";
 
 export type { PaneMode } from "./diff-view-state";
+type ComparisonFile = TFile | ExternalMarkdown;
+
+interface LoadedComparison {
+  leftContent: string;
+  rightContent: string | null;
+}
+
 type EditableSide = "left" | "right";
 type EditableRowType = "equal" | "added" | "removed" | "changed";
 
@@ -72,6 +82,9 @@ export class SideBySideDiffView extends ItemView {
   private readonly plugin: DiffViewPlugin;
   private readonly session = new DiffSession();
   private viewState: DiffViewState = { leftPath: null, rightPath: null, editRight: false, mode: "compare" };
+  private externalMarkdown: ExternalMarkdown | null = null;
+  private retainedExternalMarkdown: ExternalMarkdown | null = null;
+  private dropToken = 0;
   private renderToken = 0;
   private comparisonOptions: ComparisonOptions = {};
   private readonly changeActions = new Map<number, ChangeActions>();
@@ -111,11 +124,160 @@ export class SideBySideDiffView extends ItemView {
         }
       }, { capture: true });
     }
+    this.registerDomEvent(this.contentEl, "dragover", (event) => {
+      if (event.dataTransfer?.types.includes("Files") === true) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    });
+    this.registerDomEvent(this.contentEl, "drop", (event) => {
+      if (event.dataTransfer?.types.includes("Files") !== true) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void this.dropMarkdown(Array.from(event.dataTransfer.files));
+    });
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
     this.registerEvent(this.app.vault.on("delete", (file) => { this.refreshForPath(file.path); }));
+  }
+  /** Resolves the dragged vault link and opens a different text file in the right pane. */
+  async dropVaultFile(leftFile: ComparisonFile, text: string): Promise<void> {
+    const link = parseDroppedVaultLink(text, this.app.vault.getName());
+    if (link === null) {
+      new Notice(this.translate("notice.selectedFileLoadFailed"));
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(link)
+      ?? this.app.metadataCache.getFirstLinkpathDest(link, leftFile.path);
+    if (!isTextFile(file)) {
+      new Notice(this.translate("notice.selectedFileLoadFailed"));
+      return;
+    }
+    if (file.path === leftFile.path) {
+      new Notice(this.translate("notice.differentFiles"));
+      return;
+    }
+    const token = ++this.dropToken;
+    if (!await this.prepareForTransition(this.translate("modal.unsaved.dropQuestion"), () => Promise.resolve(token === this.dropToken))) return;
+    if (token !== this.dropToken) return;
+    await this.applyRightFile(leftFile, file);
+  }
+  /** Replaces the right file with a dropped Markdown file, preserving the current left file. */
+  async dropMarkdown(files: readonly File[]): Promise<void> {
+    const file = files[0];
+    if (files.length !== 1 || !file || !/\.md$/i.test(file.name)) {
+      new Notice(this.translate("notice.dropMarkdownOnly"));
+      return;
+    }
+    const token = ++this.dropToken;
+    try {
+      const content = await file.text();
+      if (token !== this.dropToken) return;
+      const leftPath = this.state.leftPath;
+      const leftFile = leftPath === null ? null : this.getComparisonFile(leftPath);
+      if (leftFile === null) return;
+      const candidate: ExternalMarkdown = { path: `external-markdown:${token.toString()}`, name: file.name, extension: "md", content, diskPath: getDroppedFilePath(file) };
+      const rightFile = await this.resolveDroppedFile(candidate);
+      const sameFile = await this.isSameComparisonFile(leftFile, rightFile);
+      if (token !== this.dropToken) return;
+      if (sameFile) {
+        new Notice(this.translate("notice.differentFiles"));
+        return;
+      }
+      let loaded = await this.loadComparison(leftFile, rightFile);
+      if (token !== this.dropToken) return;
+      const hadUnsavedChanges = this.hasUnsavedChanges();
+      const validateDrop = async (): Promise<boolean> => {
+        if (token !== this.dropToken) return false;
+        if (hadUnsavedChanges) {
+          loaded = await this.loadComparison(leftFile, rightFile);
+          const sameFileNow = await this.isSameComparisonFile(leftFile, rightFile);
+          if (token !== this.dropToken) return false;
+          if (sameFileNow) {
+            new Notice(this.translate("notice.differentFiles"));
+            return false;
+          }
+        }
+        return token === this.dropToken;
+      };
+      if (!await this.prepareForTransition(this.translate("modal.unsaved.dropQuestion"), validateDrop)) return;
+      if (token !== this.dropToken) return;
+      // A confirmation/save may take time or update a compared file. Validate again
+      // before replacing the session, keeping the old view on a failed native read.
+      if (hadUnsavedChanges) loaded = await this.loadComparison(leftFile, rightFile);
+      if (token !== this.dropToken) return;
+      if (!(rightFile instanceof TFile)) rightFile.content = loaded.rightContent ?? content;
+      this.session.reset();
+      this.activeChangeRowIndex = null;
+      this.retainedExternalMarkdown = leftFile instanceof TFile ? null : leftFile;
+      this.externalMarkdown = rightFile instanceof TFile ? null : rightFile;
+      this.viewState = { leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" };
+      await this.renderDiff(null, loaded);
+    } catch (error) {
+      if (token !== this.dropToken) return;
+      console.error("Side-by-Side Diff could not read dropped Markdown", error);
+      new Notice(this.translate("notice.dropReadFailed"));
+    }
+  }
+  /** Converts drops within the desktop vault to the existing Obsidian file object. */
+  async resolveDroppedFile(file: ExternalMarkdown): Promise<ComparisonFile> {
+    const adapter = this.app.vault.adapter;
+    if (file.diskPath !== null && adapter instanceof FileSystemAdapter) {
+      const path = await getVaultRelativePath(file.diskPath, adapter.getBasePath());
+      const vaultFile = path === null ? null : this.app.vault.getAbstractFileByPath(path);
+      if (isTextFile(vaultFile)) return vaultFile;
+    }
+    return file;
+  }
+  /** Returns the native path used solely for physical identity checks. */
+  getComparisonDiskPath(file: ComparisonFile): string | null {
+    if (!(file instanceof TFile)) return file.diskPath;
+    const adapter = this.app.vault.adapter;
+    return adapter instanceof FileSystemAdapter ? join(adapter.getBasePath(), file.path) : null;
+  }
+  /** Rejects duplicate physical files even when their paths or source types differ. */
+  async isSameComparisonFile(left: ComparisonFile, right: ComparisonFile): Promise<boolean> {
+    if (left.path === right.path) return true;
+    const leftPath = this.getComparisonDiskPath(left);
+    const rightPath = this.getComparisonDiskPath(right);
+    if (leftPath === null || rightPath === null) return false;
+    const identities = await Promise.all([getPhysicalFileIdentity(leftPath), getPhysicalFileIdentity(rightPath)]);
+    return identities[0] === identities[1];
+  }
+  /** Loads both inputs before committing a dropped comparison to the view. */
+  async loadComparison(left: ComparisonFile, right: ComparisonFile | null): Promise<LoadedComparison> {
+    const [leftContent, rightContent] = await Promise.all([
+      this.readComparisonFile(left), right === null ? Promise.resolve(null) : this.readComparisonFile(right)
+    ]);
+    return { leftContent, rightContent };
+  }
+  /** Refuses stale actions rather than reinterpreting displayed row indexes against new disk content. */
+  async readChangeContents(left: ComparisonFile, right: ComparisonFile): Promise<LoadedComparison | null> {
+    const token = this.renderToken;
+    const loaded = await this.loadComparison(left, right);
+    if (token !== this.renderToken || this.state.leftPath !== left.path || this.state.rightPath !== right.path) return null;
+    const changed = !(left instanceof TFile) && loaded.leftContent !== left.content ? left
+      : !(right instanceof TFile) && loaded.rightContent !== right.content ? right : null;
+    if (changed !== null) {
+      new Notice(this.translate("notice.comparisonChanged", { name: changed.name }));
+      await this.renderDiff(this.getScrollPosition());
+      return null;
+    }
+    return loaded;
+  }
+  /** Resolves either pane without treating an external file as a vault file. */
+  getComparisonFile(path: string): ComparisonFile | null {
+    if (this.externalMarkdown?.path === path) return this.externalMarkdown;
+    if (this.retainedExternalMarkdown?.path === path) return this.retainedExternalMarkdown;
+    const file = this.app.vault.getAbstractFileByPath(path);
+    return file instanceof TFile ? file : null;
+  }
+  /** Reads dropped desktop files directly and vault files through Obsidian. */
+  readComparisonFile(file: ComparisonFile): Promise<string> {
+    return file instanceof TFile ? this.app.vault.cachedRead(file) : readExternalMarkdown(file);
   }
   /** Translates one UI key using the plugin's current language. */
   translate(key: string, variables: Record<string, string | number> = {}): string {
@@ -129,6 +291,8 @@ export class SideBySideDiffView extends ItemView {
   override getDisplayText(): string {
     const labels = this.getPaneLabels();
     const getFileName = (path: string): string => {
+      if (this.externalMarkdown?.path === path) return this.externalMarkdown.name;
+      if (this.retainedExternalMarkdown?.path === path) return this.retainedExternalMarkdown.name;
       const file = this.app.vault.getAbstractFileByPath(path);
       return file instanceof TFile ? file.name : path.split("/").pop() ?? this.translate("fileFallback");
     };
@@ -139,17 +303,22 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Returns the serializable paths needed to restore the view. */
   override getState(): Record<string, unknown> {
-    return {
-      leftPath: this.state.leftPath,
-      rightPath: this.state.rightPath,
-      editRight: this.state.editRight,
-      mode: this.state.mode
-    };
+    const externalPaths = [this.externalMarkdown?.path, this.retainedExternalMarkdown?.path];
+    const hasExternal = externalPaths.some((path) => path !== undefined && (path === this.state.leftPath || path === this.state.rightPath));
+    if (hasExternal) {
+      const vaultPath = [this.state.leftPath, this.state.rightPath].find((path) => path !== null && !externalPaths.includes(path)) ?? null;
+      return { leftPath: vaultPath, rightPath: null, editRight: false, mode: "compare" };
+    }
+    return { ...this.state };
   }
   /** Stores new paths and redraws the comparison. */
   override async setState(state: unknown, result: ViewStateResult): Promise<void> {
     await super.setState(state, result);
-    this.viewState = parseDiffViewState(state);
+    const nextState = parseDiffViewState(state);
+    if (nextState.leftPath !== this.externalMarkdown?.path && nextState.rightPath !== this.externalMarkdown?.path) this.externalMarkdown = null;
+    if (nextState.leftPath !== this.retainedExternalMarkdown?.path && nextState.rightPath !== this.retainedExternalMarkdown?.path) this.retainedExternalMarkdown = null;
+    this.dropToken += 1;
+    this.viewState = nextState;
     await this.renderDiff();
   }
   /** Renders the initial comparison when the leaf opens. */
@@ -158,6 +327,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Clears the view when its leaf closes. */
   override async onClose(): Promise<void> {
+    this.dropToken += 1;
     if (this.state.editRight && this.rightEditorState?.editor) {
       this.synchronizeEditablePanes(this.rightEditorState.editor);
     }
@@ -358,7 +528,7 @@ export class SideBySideDiffView extends ItemView {
     }
   }
   /** Loads the active comparison or the initial left-hand file selection. */
-  async renderDiff(scrollPosition: ScrollPosition | null = null): Promise<void> {
+  async renderDiff(scrollPosition: ScrollPosition | null = null, loaded: LoadedComparison | null = null): Promise<void> {
     this.disposeRightEditorObserver();
     const token = ++this.renderToken;
     this.previousChangeButton = null;
@@ -371,33 +541,36 @@ export class SideBySideDiffView extends ItemView {
       this.renderMessage(this.translate("view.leftUnavailable"));
       return;
     }
-    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
-    if (!(leftFile instanceof TFile)) {
+    const leftFile = this.getComparisonFile(leftPath);
+    if (leftFile === null) {
       this.renderMessage(this.translate("view.leftUnavailable"));
       return;
     }
     try {
-      const storedLeftContent = await this.app.vault.cachedRead(leftFile);
+      const storedLeftContent = loaded?.leftContent ?? await this.readComparisonFile(leftFile);
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       if (token !== this.renderToken) {
         return;
       }
       const rightPath = this.state.rightPath;
       if (rightPath === null) {
+        if (!(leftFile instanceof TFile)) leftFile.content = storedLeftContent;
         this.buildSelectionLayout(leftFile, splitLines(leftContent));
         this.restoreScrollPosition(scrollPosition);
         return;
       }
-      const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
-      if (!(rightFile instanceof TFile)) {
+      const rightFile = this.getComparisonFile(rightPath);
+      if (rightFile === null) {
         this.renderMessage(this.translate("view.rightUnavailable"));
         return;
       }
-      const storedRightContent = await this.app.vault.cachedRead(rightFile);
+      const storedRightContent = loaded?.rightContent ?? await this.readComparisonFile(rightFile);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
       if (token !== this.renderToken) {
         return;
       }
+      if (!(leftFile instanceof TFile)) leftFile.content = storedLeftContent;
+      if (!(rightFile instanceof TFile)) rightFile.content = storedRightContent;
       if (this.state.editRight) {
         // Keep the first snapshot so a later rerender cannot hide an external edit.
         this.session.captureSaveBaseline(rightFile.path, storedRightContent);
@@ -496,7 +669,7 @@ export class SideBySideDiffView extends ItemView {
     return position >= 0 ? position : null;
   }
   /** Opens a file picker for the right-hand pane. */
-  selectRightFile(leftFile: TFile): void {
+  selectRightFile(leftFile: ComparisonFile): void {
     const files = this.app.vault.getFiles().filter((file) => isTextFile(file) && file.path !== leftFile.path).sort((a, b) => a.path.localeCompare(b.path, this.plugin.language));
     const recentFiles = getRecentFiles(files, this.plugin.settings.recentRightFilePaths);
     const modal = new FilePickerModal(this.app, files, (rightFile) => {
@@ -512,7 +685,8 @@ export class SideBySideDiffView extends ItemView {
     modal.open();
   }
   /** Applies the selected right file and redraws the comparison view. */
-  async applyRightFile(leftFile: TFile, rightFile: TFile): Promise<void> {
+  async applyRightFile(leftFile: ComparisonFile, rightFile: TFile): Promise<void> {
+    this.dropToken += 1;
     const nextState: DiffViewState = { leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" };
     this.viewState = nextState;
     this.activeChangeRowIndex = null;
@@ -530,6 +704,8 @@ export class SideBySideDiffView extends ItemView {
     if (this.state.rightPath === null || this.state.editRight) {
       return;
     }
+    const rightFile = this.getComparisonFile(this.state.rightPath);
+    if (rightFile === null || (!(rightFile instanceof TFile) && rightFile.diskPath === null)) return;
     if (!await this.prepareForTransition(this.translate("modal.unsaved.editQuestion"))) {
       return;
     }
@@ -565,8 +741,8 @@ export class SideBySideDiffView extends ItemView {
           new Notice(this.translate("view.rightUnavailable"));
           return false;
         }
-        const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
-        if (!(rightFile instanceof TFile)) {
+        const rightFile = this.getComparisonFile(rightPath);
+        if (rightFile === null) {
           new Notice(this.translate("view.rightUnavailable"));
           return false;
         }
@@ -596,7 +772,7 @@ export class SideBySideDiffView extends ItemView {
       return false;
     }
   }
-  /** Saves all edited right-side rows back to the right-hand vault file. */
+  /** Saves all edited right-side rows back to the selected file. */
   async saveRightEdits(): Promise<boolean> {
     if (!this.hasRightEditorChanges()) {
       return true;
@@ -607,8 +783,8 @@ export class SideBySideDiffView extends ItemView {
       new Notice(this.translate("view.rightUnavailable"));
       return false;
     }
-    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
-    if (!(rightFile instanceof TFile)) {
+    const rightFile = this.getComparisonFile(rightPath);
+    if (rightFile === null) {
       new Notice(this.translate("view.rightUnavailable"));
       return false;
     }
@@ -884,16 +1060,18 @@ export class SideBySideDiffView extends ItemView {
     return this.session.getDisplayedContent(path, storedContent);
   }
   /** Processes a file only when its save snapshot still matches the process input. */
-  async processUnchangedFile(file: TFile, transform: (currentContent: string) => string): Promise<FileSaveResult> {
+  async processUnchangedFile(file: ComparisonFile, transform: (currentContent: string) => string): Promise<FileSaveResult> {
     let observedContent: string | undefined;
     try {
-      await this.app.vault.process(
-        file,
-        (currentContent) => {
-          observedContent = currentContent;
-          return createGuardedSaveTransform(this.session.getSaveBaseline(file.path), transform)(currentContent);
-        },
-      );
+      const guardedTransform = (currentContent: string): string => {
+        observedContent = currentContent;
+        return createGuardedSaveTransform(this.session.getSaveBaseline(file.path), transform)(currentContent);
+      };
+      if (file instanceof TFile) {
+        await this.app.vault.process(file, guardedTransform);
+      } else {
+        await processExternalMarkdown(file, guardedTransform);
+      }
     } catch (error) {
       if (!(error instanceof SaveConflictError)) {
         throw error;
@@ -917,8 +1095,7 @@ export class SideBySideDiffView extends ItemView {
     return writePendingChanges(
       this.session.getPendingChanges(),
       (path) => {
-        const file = this.app.vault.getAbstractFileByPath(path);
-        return file instanceof TFile ? file : null;
+        return this.getComparisonFile(path);
       },
       (file, content) => this.processUnchangedFile(file, () => content),
       (path) => { this.session.removePendingChange(path); }
@@ -961,17 +1138,16 @@ export class SideBySideDiffView extends ItemView {
       new Notice(this.translate("notice.comparedFilesUnavailable"));
       return;
     }
-    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
-    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
-    if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile)) {
+    const leftFile = this.getComparisonFile(leftPath);
+    const rightFile = this.getComparisonFile(rightPath);
+    if (leftFile === null || rightFile === null) {
       new Notice(this.translate("notice.comparedFilesUnavailable"));
       return;
     }
     try {
-      const [storedLeftContent, storedRightContent] = await Promise.all([
-        this.app.vault.cachedRead(leftFile),
-        this.app.vault.cachedRead(rightFile)
-      ]);
+      const loaded = await this.readChangeContents(leftFile, rightFile);
+      if (loaded === null || loaded.rightContent === null) return;
+      const { leftContent: storedLeftContent, rightContent: storedRightContent } = loaded;
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
       const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
@@ -987,6 +1163,7 @@ export class SideBySideDiffView extends ItemView {
         direction
       );
       const targetFile = leftToRight ? rightFile : leftFile;
+      if (!(targetFile instanceof TFile) && targetFile.diskPath === null) return;
       const targetContent = leftToRight ? rightContent : leftContent;
       const targetLines = leftToRight ? nextRightLines : nextLeftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
@@ -1012,17 +1189,16 @@ export class SideBySideDiffView extends ItemView {
       new Notice(this.translate("notice.comparedFilesUnavailable"));
       return;
     }
-    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
-    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
-    if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile)) {
+    const leftFile = this.getComparisonFile(leftPath);
+    const rightFile = this.getComparisonFile(rightPath);
+    if (leftFile === null || rightFile === null) {
       new Notice(this.translate("notice.comparedFilesUnavailable"));
       return;
     }
     try {
-      const [storedLeftContent, storedRightContent] = await Promise.all([
-        this.app.vault.cachedRead(leftFile),
-        this.app.vault.cachedRead(rightFile)
-      ]);
+      const loaded = await this.readChangeContents(leftFile, rightFile);
+      if (loaded === null || loaded.rightContent === null) return;
+      const { leftContent: storedLeftContent, rightContent: storedRightContent } = loaded;
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
       const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
@@ -1046,6 +1222,7 @@ export class SideBySideDiffView extends ItemView {
       }
       const leftToRight = direction === "left-to-right";
       const targetFile = leftToRight ? rightFile : leftFile;
+      if (!(targetFile instanceof TFile) && targetFile.diskPath === null) return;
       const targetContent = leftToRight ? rightContent : leftContent;
       const targetLines = leftToRight ? rightLines : leftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
@@ -1066,7 +1243,7 @@ export class SideBySideDiffView extends ItemView {
     this.contentEl.createDiv({ cls: "file-diff-sbs-message", text: message });
   }
   /** Shows the left file and an inline picker before a right file is selected. */
-  buildSelectionLayout(leftFile: TFile, leftLines: string[]): void {
+  buildSelectionLayout(leftFile: ComparisonFile, leftLines: string[]): void {
     const root = this.contentEl.createDiv({ cls: "file-diff-sbs-root" });
     const toolbar = root.createDiv({ cls: "file-diff-sbs-toolbar" });
     const title = toolbar.createDiv({ cls: "file-diff-sbs-title" });
@@ -1097,6 +1274,25 @@ export class SideBySideDiffView extends ItemView {
       cls: "mod-cta"
     });
     chooseButton.addEventListener("click", () => { this.selectRightFile(leftFile); });
+    const dropCard = rightPane.createDiv({ cls: "file-diff-sbs-picker-card file-diff-sbs-drop-card" });
+    dropCard.createEl("h3", { text: this.translate("view.selection.dropFiles") });
+    dropCard.createEl("p", { text: this.translate("view.dropMarkdown") });
+    dropCard.addEventListener("dragover", (event) => {
+      if (event.dataTransfer && ["text/plain", "text/uri-list"].some((type) => event.dataTransfer?.types.includes(type) === true)) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = "copy";
+      }
+    });
+    dropCard.addEventListener("drop", (event) => {
+      if (!event.dataTransfer || event.dataTransfer.types.includes("Files")) return;
+      const text = event.dataTransfer.getData("text/uri-list").split(/\r?\n/).filter((line) => line.length > 0 && !line.startsWith("#")).join("\n")
+        || event.dataTransfer.getData("text/plain");
+      if (!text) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void this.dropVaultFile(leftFile, text);
+    });
   }
   /** Returns pane labels for proposal, acceptance and regular comparison modes. */
   getPaneLabels(): { left: string; right: string } {
@@ -1126,7 +1322,7 @@ export class SideBySideDiffView extends ItemView {
     }
   }
   /** Builds toolbar, file headers and the aligned diff rows. */
-  buildLayout(leftFile: TFile, rightFile: TFile, leftLines: string[], rightLines: string[]): void {
+  buildLayout(leftFile: ComparisonFile, rightFile: ComparisonFile, leftLines: string[], rightLines: string[]): void {
     const paneLabels = this.getPaneLabels();
     const root = this.contentEl.createDiv({ cls: "file-diff-sbs-root" });
     // Actions reuse these rendered options even if the setting changes before a refresh.
@@ -1182,9 +1378,11 @@ export class SideBySideDiffView extends ItemView {
     this.nextChangeButton = nextChangeButton;
     if (!this.state.editRight) {
       const editButton = actions.createEl("button", { text: this.translate("actions.edit") });
+      editButton.disabled = !(rightFile instanceof TFile) && rightFile.diskPath === null;
       editButton.title = this.translate("actions.editTitle");
       editButton.addEventListener("click", () => { void this.enableRightEditMode(); });
       const swapButton = actions.createEl("button", { text: this.translate("actions.swap") });
+      swapButton.disabled = this.externalMarkdown != null && this.externalMarkdown.diskPath === null;
       swapButton.title = this.translate("actions.swapTitle");
       swapButton.addEventListener("click", () => { void this.swapFiles(); });
       const saveButton = actions.createEl("button", {
@@ -1391,7 +1589,7 @@ export class SideBySideDiffView extends ItemView {
     }
   }
   /** Shows the identical-file message and the actions available for the current mode. */
-  buildIdenticalMessage(parent: HTMLElement, leftFile: TFile, rightFile: TFile): void {
+  buildIdenticalMessage(parent: HTMLElement, leftFile: ComparisonFile, rightFile: ComparisonFile): void {
     const message = parent.createDiv({ cls: "file-diff-sbs-identical-message" });
     message.createEl("strong", { text: this.translate("messages.identical.title") });
     if (this.state.editRight) {
@@ -1401,11 +1599,13 @@ export class SideBySideDiffView extends ItemView {
     message.createSpan({ text: this.translate("messages.identical.trash") });
     const actions = message.createDiv({ cls: "file-diff-sbs-identical-actions" });
     const deleteLeftButton = actions.createEl("button", { text: this.translate("messages.identical.deleteLeft") });
+    deleteLeftButton.disabled = !(leftFile instanceof TFile);
     deleteLeftButton.title = leftFile.path;
-    deleteLeftButton.addEventListener("click", () => { this.confirmDeleteIdenticalFile(leftFile); });
+    deleteLeftButton.addEventListener("click", () => { if (leftFile instanceof TFile) this.confirmDeleteIdenticalFile(leftFile); });
     const deleteRightButton = actions.createEl("button", { text: this.translate("messages.identical.deleteRight") });
+    deleteRightButton.disabled = !(rightFile instanceof TFile);
     deleteRightButton.title = rightFile.path;
-    deleteRightButton.addEventListener("click", () => { this.confirmDeleteIdenticalFile(rightFile); });
+    deleteRightButton.addEventListener("click", () => { if (rightFile instanceof TFile) this.confirmDeleteIdenticalFile(rightFile); });
   }
   /** Shows that every detected suggestion was accepted or dismissed. */
   buildResolvedMessage(parent: HTMLElement): void {
@@ -1425,8 +1625,8 @@ export class SideBySideDiffView extends ItemView {
     if (leftPath === null || rightPath === null) {
       return;
     }
-    const leftFile = this.app.vault.getAbstractFileByPath(leftPath);
-    const rightFile = this.app.vault.getAbstractFileByPath(rightPath);
+    const leftFile = this.getComparisonFile(leftPath);
+    const rightFile = this.getComparisonFile(rightPath);
     if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile) || !this.isChangeCopyFile(leftFile, rightFile)) {
       return;
     }
@@ -1442,7 +1642,7 @@ export class SideBySideDiffView extends ItemView {
       && file.basename.startsWith(expectedPrefix);
   }
   /** Adds a pane header with side label and vault-relative path. */
-  buildFileHeader(parent: HTMLElement, file: TFile, sideLabel: string): void {
+  buildFileHeader(parent: HTMLElement, file: ComparisonFile, sideLabel: string): void {
     const header = parent.createDiv({ cls: "file-diff-sbs-file-header" });
     header.createSpan({ text: sideLabel, cls: "file-diff-sbs-side-label" });
     header.createSpan({ text: file.name, cls: "file-diff-sbs-file-path" });
@@ -1591,6 +1791,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Swaps the files while keeping the current diff view open. */
   async swapFiles(): Promise<void> {
+    if (this.externalMarkdown != null && this.externalMarkdown.diskPath === null) return;
     if (!await this.prepareForSwap()) {
       return;
     }
@@ -1609,11 +1810,14 @@ export class SideBySideDiffView extends ItemView {
     return this.prepareForTransition(this.translate("modal.unsaved.swapQuestion"));
   }
   /** Confirms how transient comparison changes should be handled before a view transition. */
-  async prepareForTransition(question: string): Promise<boolean> {
+  async prepareForTransition(question: string, validate?: () => Promise<boolean>): Promise<boolean> {
     if (!this.hasUnsavedChanges()) {
-      return true;
+      return validate === undefined || await validate();
     }
     const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this), question).waitForChoice();
+    // An asynchronous drop may have failed or been superseded while the dialog was open.
+    // Validate before a discard can erase the current session or a save can write it.
+    if (validate !== undefined && !await validate()) return false;
     if (choice === "discard") {
       this.session.clearTransientChanges();
       return true;

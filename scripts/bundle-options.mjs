@@ -5,7 +5,7 @@ export const PLUGIN_BUNDLE_OPTIONS = {
 	platform: "node",
 	format: "cjs",
 	target: "es2020",
-	external: ["obsidian"],
+	external: ["obsidian", "electron"],
 	loader: {
 		".png": "dataurl",
 		".webp": "dataurl"

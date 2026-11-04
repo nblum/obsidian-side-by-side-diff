@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Grazie per aver installato Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Confronta due file di testo, esamina ogni differenza e salva solo le modifiche che scegli.",
 	"modal.introduction.welcome.feedback.title": "Feedback",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff funziona interamente nel tuo vault. Condividi le tue idee o lascia una stella su GitHub.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff funziona localmente in Obsidian. Condividi le tue idee o lascia una stella su GitHub.",
 	"modal.introduction.welcome.reportBug.title": "Segnala un problema",
 	"modal.introduction.welcome.reportBug.description": "Hai trovato un problema? Una breve segnalazione con i passaggi per riprodurlo aiuta a risolverlo.",
 	"modal.introduction.welcome.reportBug.link": "Segnala un problema",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Portoghese (Brasile)",
 	"settings.language.pt-PT": "Portoghese (Portogallo)",
 	"settings.language.nl": "Olandese",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Puoi trascinare qui file da Obsidian o dal tuo gestore di file.",
+	"notice.dropMarkdownOnly": "Trascina esattamente un file Markdown (.md).",
+	"notice.dropReadFailed": "Impossibile leggere il file Markdown trascinato.",
+	"modal.unsaved.dropQuestion": "Salvare le modifiche prima di confrontare il file trascinato?",
+	"view.selection.dropFiles": "Trascina file",
+	"notice.comparisonChanged": "«{name}» è cambiato da quando è stato visualizzato questo confronto. Controlla il confronto aggiornato prima di accettare modifiche."
 }

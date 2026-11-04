@@ -5,7 +5,7 @@ further development and acceptance.
 
 ## Goal
 
-The plugin compares two text files from the current Obsidian vault in a safe, traceable way. Changes are made
+The plugin compares two text files, either from the current Obsidian vault or with a dropped external Markdown source in a safe, traceable way. Changes are made
 visible, can be reviewed and staged individually, and are written only through an explicit save action.
 
 ## Feature scope
@@ -29,6 +29,28 @@ visible, can be reviewed and staged individually, and are written only through a
 - The right-file selector remembers up to five recently selected files and shows them in a separate recent-files group.
 - Selecting exactly two text files in the file explorer and choosing `Compare files` from the context menu opens the
   comparison view with both files directly.
+
+### External Markdown sources
+
+- The initial right pane shows a **Drop files** card below **Select right file**. Drop an Obsidian vault file
+  there to select it on the right, or drop one external `.md` file from the file manager into the comparison.
+- The external file opens on the right, replacing any previous right file. The selected left-hand file stays
+  in place; dropping never swaps the panes automatically.
+- For drops with a desktop filesystem path, the right-hand external file supports direct editing and
+  accepting changes. Only explicit saves write to disk. Both staged and edited saves check for external changes,
+  preserve line endings, and fail if the file was deleted. Files are not imported or offered for trash actions.
+- Single-row and block acceptance, ignore, undo, and heading alignment work with external targets as well.
+- If no desktop path is available, the drop remains a read-only snapshot and swapping is disabled.
+- Pending changes require the existing save/discard confirmation before a new dropped snapshot replaces them.
+- Invalid drops and failed native reads preserve the comparison, including pending edits and review decisions
+  when a read fails during save/discard confirmation. Newer selections invalidate older pending drops.
+- A drop referring to the same physical file as the left pane is rejected, including symlinks and hard links.
+  Files already present in the vault are resolved to their existing vault identity.
+- Accept actions detect external content changed since display and refresh without staging a change. The user
+  must review the new comparison before accepting. External saves are serialized by physical file identity,
+  with each save validating its baseline after earlier saves finish.
+- Desktop files are reread when rebuilding the comparison. External content and paths are not persisted; restoring the view shows the vault note
+  with the file selector, ready for another drop.
 
 ### Markdown heading alignment
 
@@ -150,7 +172,7 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
 ## Technical requirements
 
 - Obsidian `1.6.6` or later.
-- Files being compared must be text files in the vault.
+- Save targets are vault text files or explicitly dropped Markdown files with an accessible desktop path.
 - No external services or additional runtime dependencies are required.
 - Each supported language needs a complete translation file with the same key set as the other languages.
 - The save action must always be explicitly triggered by the user.

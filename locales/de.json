@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Vielen Dank für die Installation von Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Vergleiche zwei Textdateien, prüfe jede Änderung und speichere nur die Änderungen, die du übernehmen möchtest.",
 	"modal.introduction.welcome.feedback.title": "Feedback",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff läuft vollständig in deinem Vault. Teile deine Ideen oder unterstütze das Plugin mit einem GitHub-Stern.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff läuft lokal in Obsidian. Teile deine Ideen oder unterstütze das Plugin mit einem GitHub-Stern.",
 	"modal.introduction.welcome.reportBug.title": "Bug melden",
 	"modal.introduction.welcome.reportBug.description": "Etwas funktioniert nicht wie erwartet? Ein kurzer Bericht mit Schritten zum Nachvollziehen hilft, das Problem zu lösen.",
 	"modal.introduction.welcome.reportBug.link": "Bug melden",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Portugiesisch (Brasilien)",
 	"settings.language.pt-PT": "Portugiesisch (Portugal)",
 	"settings.language.nl": "Niederländisch",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Du kannst hier Dateien aus Obsidian oder deinem Dateimanager ablegen.",
+	"notice.dropMarkdownOnly": "Bitte genau eine Markdown-Datei (.md) ablegen.",
+	"notice.dropReadFailed": "Die abgelegte Markdown-Datei konnte nicht gelesen werden.",
+	"modal.unsaved.dropQuestion": "Änderungen vor dem Vergleich der abgelegten Datei speichern?",
+	"view.selection.dropFiles": "Dateien ablegen",
+	"notice.comparisonChanged": "„{name}“ wurde seit der Anzeige dieses Vergleichs geändert. Prüfe den aktualisierten Vergleich, bevor du Änderungen übernimmst."
 }

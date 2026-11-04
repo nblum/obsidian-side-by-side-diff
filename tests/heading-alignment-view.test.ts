@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
+import { createRequire } from "node:module";
+import { mkdtemp, writeFile, readFile, rm, unlink, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import esbuild from "esbuild";
 import type { TFile } from "obsidian";
 import type { SideBySideDiffView } from "../src/diff-view.ts";
@@ -32,9 +36,13 @@ runInNewContext(output.text, {
 	module,
 	exports: module.exports,
 	console,
+	URL,
+	Buffer,
 	require: (name: string) => {
+		if (name === "electron") return {};
+		if (name.startsWith("node:")) return createRequire(import.meta.url)(name);
 		assert.equal(name, "obsidian");
-		return { ItemView: class {}, Notice: class {}, Modal: class {}, SuggestModal: class {}, TFile: TestFile };
+		return { ItemView: class { async setState() {} }, Notice: class {}, Modal: class {}, SuggestModal: class {}, TFile: TestFile, FileSystemAdapter: class {} };
 	}
 });
 
@@ -55,10 +63,15 @@ function createView(left: string[], right: string[], enabled = true, leftExtensi
 	const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
 	Object.assign(view, {
 		session,
+		dropToken: 0,
+		renderToken: 0,
+		externalMarkdown: null,
+		retainedExternalMarkdown: null,
 		plugin: { settings, translate: (key: string) => key },
 		viewState: { leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" },
 		contentEl: element,
 		app: { vault: {
+			getName: () => "Test Vault",
 			getAbstractFileByPath: (path: string) => path === leftFile.path ? leftFile : rightFile,
 			cachedRead: (file: TestFile) => Promise.resolve((file === leftFile ? left : right).join("\n"))
 		} },
@@ -173,4 +186,247 @@ test("edit-mode height measurement preserves scrolling when wrapped rows tempora
 	view.synchronizeEditableLineHeights(editor);
 	assert.equal(scroll.scrollTop, 450);
 	assert.equal(scroll.scrollLeft, 12);
+});
+
+/** Supplies the browser file interface used by the drop handler without filesystem access. */
+function droppedMarkdown(name: string, content: string): File {
+	return { name, text: () => Promise.resolve(content) } as File;
+}
+
+test("external drops replace only the right file and memory-only targets cannot be edited", async () => {
+	for (const grouped of [false, true]) {
+		const { view, session } = createView(["old"], ["vault"]);
+		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+		await view.dropMarkdown([droppedMarkdown("external.MD", "external")]);
+		assert.equal(view.state.leftPath, "left.md");
+		const source = view.getComparisonFile(view.state.rightPath!);
+		assert.ok(source);
+		assert.equal(source.name, "external.MD");
+		assert.equal(await view.readComparisonFile(source), "external");
+		assert.equal(session.hasPendingChanges(), false);
+		if (grouped) await view.applyGroupChange(0, 0, "left-to-right");
+		else await view.applyRowChange(0, "left-to-right");
+		assert.equal(session.hasPendingChanges(), false);
+		if (grouped) await view.applyGroupChange(0, 0, "right-to-left");
+		else await view.applyRowChange(0, "right-to-left");
+		assert.deepEqual(session.getPendingChanges(), [{ path: "left.md", content: "external" }]);
+		assert.equal(session.getSaveBaseline("left.md"), "old");
+		await view.swapFiles();
+		assert.equal(view.state.rightPath, source.path);
+		assert.equal(view.state.leftPath, "left.md");
+		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare" });
+	}
+});
+
+test("invalid drops and cancelled transitions preserve the current comparison", async () => {
+	const { view, session } = createView(["left"], ["right"]);
+	Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(false) });
+	const before = view.state;
+	session.stageChange("right.md", "pending", "right");
+	await view.dropMarkdown([]);
+	await view.dropMarkdown([droppedMarkdown("image.png", "binary")]);
+	await view.dropMarkdown([droppedMarkdown("a.md", "a"), droppedMarkdown("b.md", "b")]);
+	await view.dropMarkdown([droppedMarkdown("a.md", "a")]);
+	assert.deepEqual(view.state, before);
+	assert.equal(session.getDisplayedContent("right.md", "right"), "pending");
+});
+
+test("the latest drop wins if browser file reads finish out of order", async () => {
+	const { view } = createView(["left"], ["right"]);
+	Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+	let finishRead!: (value: string) => void;
+	const first = view.dropMarkdown([{ name: "first.md", text: () => new Promise<string>((resolve) => { finishRead = resolve; }) } as File]);
+	await view.dropMarkdown([droppedMarkdown("second.md", "second")]);
+	finishRead("first");
+	await first;
+	assert.equal(view.getComparisonFile(view.state.rightPath!)?.name, "second.md");
+});
+
+test("memory-only external targets stay read-only without changing the left file", async () => {
+	const { view } = createView(["left"], ["right"]);
+	Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+	await view.dropMarkdown([droppedMarkdown("outside.md", "outside")]);
+	const sourcePath = view.state.rightPath!;
+	await view.enableRightEditMode();
+	assert.equal(view.state.editRight, false);
+	assert.equal(view.state.leftPath, "left.md");
+	assert.equal(view.getComparisonFile(sourcePath)?.name, "outside.md");
+});
+
+test("a first drop keeps the initial vault note on the left and read failures preserve pending changes", async () => {
+	const { view, session } = createView(["left"], ["right"]);
+	Object.assign(view, {
+		externalMarkdown: null, dropToken: 0,
+		viewState: { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare" },
+		prepareForTransition: () => Promise.resolve(true)
+	});
+	await view.dropMarkdown([droppedMarkdown("outside.md", "outside")]);
+	assert.equal(view.state.leftPath, "left.md");
+	session.stageChange("left.md", "pending", "left");
+	const before = { ...view.state };
+	await view.dropMarkdown([{ name: "unreadable.md", text: () => Promise.reject(new Error("read failed")) } as File]);
+	assert.deepEqual({ ...view.state }, before);
+	assert.equal(session.getDisplayedContent("left.md", "left"), "pending");
+});
+
+test("the drop card selects vault files from paths and Obsidian wikilinks", async () => {
+	const { view, rightFile } = createView(["left"], ["right"]);
+	const leftFile = view.getComparisonFile("left.md")!;
+	let selected = 0;
+	Object.assign(view, {
+		prepareForTransition: () => Promise.resolve(true),
+		applyRightFile: (left: unknown, right: unknown) => {
+			assert.equal(left, leftFile);
+			assert.equal(right, rightFile);
+			selected += 1;
+			return Promise.resolve();
+		}
+	});
+	Object.assign(view.app.vault, { getAbstractFileByPath: (path: string) => path === "right.md" ? rightFile : null });
+	Object.assign(view.app, { metadataCache: { getFirstLinkpathDest: (link: string) => link === "right" ? rightFile : null } });
+	await view.dropVaultFile(leftFile, "right.md");
+	await view.dropVaultFile(leftFile, "[[right|Alias]]");
+	assert.equal(selected, 2);
+	Object.assign(view, { prepareForTransition: () => Promise.resolve(false) });
+	await view.dropVaultFile(leftFile, "right.md");
+	assert.equal(selected, 2);
+});
+
+
+test("Obsidian open URLs and encoded Markdown links select the dragged vault note", async () => {
+	const { view, rightFile } = createView(["left"], ["right"]);
+	const leftFile = view.getComparisonFile("left.md")!;
+	let selected = 0;
+	Object.assign(view, {
+		prepareForTransition: () => Promise.resolve(true),
+		applyRightFile: (_left: unknown, right: unknown) => {
+			assert.equal(right, rightFile);
+			selected += 1;
+			return Promise.resolve();
+		}
+	});
+	Object.assign(view.app.vault, {
+		getName: () => "Test Vault",
+		getAbstractFileByPath: (path: string) => path === "Notes/Right note.md" ? rightFile : null
+	});
+	Object.assign(view.app, { metadataCache: { getFirstLinkpathDest: () => null } });
+	await view.dropVaultFile(leftFile, "obsidian://open?vault=Test%20Vault&file=Notes%2FRight%20note.md");
+	await view.dropVaultFile(leftFile, "[Right note](Notes/Right%20note.md)");
+	assert.equal(selected, 2);
+	for (const invalid of [
+		"obsidian://open?vault=Another%20Vault&file=Notes%2FRight%20note.md",
+		"obsidian://open?vault=Test%20Vault",
+		"[Broken](Notes/%ZZ.md)",
+		"obsidian://open?vault=Test%20Vault&file=left.md"
+	]) await view.dropVaultFile(leftFile, invalid);
+	assert.equal(selected, 2);
+});
+
+
+/** Creates a browser drop carrying the legacy desktop path for real-file save tests. */
+function desktopMarkdown(path: string, content: string): File {
+	return { ...droppedMarkdown("outside.md", content), path } as File;
+}
+
+test("desktop Markdown can be swapped and accepts staged blocks only on explicit save", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "sbs-external-block-"));
+	try {
+		const diskPath = join(dir, "outside.md");
+		const original = "old\r\nextra\r\n";
+		await writeFile(diskPath, original);
+		const { view, session } = createView(["new", ""], ["other"]);
+		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+		await view.dropMarkdown([desktopMarkdown(diskPath, original)]);
+		const externalPath = view.state.rightPath!;
+		assert.equal(view.state.leftPath, "left.md");
+		await view.swapFiles();
+		assert.equal(view.state.leftPath, externalPath);
+		await view.swapFiles();
+		assert.equal(view.state.rightPath, externalPath);
+		assert.equal(view.state.leftPath, "left.md");
+		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare" });
+		await view.applyGroupChange(0, 10, "left-to-right");
+		assert.equal(await readFile(diskPath, "utf8"), original);
+		assert.equal(session.getPendingChanges()[0]?.content, "new\r\n");
+		assert.equal(session.undo(), true);
+		assert.equal(session.hasPendingChanges(), false);
+		await view.applyGroupChange(0, 10, "left-to-right");
+		assert.equal(await view.writePendingChanges(), "saved");
+		assert.equal(await readFile(diskPath, "utf8"), "new\r\n");
+		assert.equal(session.hasPendingChanges(), false);
+		// Another drop replaces the right file without moving the left one.
+		await view.dropMarkdown([desktopMarkdown(diskPath, "new\r\n")]);
+		assert.equal(view.state.leftPath, "left.md");
+		assert.equal(view.getComparisonFile(view.state.rightPath!)?.name, "outside.md");
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("desktop edit saves preserve line endings and reject external modifications and deletion", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "sbs-external-edit-"));
+	try {
+		const diskPath = join(dir, "outside.md");
+		const original = "original\r\nlong text\r\n";
+		await writeFile(diskPath, original, { mode: 0o600 });
+		const { view, session } = createView(["left"], ["right"]);
+		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+		await view.dropMarkdown([desktopMarkdown(diskPath, original)]);
+		const externalPath = view.state.rightPath!;
+		assert.equal(view.state.leftPath, "left.md");
+		await view.enableRightEditMode();
+		assert.equal(view.state.editRight, true);
+		assert.equal(view.getComparisonFile(externalPath)?.name, "outside.md");
+		// The actual renderer captures this baseline when it builds the editor.
+		session.captureSaveBaseline(externalPath, original);
+		let edited = "ä\n";
+		Object.assign(view, {
+			rightEditorState: { editor: {}, initialValue: original },
+			serializeRightEditor: () => edited
+		});
+		assert.equal(await readFile(diskPath, "utf8"), original);
+		await writeFile(diskPath, "changed elsewhere\r\n");
+		assert.equal(await view.saveRightEdits(), false);
+		assert.equal(await readFile(diskPath, "utf8"), "changed elsewhere\r\n");
+		assert.equal(await view.saveRightEdits(), true);
+		assert.equal(await readFile(diskPath, "utf8"), "ä\r\n");
+		assert.equal((await stat(diskPath)).mode & 0o777, 0o600);
+		// A close-time save uses the same external target and guarded writer.
+		session.captureSaveBaseline(externalPath, "ä\r\n");
+		edited = "";
+		assert.equal(await view.saveChangesBeforeClose(), true);
+		assert.equal(await readFile(diskPath, "utf8"), "");
+		await unlink(diskPath);
+		edited = "not recreated";
+		assert.equal(await view.saveRightEdits(), false);
+		await assert.rejects(readFile(diskPath), { code: "ENOENT" });
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("dropping another external file after a manual swap preserves the external left file", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "sbs-drop-right-"));
+	try {
+		const firstPath = join(dir, "first.md");
+		const secondPath = join(dir, "second.md");
+		await writeFile(firstPath, "first");
+		await writeFile(secondPath, "second");
+		const { view } = createView(["left"], ["right"]);
+		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
+		await view.dropMarkdown([desktopMarkdown(firstPath, "first")]);
+		const firstId = view.state.rightPath!;
+		await view.swapFiles();
+		assert.equal(view.state.leftPath, firstId);
+		await view.dropMarkdown([desktopMarkdown(secondPath, "second")]);
+		assert.equal(view.state.leftPath, firstId);
+		assert.equal(await view.readComparisonFile(view.getComparisonFile(firstId)!), "first");
+		assert.equal(await view.readComparisonFile(view.getComparisonFile(view.state.rightPath!)!), "second");
+		await view.applyRowChange(0, "left-to-right");
+		assert.equal(await view.writePendingChanges(), "saved");
+		assert.equal(await readFile(secondPath, "utf8"), "first");
+		assert.deepEqual({ ...view.getState() }, { leftPath: null, rightPath: null, editRight: false, mode: "compare" });
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 });

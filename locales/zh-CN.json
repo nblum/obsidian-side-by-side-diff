@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "感谢安装 Side-by-Side Diff",
 	"modal.introduction.welcome.description": "比较两个文本文件，逐一检查差异，并仅保存您选择的更改。",
 	"modal.introduction.welcome.feedback.title": "反馈",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff 完全在您的仓库中运行。欢迎分享想法，或在 GitHub 上为插件点亮星标。",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff 在 Obsidian 中本地运行。欢迎分享想法，或在 GitHub 上为插件点亮星标。",
 	"modal.introduction.welcome.reportBug.title": "问题报告",
 	"modal.introduction.welcome.reportBug.description": "发现功能未按预期运行？请简要描述问题并提供复现步骤，以便解决。",
 	"modal.introduction.welcome.reportBug.link": "报告问题",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Português (Brasil)",
 	"settings.language.pt-PT": "Português (Portugal)",
 	"settings.language.nl": "Nederlands",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "你可以将 Obsidian 或文件管理器中的文件拖放到此处。",
+	"notice.dropMarkdownOnly": "请仅拖放一个 Markdown（.md）文件。",
+	"notice.dropReadFailed": "无法读取拖放的 Markdown 文件。",
+	"modal.unsaved.dropQuestion": "比较拖放的文件前保存更改吗？",
+	"view.selection.dropFiles": "拖放文件",
+	"notice.comparisonChanged": "“{name}”在此比较显示后已发生更改。请先查看刷新后的比较，再接受更改。"
 }

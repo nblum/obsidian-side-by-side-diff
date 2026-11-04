@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Gracias por instalar Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Compara dos archivos de texto, revisa cada diferencia y guarda solo los cambios que elijas.",
 	"modal.introduction.welcome.feedback.title": "Comentarios",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff funciona íntegramente en tu bóveda. Comparte tus ideas o valora el plugin con una estrella en GitHub.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff funciona localmente en Obsidian. Comparte tus ideas o valora el plugin con una estrella en GitHub.",
 	"modal.introduction.welcome.reportBug.title": "Informar de un error",
 	"modal.introduction.welcome.reportBug.description": "¿Algo no funciona como esperabas? Un informe breve con los pasos para reproducirlo ayuda a resolver el problema.",
 	"modal.introduction.welcome.reportBug.link": "Informar de un error",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Português (Brasil)",
 	"settings.language.pt-PT": "Português (Portugal)",
 	"settings.language.nl": "Neerlandés",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Puedes arrastrar aquí archivos desde Obsidian o tu explorador de archivos.",
+	"notice.dropMarkdownOnly": "Arrastra exactamente un archivo Markdown (.md).",
+	"notice.dropReadFailed": "No se pudo leer el archivo Markdown arrastrado.",
+	"modal.unsaved.dropQuestion": "¿Guardar los cambios antes de comparar el archivo arrastrado?",
+	"view.selection.dropFiles": "Arrastrar archivos",
+	"notice.comparisonChanged": "«{name}» ha cambiado desde que se mostró esta comparación. Revisa la comparación actualizada antes de aceptar cambios."
 }

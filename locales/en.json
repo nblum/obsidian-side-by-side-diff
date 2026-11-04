@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Thanks for installing Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Compare two text files, review every difference, and save only the changes you choose.",
 	"modal.introduction.welcome.feedback.title": "Feedback",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff runs entirely in your vault. Share your ideas or rate the plugin with a GitHub star.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff runs locally in Obsidian. Share your ideas or rate the plugin with a GitHub star.",
 	"modal.introduction.welcome.reportBug.title": "Bug report",
 	"modal.introduction.welcome.reportBug.description": "Found something that does not work as expected? A concise report with the steps to reproduce it helps resolve the issue.",
 	"modal.introduction.welcome.reportBug.link": "Report a bug",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Português (Brasil)",
 	"settings.language.pt-PT": "Português (Portugal)",
 	"settings.language.nl": "Nederlands",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "You can drop files from Obsidian or your file explorer here.",
+	"notice.dropMarkdownOnly": "Drop exactly one Markdown (.md) file.",
+	"notice.dropReadFailed": "The dropped Markdown file could not be read.",
+	"modal.unsaved.dropQuestion": "Save changes before comparing the dropped file?",
+	"view.selection.dropFiles": "Drop files",
+	"notice.comparisonChanged": "“{name}” changed since this comparison was displayed. Review the refreshed comparison before accepting changes."
 }

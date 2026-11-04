@@ -241,8 +241,10 @@
 
 .file-diff-sbs-picker-pane {
 	display: flex;
-	align-items: flex-start;
-	justify-content: center;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 1rem;
 	min-height: 100%;
 	padding: 2.5rem 1.5rem;
 	border-left: 1px solid var(--background-modifier-border);
@@ -250,6 +252,7 @@
 }
 
 .file-diff-sbs-picker-card {
+	width: 100%;
 	max-width: 28rem;
 	padding: 1.5rem;
 	border: 1px solid var(--background-modifier-border);
@@ -487,4 +490,8 @@
 .file-diff-sbs-message {
 	padding: 1.5rem;
 	color: var(--text-muted);
+}
+
+.file-diff-sbs-drop-card {
+	border-style: dashed;
 }

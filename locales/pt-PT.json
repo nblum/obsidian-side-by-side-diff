@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Obrigado por instalar o Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Compare dois ficheiros de texto, reveja cada diferença e guarde apenas as alterações que escolher.",
 	"modal.introduction.welcome.feedback.title": "Comentários",
-	"modal.introduction.welcome.feedback.description": "O Side-by-Side Diff funciona inteiramente no seu cofre. Partilhe as suas ideias ou avalie o plugin com uma estrela no GitHub.",
+	"modal.introduction.welcome.feedback.description": "O Side-by-Side Diff funciona localmente no Obsidian. Partilhe as suas ideias ou avalie o plugin com uma estrela no GitHub.",
 	"modal.introduction.welcome.reportBug.title": "Comunicar um erro",
 	"modal.introduction.welcome.reportBug.description": "Algo não funciona como esperado? Uma descrição breve com os passos para reproduzir o problema ajuda a resolvê-lo.",
 	"modal.introduction.welcome.reportBug.link": "Comunicar um erro",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Português (Brasil)",
 	"settings.language.pt-PT": "Português (Portugal)",
 	"settings.language.nl": "Neerlandês",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Pode largar aqui ficheiros do Obsidian ou do seu explorador de ficheiros.",
+	"notice.dropMarkdownOnly": "Largue exatamente um ficheiro Markdown (.md).",
+	"notice.dropReadFailed": "Não foi possível ler o ficheiro Markdown largado.",
+	"modal.unsaved.dropQuestion": "Guardar as alterações antes de comparar o ficheiro largado?",
+	"view.selection.dropFiles": "Largar ficheiros",
+	"notice.comparisonChanged": "“{name}” foi alterado desde que esta comparação foi apresentada. Reveja a comparação atualizada antes de aceitar alterações."
 }

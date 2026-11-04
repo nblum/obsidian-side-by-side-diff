@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Merci d'avoir installé Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Comparez deux fichiers texte, examinez chaque différence et n'enregistrez que les modifications que vous choisissez.",
 	"modal.introduction.welcome.feedback.title": "Avis",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff fonctionne entièrement dans votre coffre. Partagez vos idées ou soutenez le projet avec une étoile GitHub.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff fonctionne localement dans Obsidian. Partagez vos idées ou soutenez le projet avec une étoile GitHub.",
 	"modal.introduction.welcome.reportBug.title": "Signaler un problème",
 	"modal.introduction.welcome.reportBug.description": "Un problème ? Un bref rapport avec les étapes pour le reproduire aidera à le résoudre.",
 	"modal.introduction.welcome.reportBug.link": "Signaler un problème",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Portugais (Brésil)",
 	"settings.language.pt-PT": "Portugais (Portugal)",
 	"settings.language.nl": "Néerlandais",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Vous pouvez déposer ici des fichiers depuis Obsidian ou votre explorateur de fichiers.",
+	"notice.dropMarkdownOnly": "Déposez exactement un fichier Markdown (.md).",
+	"notice.dropReadFailed": "Impossible de lire le fichier Markdown déposé.",
+	"modal.unsaved.dropQuestion": "Enregistrer les modifications avant de comparer le fichier déposé ?",
+	"view.selection.dropFiles": "Déposer des fichiers",
+	"notice.comparisonChanged": "« {name} » a changé depuis l’affichage de cette comparaison. Vérifiez la comparaison actualisée avant d’accepter des modifications."
 }

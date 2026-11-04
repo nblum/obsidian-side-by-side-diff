@@ -36,7 +36,7 @@
 	"modal.introduction.welcome.title": "Bedankt voor het installeren van Side-by-Side Diff",
 	"modal.introduction.welcome.description": "Vergelijk twee tekstbestanden, bekijk elk verschil en sla alleen de wijzigingen op die je kiest.",
 	"modal.introduction.welcome.feedback.title": "Feedback",
-	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff werkt volledig in je kluis. Deel je ideeën of geef de plugin een GitHub-ster.",
+	"modal.introduction.welcome.feedback.description": "Side-by-Side Diff werkt lokaal in Obsidian. Deel je ideeën of geef de plugin een GitHub-ster.",
 	"modal.introduction.welcome.reportBug.title": "Probleem melden",
 	"modal.introduction.welcome.reportBug.description": "Werkt er iets niet zoals verwacht? Een korte melding met stappen om het probleem te reproduceren helpt om het op te lossen.",
 	"modal.introduction.welcome.reportBug.link": "Probleem melden",
@@ -181,5 +181,11 @@
 	"settings.language.pt-BR": "Português (Brasil)",
 	"settings.language.pt-PT": "Português (Portugal)",
 	"settings.language.nl": "Nederlands",
-	"settings.language.zh-CN": "简体中文"
+	"settings.language.zh-CN": "简体中文",
+	"view.dropMarkdown": "Je kunt hier bestanden vanuit Obsidian of je bestandsbeheerder naartoe slepen.",
+	"notice.dropMarkdownOnly": "Sleep precies één Markdown-bestand (.md).",
+	"notice.dropReadFailed": "Het gesleepte Markdown-bestand kon niet worden gelezen.",
+	"modal.unsaved.dropQuestion": "Wijzigingen opslaan voordat het gesleepte bestand wordt vergeleken?",
+	"view.selection.dropFiles": "Bestanden slepen",
+	"notice.comparisonChanged": "“{name}” is gewijzigd sinds deze vergelijking werd weergegeven. Controleer de vernieuwde vergelijking voordat je wijzigingen accepteert."
 }

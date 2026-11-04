@@ -4,7 +4,22 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Compare an external Markdown file by dropping it into the comparison view, without importing it. The drop opens on
+  the right and keeps the selected left file in place. Edit it or accept changes into it, then save explicitly. External saves check for intervening changes,
+  preserve line endings, and do not recreate deleted files.
+
 ### Fixed
+
+- Refuse accept actions on external files that changed since display and refresh the comparison before review.
+- Serialize external saves by physical file identity so concurrent saves cannot silently overwrite each other.
+- Reject dropped aliases of the left file and recognize existing vault files dropped from the operating system.
+- Cancel older drops when a newer file is selected, including drops awaiting save/discard confirmation.
+- Validate native reads before replacing a comparison or discarding its pending edits and review decisions.
+
+- Resolve Obsidian file drops from open URLs and encoded Markdown links instead of incorrectly reporting that
+  different files are identical. Accept URI-list drag data as well as plain text.
 
 - Preserve the viewport while measuring wrapped edit-mode rows so temporary layout collapse cannot cause scroll jumps.
 - Stop repeated edit-mode alignment updates that could pull the comparison back down while scrolling upward.

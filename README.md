@@ -43,7 +43,8 @@ selectively accept or reject edits; changes are written only when explicitly sav
 - edit the right-hand file directly and save changes in one step
 - create change proposals as timestamped copies and later apply them to the original
 - display the interface automatically in German, English, Spanish, Brazilian or European Portuguese, French, Italian, Dutch, or Simplified Chinese
-- work entirely locally within the Obsidian vault
+- compare a dropped external Markdown file with a vault note, without importing it
+- work entirely locally
 
 ## Open a comparison with a URI
 
@@ -81,6 +82,22 @@ directly with both files:
 3. Review the synchronized view. Use `→` to stage a change as a proposal, or `×` to ignore the left-hand diff.
 4. Navigate between changes with the toolbar or `Alt+ArrowDown` / `Alt+ArrowUp`; accept or ignore the highlighted change with `Alt+ArrowRight` / `Alt+ArrowLeft`.
 5. Save all staged changes with `Save changes` or `Ctrl/Cmd + S`.
+
+## Compare external Markdown
+
+Open a comparison with a vault note, then drag one `.md` file from your computer into the comparison view.
+The dropped file opens on the **right**, replacing the previous right-hand file; the left-hand note stays in place.
+You can also drop a vault file onto the **Drop files** card below **Select right file** to select it on the right.
+
+Review and accept changes as usual, or use `Edit mode` to edit the external file directly.
+**Saving writes to the external file on your computer**, without importing it into the vault.
+Existing line endings are preserved. If the file has changed or been deleted, saving is canceled so you can
+review its current contents. If it changes before you accept a suggestion, the comparison refreshes for another review.
+
+Drop the file again after reopening the view; external file contents and paths are not stored between sessions.
+If Obsidian cannot provide access to the dropped file's location, you can compare a read-only snapshot but cannot
+edit or save it. You cannot compare a file with itself, including through a shortcut to the same file.
+External files are never offered for trash actions.
 
 ## Keyboard shortcuts
 
@@ -164,13 +181,14 @@ appreciated.
 
 ## Privacy and permissions
 
-Side-by-Side Diff runs entirely inside the current Obsidian vault.
+Side-by-Side Diff runs locally in Obsidian.
 
 - It makes no network requests and uses no telemetry, analytics, ads, or external services.
 - It does not require an account or payment.
 - It enumerates vault file metadata (paths and names) to populate the file selectors and context actions.
 - It reads and writes file contents only after an explicit user action, plus its own plugin settings.
-- It does not access files outside the vault.
+- It accesses external Markdown files only after you explicitly drop them into the comparison view. External
+  paths stay in memory. It writes those files only through an explicit save action.
 
 The source repository contains TypeScript; `main.js` is generated locally and attached to releases.
 
