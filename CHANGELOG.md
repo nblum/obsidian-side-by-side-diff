@@ -4,6 +4,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-09
+
 ### Changed
 
 - Replace Node filesystem access for external Markdown with browser file handles scoped to explicitly dropped

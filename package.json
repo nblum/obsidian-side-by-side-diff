@@ -1,6 +1,6 @@
 {
   "name": "side-by-side-diff",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Compare notes and text files side by side. A Markdown diff viewer for file comparison, highlighting differences, and selectively merging changes.",
   "main": "main.js",
   "type": "module",
