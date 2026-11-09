@@ -36,19 +36,22 @@ visible, can be reviewed and staged individually, and are written only through a
   there to select it on the right, or drop one external `.md` file from the file manager into the comparison.
 - The external file opens on the right, replacing any previous right file. The selected left-hand file stays
   in place; dropping never swaps the panes automatically.
-- For drops with a desktop filesystem path, the right-hand external file supports direct editing and
+- For drops with a writable browser file handle, the right-hand external file supports direct editing and
   accepting changes. Only explicit saves write to disk. Both staged and edited saves check for external changes,
   preserve line endings, and fail if the file was deleted. Files are not imported or offered for trash actions.
 - Single-row and block acceptance, ignore, undo, and heading alignment work with external targets as well.
-- If no desktop path is available, the drop remains a read-only snapshot and swapping is disabled.
+- If browser file handles or their write methods are unavailable, the drop remains a read-only snapshot with an
+  explanatory message and swapping is disabled. Permission denial or save failures preserve pending changes.
 - Pending changes require the existing save/discard confirmation before a new dropped snapshot replaces them.
 - Invalid drops and failed native reads preserve the comparison, including pending edits and review decisions
   when a read fails during save/discard confirmation. Newer selections invalidate older pending drops.
-- A drop referring to the same physical file as the left pane is rejected, including symlinks and hard links.
-  Files already present in the vault are resolved to their existing vault identity.
+- Matching native vault paths are resolved to their existing vault identity. Matching paths and external handles
+  identified by the browser as the same entry are rejected. Symlink and hard-link aliases are not guaranteed to
+  be detected, especially between a vault file and an external handle.
 - Accept actions detect external content changed since display and refresh without staging a change. The user
-  must review the new comparison before accepting. External saves are serialized by physical file identity,
-  with each save validating its baseline after earlier saves finish.
+  must review the new comparison before accepting. External saves are serialized across views,
+  with each save validating its baseline after earlier saves finish. Browser writers request exclusive access and
+  recheck current content before committing; failed or conflicting writes are aborted.
 - Desktop files are reread when rebuilding the comparison. External content and paths are not persisted; restoring the view shows the vault note
   with the file selector, ready for another drop.
 
@@ -172,7 +175,9 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
 ## Technical requirements
 
 - Obsidian `1.6.6` or later.
-- Save targets are vault text files or explicitly dropped Markdown files with an accessible desktop path.
+- Save targets are vault text files or explicitly dropped Markdown files with a writable browser file handle.
+- External reads and writes use only the dropped browser capability, without Node filesystem access. Browser
+  capability support is detected at runtime; an unsupported installer keeps external drops read-only.
 - No external services or additional runtime dependencies are required.
 - Each supported language needs a complete translation file with the same key set as the other languages.
 - The save action must always be explicitly triggered by the user.

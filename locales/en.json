@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "The dropped Markdown file could not be read.",
 	"modal.unsaved.dropQuestion": "Save changes before comparing the dropped file?",
 	"view.selection.dropFiles": "Drop files",
-	"notice.comparisonChanged": "“{name}” changed since this comparison was displayed. Review the refreshed comparison before accepting changes."
+	"notice.comparisonChanged": "“{name}” changed since this comparison was displayed. Review the refreshed comparison before accepting changes.",
+	"view.externalReadOnly": "This dropped file is read-only because writable file access is unavailable."
 }

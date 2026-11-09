@@ -104,8 +104,11 @@ Existing line endings are preserved. If the file has changed or been deleted, sa
 review its current contents. If it changes before you accept a suggestion, the comparison refreshes for another review.
 
 Drop the file again after reopening the view; external file contents and paths are not stored between sessions.
-If Obsidian cannot provide access to the dropped file's location, you can compare a read-only snapshot but cannot
-edit or save it. You cannot compare a file with itself, including through a shortcut to the same file.
+If writable browser file handles are unavailable, you can compare a read-only snapshot but cannot edit or save it.
+External saving depends on the Obsidian installer’s browser runtime; updating only Obsidian’s app version may not
+update that runtime. Reinstalling with a recent installer can enable support.
+Matching vault paths and external browser handles are rejected as the same file. Aliases through symlinks or
+hard links may not be recognized, especially when one pane is a vault file; avoid comparing these aliases.
 External files are never offered for trash actions.
 
 ## Keyboard shortcuts
@@ -163,7 +166,9 @@ Side-by-Side Diff runs locally in Obsidian.
 - It enumerates vault file metadata (paths and names) to populate the file selectors and context actions.
 - It reads and writes file contents only after an explicit user action, plus its own plugin settings.
 - It accesses external Markdown files only after you explicitly drop them into the comparison view. External
-  paths stay in memory. It writes those files only through an explicit save action.
+  paths and browser file handles stay in memory. It writes those files only through an explicit save action, using
+  access scoped to the dropped file. External reads and saves use browser file handles rather than Node’s `fs`
+  module. Vault file contents continue to use Obsidian’s Vault API.
 
 ## Feedback and support
 

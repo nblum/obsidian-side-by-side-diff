@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Não foi possível ler o arquivo Markdown solto.",
 	"modal.unsaved.dropQuestion": "Salvar as alterações antes de comparar o arquivo solto?",
 	"view.selection.dropFiles": "Soltar arquivos",
-	"notice.comparisonChanged": "“{name}” mudou desde que esta comparação foi exibida. Revise a comparação atualizada antes de aceitar alterações."
+	"notice.comparisonChanged": "“{name}” mudou desde que esta comparação foi exibida. Revise a comparação atualizada antes de aceitar alterações.",
+	"view.externalReadOnly": "Este arquivo arrastado é somente leitura porque o acesso de gravação ao arquivo não está disponível."
 }

@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { diskFileHandle } from "./helpers/external-file-handle.ts";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { createRequire } from "node:module";
@@ -35,6 +36,7 @@ const module = { exports: {} as { SideBySideDiffView: typeof SideBySideDiffView 
 runInNewContext(output.text, {
 	module,
 	exports: module.exports,
+	TextDecoder,
 	console,
 	URL,
 	Buffer,
@@ -323,12 +325,12 @@ test("Obsidian open URLs and encoded Markdown links select the dragged vault not
 });
 
 
-/** Creates a browser drop carrying the legacy desktop path for real-file save tests. */
+/** Creates a browser drop whose native path is used only for vault matching. */
 function desktopMarkdown(path: string, content: string): File {
 	return { ...droppedMarkdown("outside.md", content), path } as File;
 }
 
-test("desktop Markdown can be swapped and accepts staged blocks only on explicit save", async () => {
+test("browser handles without native paths can be swapped and save staged blocks explicitly", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "sbs-external-block-"));
 	try {
 		const diskPath = join(dir, "outside.md");
@@ -336,7 +338,7 @@ test("desktop Markdown can be swapped and accepts staged blocks only on explicit
 		await writeFile(diskPath, original);
 		const { view, session } = createView(["new", ""], ["other"]);
 		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
-		await view.dropMarkdown([desktopMarkdown(diskPath, original)]);
+		await view.dropMarkdown([droppedMarkdown("outside.md", original)], Promise.resolve(diskFileHandle(diskPath)));
 		const externalPath = view.state.rightPath!;
 		assert.equal(view.state.leftPath, "left.md");
 		await view.swapFiles();
@@ -355,7 +357,7 @@ test("desktop Markdown can be swapped and accepts staged blocks only on explicit
 		assert.equal(await readFile(diskPath, "utf8"), "new\r\n");
 		assert.equal(session.hasPendingChanges(), false);
 		// Another drop replaces the right file without moving the left one.
-		await view.dropMarkdown([desktopMarkdown(diskPath, "new\r\n")]);
+		await view.dropMarkdown([droppedMarkdown("outside.md", "new\r\n")], Promise.resolve(diskFileHandle(diskPath)));
 		assert.equal(view.state.leftPath, "left.md");
 		assert.equal(view.getComparisonFile(view.state.rightPath!)?.name, "outside.md");
 	} finally {
@@ -371,7 +373,7 @@ test("desktop edit saves preserve line endings and reject external modifications
 		await writeFile(diskPath, original, { mode: 0o600 });
 		const { view, session } = createView(["left"], ["right"]);
 		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
-		await view.dropMarkdown([desktopMarkdown(diskPath, original)]);
+		await view.dropMarkdown([desktopMarkdown(diskPath, original)], Promise.resolve(diskFileHandle(diskPath)));
 		const externalPath = view.state.rightPath!;
 		assert.equal(view.state.leftPath, "left.md");
 		await view.enableRightEditMode();
@@ -414,11 +416,11 @@ test("dropping another external file after a manual swap preserves the external 
 		await writeFile(secondPath, "second");
 		const { view } = createView(["left"], ["right"]);
 		Object.assign(view, { externalMarkdown: null, dropToken: 0, prepareForTransition: () => Promise.resolve(true) });
-		await view.dropMarkdown([desktopMarkdown(firstPath, "first")]);
+		await view.dropMarkdown([desktopMarkdown(firstPath, "first")], Promise.resolve(diskFileHandle(firstPath)));
 		const firstId = view.state.rightPath!;
 		await view.swapFiles();
 		assert.equal(view.state.leftPath, firstId);
-		await view.dropMarkdown([desktopMarkdown(secondPath, "second")]);
+		await view.dropMarkdown([desktopMarkdown(secondPath, "second")], Promise.resolve(diskFileHandle(secondPath)));
 		assert.equal(view.state.leftPath, firstId);
 		assert.equal(await view.readComparisonFile(view.getComparisonFile(firstId)!), "first");
 		assert.equal(await view.readComparisonFile(view.getComparisonFile(view.state.rightPath!)!), "second");

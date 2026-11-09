@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Impossibile leggere il file Markdown trascinato.",
 	"modal.unsaved.dropQuestion": "Salvare le modifiche prima di confrontare il file trascinato?",
 	"view.selection.dropFiles": "Trascina file",
-	"notice.comparisonChanged": "«{name}» è cambiato da quando è stato visualizzato questo confronto. Controlla il confronto aggiornato prima di accettare modifiche."
+	"notice.comparisonChanged": "«{name}» è cambiato da quando è stato visualizzato questo confronto. Controlla il confronto aggiornato prima di accettare modifiche.",
+	"view.externalReadOnly": "Il file trascinato è di sola lettura perché l’accesso in scrittura al file non è disponibile."
 }

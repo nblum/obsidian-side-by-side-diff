@@ -1,8 +1,9 @@
 import { test } from "node:test";
+import { diskFileHandle } from "./helpers/external-file-handle.ts";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { createRequire } from "node:module";
-import { mkdtemp, writeFile, readFile, rm, symlink, link, unlink } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import esbuild from "esbuild";
@@ -19,7 +20,7 @@ class TestFile {
   constructor(path: string) { this.path = path; this.name = path; }
 }
 
-/** Provides the public desktop adapter API used for physical file identity. */
+/** Provides the public desktop adapter API used for native path matching. */
 class TestFileSystemAdapter {
   basePath: string;
   constructor(basePath: string) { this.basePath = basePath; }
@@ -37,7 +38,7 @@ const bundle = await esbuild.build({
 assert.ok(bundle.outputFiles?.[0]);
 const module = { exports: {} as { SideBySideDiffView: typeof SideBySideDiffView; UnsavedChangesModal: typeof import("../src/modals.ts").UnsavedChangesModal } };
 runInNewContext(bundle.outputFiles[0].text, {
-  module, exports: module.exports, Buffer, URL, console,
+  module, exports: module.exports, TextDecoder, Buffer, URL, console,
   require: (name: string) => {
     if (name === "electron") return {};
     if (name.startsWith("node:")) return createRequire(import.meta.url)(name);
@@ -92,7 +93,7 @@ test("single-row and grouped accepts refuse external content that changed after 
       const original = "anchor\nold-a\nold-b\nend";
       await writeFile(path, original);
       const { view, session, rendered } = createSafetyView();
-      await view.dropMarkdown([nativeDrop(path, original)]);
+      await view.dropMarkdown([nativeDrop(path, original)], Promise.resolve(diskFileHandle(path)));
       assert.equal(rendered().right, original);
       const changed = "inserted\nanchor\nEDITED ELSEWHERE\nold-b\nend";
       await writeFile(path, changed);
@@ -112,7 +113,7 @@ test("accepting from an external source also refuses changes not displayed on th
     const path = join(dir, "outside.md");
     await writeFile(path, "external source");
     const { view, session, contents, rendered } = createSafetyView();
-    await view.dropMarkdown([nativeDrop(path, "external source")]);
+    await view.dropMarkdown([nativeDrop(path, "external source")], Promise.resolve(diskFileHandle(path)));
     await view.swapFiles();
     await writeFile(path, "unreviewed source");
     await view.applyGroupChange(0, 10, "left-to-right");
@@ -122,7 +123,7 @@ test("accepting from an external source also refuses changes not displayed on th
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test("physical aliases of the left vault file are rejected before any transition", async () => {
+test("native drops of the left vault file are rejected before any transition", async () => {
   const dir = await mkdtemp(join(tmpdir(), "sbs-drop-identity-"));
   try {
     const base = join(dir, "vault");
@@ -130,9 +131,7 @@ test("physical aliases of the left vault file are rejected before any transition
     await mkdir(base);
     await writeFile(join(base, "left.md"), "same file");
     await writeFile(join(base, "right.md"), "right");
-    await symlink(join(base, "left.md"), join(dir, "symbolic.md"));
-    await link(join(base, "left.md"), join(dir, "hard.md"));
-    for (const path of [join(base, "left.md"), join(dir, "symbolic.md"), join(dir, "hard.md")]) {
+    for (const path of [join(base, "left.md"), `${base}/./left.md`]) {
       const { view, session, rendered } = createSafetyView(base);
       await view.renderDiff();
       session.dismissRow("review decision");
@@ -140,7 +139,7 @@ test("physical aliases of the left vault file are rejected before any transition
       Object.assign(view, { prepareForTransition: () => { transitions += 1; return Promise.resolve(true); } });
       const before = { ...view.state };
       const beforeRender = rendered();
-      await view.dropMarkdown([nativeDrop(path, "same file")]);
+      await view.dropMarkdown([nativeDrop(path, "same file")], Promise.resolve(diskFileHandle(path)));
       assert.deepEqual({ ...view.state }, before);
       assert.deepEqual(rendered(), beforeRender);
       assert.equal(session.getDismissedRowCount(), 1);
@@ -148,7 +147,7 @@ test("physical aliases of the left vault file are rejected before any transition
       assert.ok(notices.includes("notice.differentFiles"));
     }
     const { view } = createSafetyView(base);
-    await view.dropMarkdown([nativeDrop(join(base, "right.md"), "right")]);
+    await view.dropMarkdown([nativeDrop(join(base, "right.md"), "right")], Promise.resolve(diskFileHandle(join(base, "right.md"))));
     assert.equal(view.state.rightPath, "right.md", "existing vault files must keep their vault identity");
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
@@ -185,7 +184,7 @@ test("failed native reads keep the previous comparison and review decisions", as
     session.dismissRow("keep this review decision");
     const before = { ...view.state };
     const beforeRender = rendered();
-    await view.dropMarkdown([nativeDrop(join(dir, "missing.md"), "browser snapshot is readable")]);
+    await view.dropMarkdown([nativeDrop(join(dir, "missing.md"), "browser snapshot is readable")], Promise.resolve(diskFileHandle(join(dir, "missing.md"))));
     assert.deepEqual({ ...view.state }, before);
     assert.deepEqual(rendered(), beforeRender);
     assert.equal(session.getDismissedRowCount(), 1);
@@ -209,7 +208,7 @@ test("a native read failure during confirmation preserves pending edits and igno
     const before = { ...view.state };
     const beforeRender = rendered();
     modal.waitForChoice = async () => { await unlink(path); return "discard"; };
-    await view.dropMarkdown([nativeDrop(path, "readable before confirmation")]);
+    await view.dropMarkdown([nativeDrop(path, "readable before confirmation")], Promise.resolve(diskFileHandle(path)));
     assert.deepEqual({ ...view.state }, before);
     assert.deepEqual(rendered(), beforeRender);
     assert.equal(session.getDisplayedContent("right.md", "right"), "pending edits");
@@ -243,4 +242,38 @@ test("a superseded drop cannot discard the newer comparison after its dialog clo
     assert.equal(session.getDisplayedContent("next.md", "next"), "newer pending");
     assert.equal(session.getDismissedRowCount(), 1);
   } finally { modal.waitForChoice = waitForChoice; }
+});
+
+
+test("browser identity rejects a second external handle for the left entry without native paths", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "sbs-browser-identity-"));
+  try {
+    const path = join(dir, "outside.md");
+    await writeFile(path, "outside");
+    const { view, session } = createSafetyView();
+    const first = diskFileHandle(path);
+    first.isSameEntry = () => Promise.resolve(true);
+    const drop = { name: "outside.md", text: () => Promise.resolve("outside") } as File;
+    await view.dropMarkdown([drop], Promise.resolve(first));
+    await view.swapFiles();
+    const before = { ...view.state };
+    session.dismissRow("keep review");
+    let transitions = 0;
+    Object.assign(view, { prepareForTransition: () => { transitions += 1; return Promise.resolve(true); } });
+    await view.dropMarkdown([drop], Promise.resolve(diskFileHandle(path)));
+    assert.deepEqual({ ...view.state }, before);
+    assert.equal(session.getDismissedRowCount(), 1);
+    assert.equal(transitions, 0);
+    assert.ok(notices.includes("notice.differentFiles"));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("snapshot fallback can merge into the vault but never stages an external write", async () => {
+  const { view, session, contents } = createSafetyView();
+  await view.dropMarkdown([{ name: "snapshot.md", text: () => Promise.resolve("snapshot") } as File]);
+  await view.applyGroupChange(0, 10, "left-to-right");
+  assert.equal(session.hasPendingChanges(), false);
+  await view.applyGroupChange(0, 10, "right-to-left");
+  assert.equal(await view.writePendingChanges(), "saved");
+  assert.equal(contents.get("left.md"), "snapshot");
 });

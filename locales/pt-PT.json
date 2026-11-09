@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Não foi possível ler o ficheiro Markdown largado.",
 	"modal.unsaved.dropQuestion": "Guardar as alterações antes de comparar o ficheiro largado?",
 	"view.selection.dropFiles": "Largar ficheiros",
-	"notice.comparisonChanged": "“{name}” foi alterado desde que esta comparação foi apresentada. Reveja a comparação atualizada antes de aceitar alterações."
+	"notice.comparisonChanged": "“{name}” foi alterado desde que esta comparação foi apresentada. Reveja a comparação atualizada antes de aceitar alterações.",
+	"view.externalReadOnly": "Este ficheiro arrastado é só de leitura porque o acesso de escrita ao ficheiro não está disponível."
 }

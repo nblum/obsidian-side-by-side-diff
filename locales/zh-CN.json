@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "无法读取拖放的 Markdown 文件。",
 	"modal.unsaved.dropQuestion": "比较拖放的文件前保存更改吗？",
 	"view.selection.dropFiles": "拖放文件",
-	"notice.comparisonChanged": "“{name}”在此比较显示后已发生更改。请先查看刷新后的比较，再接受更改。"
+	"notice.comparisonChanged": "“{name}”在此比较显示后已发生更改。请先查看刷新后的比较，再接受更改。",
+	"view.externalReadOnly": "无法获取写入权限，拖入的文件仅供读取。"
 }

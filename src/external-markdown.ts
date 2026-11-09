@@ -1,29 +1,30 @@
-import { open, readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, sep } from "node:path";
 import { webUtils } from "electron";
+import { SaveConflictError } from "./save-guard";
 
-/** A dropped Markdown file, optionally backed by an accessible desktop file. */
+/** A file-scoped browser capability obtained from an explicit file drop. */
+export interface ExternalFileHandle extends FileSystemFileHandle {
+  requestPermission(options: { mode: "readwrite" }): Promise<PermissionState>;
+}
+
+/** A dropped Markdown snapshot with an optional browser file capability. */
 export interface ExternalMarkdown {
   path: string;
   name: string;
   extension: string;
   content: string;
+  handle: ExternalFileHandle | null;
+  // Native paths are used only to recognize vault files, never for external I/O.
   diskPath: string | null;
 }
 
-const saveQueues = new Map<string, Promise<void>>();
+// Serialize external saves across views, including separately dropped handles for
+// the same entry. No filesystem identifiers or persistent handle registry needed.
+let saveQueue = Promise.resolve();
 
-/** Identifies physical files consistently across symlinks and hard links. */
-export async function getPhysicalFileIdentity(path: string): Promise<string> {
-  const info = await stat(path, { bigint: true });
-  if (!info.isFile()) throw new Error("The dropped path is not a file.");
-  return `${info.dev.toString()}:${info.ino.toString()}`;
-}
-
-/** Resolves desktop drops inside the vault back to their existing vault identity. */
-export async function getVaultRelativePath(path: string, vaultBase: string): Promise<string | null> {
-  const [filePath, basePath] = await Promise.all([realpath(path), realpath(vaultBase)]);
-  const pathInVault = relative(basePath, filePath);
+/** Resolves a native drop path within the vault without reading the filesystem. */
+export function getVaultRelativePath(path: string, vaultBase: string): string | null {
+  const pathInVault = relative(vaultBase, path);
   if (!pathInVault || pathInVault === ".." || pathInVault.startsWith(`..${sep}`) || isAbsolute(pathInVault)) return null;
   return pathInVault.split(sep).join("/");
 }
@@ -40,46 +41,67 @@ export function getDroppedFilePath(file: File): string | null {
   return typeof legacyPath === "string" && legacyPath.length > 0 ? legacyPath : null;
 }
 
-/** Reads the live desktop file, retaining memory-only drops as comparison sources. */
-export async function readExternalMarkdown(file: ExternalMarkdown): Promise<string> {
-  return file.diskPath === null ? file.content : readFile(file.diskPath, "utf8");
-}
-
-/** Writes an existing desktop file only after the caller has validated its current content. */
-export async function processExternalMarkdown(file: ExternalMarkdown, transform: (content: string) => string): Promise<void> {
-  if (file.diskPath === null) throw new Error("The dropped file has no writable desktop path.");
-  const identity = await getPhysicalFileIdentity(file.diskPath);
-  const previous = saveQueues.get(identity) ?? Promise.resolve();
-  let release: () => void = () => {};
-  const queued = new Promise<void>((resolve) => { release = resolve; });
-  saveQueues.set(identity, queued);
-  await previous;
+/** Captures the capability during the drop event, before its data store expires. */
+export function getDroppedFileHandle(item: DataTransferItem | undefined): Promise<ExternalFileHandle | null> {
+  const source = item as (DataTransferItem & { getAsFileSystemHandle?: () => Promise<FileSystemHandle | null> }) | undefined;
+  if (source?.kind !== "file" || typeof source.getAsFileSystemHandle !== "function") return Promise.resolve(null);
   try {
-    await writeExternalMarkdown(file, transform);
-  } finally {
-    release();
-    if (saveQueues.get(identity) === queued) saveQueues.delete(identity);
+    return source.getAsFileSystemHandle().then((handle) => {
+      if (handle?.kind !== "file") return null;
+      const file = handle as Partial<ExternalFileHandle>;
+      return typeof file.getFile === "function" && typeof file.isSameEntry === "function"
+        && typeof file.createWritable === "function" && typeof file.requestPermission === "function"
+        ? handle as ExternalFileHandle : null;
+    }).catch(() => null);
+  } catch {
+    return Promise.resolve(null);
   }
 }
 
-/** Reads, validates, and writes only while this physical file's save queue is held. */
-async function writeExternalMarkdown(file: ExternalMarkdown, transform: (content: string) => string): Promise<void> {
-  if (file.diskPath === null) throw new Error("The dropped file has no writable desktop path.");
-  // r+ neither creates a deleted file nor truncates it before the save guard runs.
-  const handle = await open(file.diskPath, "r+");
+/** Reads fresh content through the dropped capability, or a read-only snapshot. */
+export async function readExternalMarkdown(file: ExternalMarkdown): Promise<string> {
+  if (file.handle === null) return file.content;
+  const bytes = await (await file.handle.getFile()).arrayBuffer();
+  // File.text() strips a UTF-8 BOM; preserve it as the previous native reader did.
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+}
+
+/** Starts permission acquisition within the save gesture, then queues the guarded save. */
+export async function processExternalMarkdown(file: ExternalMarkdown, transform: (content: string) => string): Promise<void> {
+  const handle = file.handle;
+  if (handle === null) throw new Error("The dropped file has no writable browser handle.");
+  // Request before waiting for other saves: user activation can expire while queued.
+  const permission = handle.requestPermission({ mode: "readwrite" });
+  const save = saveQueue.then(async () => {
+    if (await permission !== "granted") throw new Error("Write access to the dropped file was denied.");
+    await writeExternalMarkdown(file, handle, transform);
+  });
+  // Observe permission rejection immediately even while a previous save is pending.
+  void permission.catch(() => {});
+  saveQueue = save.catch(() => {});
+  await save;
+}
+
+/** Validates the baseline while holding a browser writer and aborts failed saves. */
+async function writeExternalMarkdown(file: ExternalMarkdown, handle: ExternalFileHandle, transform: (content: string) => string): Promise<void> {
+  // Exclusive mode also rejects overlapping browser writers outside this plugin.
+  const options: FileSystemCreateWritableOptions & { mode: "exclusive" } = { mode: "exclusive" };
+  const writable = await handle.createWritable(options);
   try {
-    const current = await handle.readFile("utf8");
+    const current = await readExternalMarkdown(file);
     const next = transform(current);
-    const buffer = Buffer.from(next, "utf8");
-    let offset = 0;
-    while (offset < buffer.length) {
-      const { bytesWritten } = await handle.write(buffer, offset, buffer.length - offset, offset);
-      if (bytesWritten === 0) throw new Error("Could not finish writing the external file.");
-      offset += bytesWritten;
+    await writable.write(next);
+    // Browser writers commit on close. Recheck after async writes so deletion or
+    // an outside edit during preparation cannot be silently overwritten.
+    const latest = await readExternalMarkdown(file);
+    if (latest !== current) {
+      transform(latest); // Let the caller observe the changed baseline for a retry.
+      throw new SaveConflictError();
     }
-    await handle.truncate(buffer.length);
+    await writable.close();
     file.content = next;
-  } finally {
-    await handle.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+    throw error;
   }
 }

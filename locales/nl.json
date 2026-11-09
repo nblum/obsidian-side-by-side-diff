@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Het gesleepte Markdown-bestand kon niet worden gelezen.",
 	"modal.unsaved.dropQuestion": "Wijzigingen opslaan voordat het gesleepte bestand wordt vergeleken?",
 	"view.selection.dropFiles": "Bestanden slepen",
-	"notice.comparisonChanged": "“{name}” is gewijzigd sinds deze vergelijking werd weergegeven. Controleer de vernieuwde vergelijking voordat je wijzigingen accepteert."
+	"notice.comparisonChanged": "“{name}” is gewijzigd sinds deze vergelijking werd weergegeven. Controleer de vernieuwde vergelijking voordat je wijzigingen accepteert.",
+	"view.externalReadOnly": "Dit neergezette bestand is alleen-lezen omdat schrijftoegang tot het bestand niet beschikbaar is."
 }

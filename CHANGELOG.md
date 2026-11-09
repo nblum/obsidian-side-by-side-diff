@@ -4,6 +4,14 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Replace Node filesystem access for external Markdown with browser file handles scoped to explicitly dropped
+  files. Keep guarded, explicit saves and line endings; abort failed writes and recheck for outside changes before
+  committing. Unsupported browser runtimes keep external drops as read-only snapshots with an explanation.
+- Recognize duplicate external entries through browser handles and vault files through matching native paths.
+  Symlink and hard-link aliases, especially between vault and external files, may no longer be recognized.
+
 ## [0.10.0] - 2026-11-05
 
 ### Added

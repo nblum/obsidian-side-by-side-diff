@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Die abgelegte Markdown-Datei konnte nicht gelesen werden.",
 	"modal.unsaved.dropQuestion": "Änderungen vor dem Vergleich der abgelegten Datei speichern?",
 	"view.selection.dropFiles": "Dateien ablegen",
-	"notice.comparisonChanged": "„{name}“ wurde seit der Anzeige dieses Vergleichs geändert. Prüfe den aktualisierten Vergleich, bevor du Änderungen übernimmst."
+	"notice.comparisonChanged": "„{name}“ wurde seit der Anzeige dieses Vergleichs geändert. Prüfe den aktualisierten Vergleich, bevor du Änderungen übernimmst.",
+	"view.externalReadOnly": "Diese abgelegte Datei ist schreibgeschützt, da kein schreibender Dateizugriff verfügbar ist."
 }

@@ -187,5 +187,6 @@
 	"notice.dropReadFailed": "Impossible de lire le fichier Markdown déposé.",
 	"modal.unsaved.dropQuestion": "Enregistrer les modifications avant de comparer le fichier déposé ?",
 	"view.selection.dropFiles": "Déposer des fichiers",
-	"notice.comparisonChanged": "« {name} » a changé depuis l’affichage de cette comparaison. Vérifiez la comparaison actualisée avant d’accepter des modifications."
+	"notice.comparisonChanged": "« {name} » a changé depuis l’affichage de cette comparaison. Vérifiez la comparaison actualisée avant d’accepter des modifications.",
+	"view.externalReadOnly": "Ce fichier déposé est en lecture seule, car l’accès en écriture au fichier n’est pas disponible."
 }
