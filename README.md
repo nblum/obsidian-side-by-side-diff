@@ -183,6 +183,7 @@ appreciated.
 ## Documentation and development
 
 - [Full feature reference](FEATURES.md) – supported behavior and detailed requirements
+- [Roadmap](ROADMAP.md) – candidate and planned features, with links to detailed concepts
 - [Contributing](CONTRIBUTING.md) – development setup, build commands, tests, and validation
 - [Changelog](CHANGELOG.md) – changes by release
 - [Review status concept](docs/concepts/review-statusanzeige.md) – proposed improvements to review states
