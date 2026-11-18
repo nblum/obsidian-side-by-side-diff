@@ -657,12 +657,19 @@ export class SideBySideDiffView extends ItemView {
       }
       if (!(leftFile instanceof TFile)) leftFile.content = storedLeftContent;
       if (!(rightFile instanceof TFile)) rightFile.content = storedRightContent;
+      const leftLines = splitLines(leftContent);
+      const rightLines = splitLines(rightContent);
       if (this.state.editRight) {
         // Keep the first snapshot so a later rerender cannot hide an external edit.
         const targetFile = this.applyDirection === "left-to-right" ? rightFile : leftFile;
         this.session.captureSaveBaseline(targetFile.path, this.applyDirection === "left-to-right" ? storedRightContent : storedLeftContent);
+        // Comparison rows omit the terminal empty line; the editor needs it to retain the final line break.
+        const targetContent = this.applyDirection === "left-to-right" ? rightContent : leftContent;
+        if (/(?:\r\n|\r|\n)$/.test(targetContent)) {
+          (this.applyDirection === "left-to-right" ? rightLines : leftLines).push("");
+        }
       }
-      this.buildLayout(leftFile, rightFile, splitLines(leftContent), splitLines(rightContent));
+      this.buildLayout(leftFile, rightFile, leftLines, rightLines);
       this.restoreScrollPosition(scrollPosition);
     } catch (error) {
       console.error("Side-by-Side Diff konnte die Dateien nicht lesen.", error);
@@ -1675,7 +1682,7 @@ export class SideBySideDiffView extends ItemView {
       const value = code ? code.innerText : line.innerText || line.textContent || "";
       return {
         value,
-        isAlignmentGap: line.classList.contains("file-diff-sbs-edit-gap") || line.classList.contains("file-diff-sbs-added") && value.trim() === "",
+        isAlignmentGap: line.classList.contains("file-diff-sbs-edit-gap"),
         rightPresent: line.dataset.rightPresent !== "false"
       };
     }));

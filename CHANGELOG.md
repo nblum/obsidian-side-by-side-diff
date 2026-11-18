@@ -32,6 +32,8 @@ All notable changes to Side-by-Side Diff are documented here.
   delivering the choice; accepting a file is no longer mistaken for cancellation.
 - Match the original-file preview before selecting a comparison to the comparison view's neutral cells,
   including its background, line spacing, and row borders.
+- Preserve actual empty and whitespace-only target lines and final line breaks when editing in either apply
+  direction; only visual alignment gaps are excluded from saved content.
 - Make comparison line and inline highlights follow the apply direction: incoming source content is green, while
   target content to be removed or replaced is red. Alignment gaps and ignored changes remain neutral.
 

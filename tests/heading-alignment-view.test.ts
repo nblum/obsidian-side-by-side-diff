@@ -822,3 +822,70 @@ test("the editor normalizes its rows around the target while preserving physical
 		assert.equal(view.state.rightPath, "right.md");
 	}
 });
+
+test("rendered target editors preserve real blank and whitespace lines while excluding alignment gaps", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		for (const target of [["A", "", "  ", "Z", ""], ["A", "Z"]]) {
+			const source = target.length > 2 ? ["A", "Z"] : ["A", "source-only", "another-source-line", "Z"];
+			const left = direction === "left-to-right" ? source : target;
+			const right = direction === "left-to-right" ? target : source;
+			const { view } = createView(left, right);
+			await view.setState({ ...view.state, direction, editRight: true }, { history: false });
+			Object.assign(view, { synchronizeEditablePanes: () => {} });
+			const root = new EditorElement();
+			view.buildEditableModeLayout(root as unknown as HTMLElement, createComparisonModelFromLines(left, right).rows);
+			const editor = root.querySelector(".file-diff-sbs-document-editor");
+			assert.ok(editor);
+			assert.equal(view.serializeRightEditor(editor as unknown as HTMLElement), target.join("\n"), `${direction}: ${JSON.stringify(target)}`);
+			const code = editor.children[0]?.querySelector(".file-diff-sbs-edit-code");
+			assert.ok(code);
+			code.textContent = "edited";
+			assert.equal(view.serializeRightEditor(editor as unknown as HTMLElement), ["edited", ...target.slice(1)].join("\n"));
+		}
+	}
+});
+
+test("loading, rendering, editing and saving retain terminal line breaks only in the selected target", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		for (const ending of ["\n", "\r\n", "\r"]) {
+			for (const finalBreaks of [0, 1, 2]) {
+				const target = ["A", "", "  ", "Z"].join(ending) + ending.repeat(finalBreaks);
+				const source = "A\nsource-only\nZ";
+				const contents = direction === "left-to-right" ? [source, target] : [target, source];
+				const { view, leftFile, rightFile } = createView([], []);
+				const stored = new Map([[leftFile.path, contents[0]!], [rightFile.path, contents[1]!]]);
+				const editors: EditorElement[] = [];
+				Object.assign(view.app.vault, {
+					cachedRead: (file: TestFile) => Promise.resolve(stored.get(file.path)),
+					process: (file: TestFile, transform: (value: string) => string) => {
+						stored.set(file.path, transform(stored.get(file.path)!));
+						return Promise.resolve();
+					}
+				});
+				Object.assign(view, {
+					renderDiff: module.exports.SideBySideDiffView.prototype.renderDiff,
+					changeActions: new Map(),
+					contentEl: { empty: () => {}, addClass: () => {} },
+					disposeRightEditorObserver: () => {}, restoreScrollPosition: () => {}, synchronizeEditablePanes: () => {},
+					buildLayout: (_left: unknown, _right: unknown, left: string[], right: string[]) => {
+						const root = new EditorElement();
+						view.buildEditableModeLayout(root as unknown as HTMLElement, createComparisonModelFromLines(left, right).rows);
+						const editor = root.querySelector(".file-diff-sbs-document-editor");
+						assert.ok(editor);
+						editors.push(editor);
+					}
+				});
+				await view.setState({ ...view.state, direction, editRight: true }, { history: false });
+				const editor = editors[0];
+				assert.ok(editor);
+				const normalized = target.replace(/\r\n?/g, "\n");
+				assert.equal(view.serializeRightEditor(editor as unknown as HTMLElement), normalized, `${direction}, ${JSON.stringify(ending)}, ${finalBreaks} final breaks`);
+				Object.assign(view, { rightEditorState: { editor, initialValue: normalized } });
+				editor.querySelector(".file-diff-sbs-edit-code")!.textContent = "edited-A";
+				assert.equal(await view.saveRightEdits(), true);
+				assert.equal(stored.get(view.targetPath!), target.replace(/^A/, "edited-A"));
+				assert.equal(stored.get(direction === "left-to-right" ? leftFile.path : rightFile.path), source);
+			}
+		}
+	}
+});

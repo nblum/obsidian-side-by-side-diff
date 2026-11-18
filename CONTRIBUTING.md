@@ -80,6 +80,7 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - alignment with differing line counts
 - preserving line endings and trailing blank lines
 - distinguishing intentional empty lines from visual alignment gaps
+- rendering and serializing actual target editor rows in both directions, including blank and whitespace-only lines
 - excluding visual alignment gaps when saving
 - matching keys and placeholders across all locale dictionaries
 - selecting the next and previous change, including wraparound and resolved-row handling
