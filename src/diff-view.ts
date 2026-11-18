@@ -140,6 +140,8 @@ export class SideBySideDiffView extends ItemView {
     });
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
+    this.registerDomEvent(this.contentEl, "copy", (event) => { this.handleCopy(event); });
+    this.registerDomEvent(this.contentEl, "pointerdown", (event) => { this.handleSelectionStart(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
     this.registerEvent(this.app.vault.on("delete", (file) => { this.refreshForPath(file.path); }));
@@ -462,6 +464,48 @@ export class SideBySideDiffView extends ItemView {
     this.editInputSnapshot = null;
     this.pendingEditSyncPreferredIndex = null;
     this.rightEditorDirty = false;
+  }
+  /** Keeps native text selection in the comparison pane where the pointer starts. */
+  handleSelectionStart(event: PointerEvent): void {
+    if (this.state.editRight || event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const code = target.closest<HTMLElement>(".file-diff-sbs-code[data-diff-side]");
+    const grid = code?.closest<HTMLElement>(".file-diff-sbs-grid");
+    const side = code?.dataset.diffSide;
+    if (!grid || (side !== "left" && side !== "right") || !this.contentEl.contains(grid)) return;
+    if (grid.dataset.diffSelectionSide !== side) {
+      this.contentEl.ownerDocument.getSelection()?.removeAllRanges();
+      grid.dataset.diffSelectionSide = side;
+    }
+  }
+  /** Copies a selection within one comparison side without the other file or alignment gaps. */
+  handleCopy(event: ClipboardEvent): void {
+    if (this.state.editRight || !event.clipboardData) return;
+    const selection = this.contentEl.ownerDocument.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return;
+    const range = selection.getRangeAt(0);
+    const startElement = range.startContainer.nodeType === 1 ? range.startContainer as Element : range.startContainer.parentElement;
+    const endElement = range.endContainer.nodeType === 1 ? range.endContainer as Element : range.endContainer.parentElement;
+    const start = startElement?.closest<HTMLElement>(".file-diff-sbs-code");
+    const end = endElement?.closest<HTMLElement>(".file-diff-sbs-code");
+    const side = start?.dataset.diffSide;
+    if (!start || !end || (side !== "left" && side !== "right") || end.dataset.diffSide !== side || !this.contentEl.contains(start) || !this.contentEl.contains(end)) return;
+    const codes = Array.from(this.contentEl.querySelectorAll<HTMLElement>(`.file-diff-sbs-code[data-diff-side='${side}']`));
+    const startIndex = codes.indexOf(start);
+    const endIndex = codes.indexOf(end);
+    if (startIndex < 0 || endIndex < startIndex) return;
+    const lines = codes.slice(startIndex, endIndex + 1).filter((code) => code.dataset.diffPresent === "true").map((code) => {
+      const part = range.cloneRange();
+      part.selectNodeContents(code);
+      if (code === start) part.setStart(range.startContainer, range.startOffset);
+      if (code === end) part.setEnd(range.endContainer, range.endOffset);
+      return part.toString();
+    });
+    if (lines.length === 0) return;
+    event.clipboardData.setData("text/plain", lines.join("\n"));
+    event.preventDefault();
+    event.stopPropagation();
   }
   /** Handles keyboard editing actions inside the comparison view. */
   handleKeydown(event: KeyboardEvent): void {
@@ -1795,6 +1839,8 @@ export class SideBySideDiffView extends ItemView {
     const lineNumber = cell.createSpan({ cls: "file-diff-sbs-line-number" });
     lineNumber.textContent = value === null ? "" : String(lineNumberValue);
     const code = cell.createSpan({ cls: "file-diff-sbs-code" });
+    code.dataset.diffSide = side;
+    code.dataset.diffPresent = String(value !== null);
     appendInlineDiff(code, value, counterpart, side, inlineTokens);
   }
   /** Swaps the files while keeping the current diff view open. */

@@ -65,6 +65,9 @@ The left and right files are displayed in sync. Line changes and differences wit
 `Swap` to switch the files and their direction. If changes are pending, the plugin asks whether to save or discard
 them first.
 
+Select text in either file and press `Ctrl/Cmd+C` to copy it in comparison mode. Selection stays in the pane where
+you start dragging and copies only that file's text, excluding line numbers, review controls, and visual alignment gaps.
+
 Contiguous changed lines, as well as changes separated only by blank lines, are grouped into one block; a block with more than three changed lines
 gets `Accept all` / `Ignore all` controls to resolve it in one step. `Undo` (button or `Ctrl/Cmd+Z`) reverts the last
 accept or ignore action, single row or whole block, until it is saved.

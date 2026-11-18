@@ -4,6 +4,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Select and copy text from either file in comparison mode. Selection stays in the pane where dragging starts
+  and copies only that file's text, without line numbers, review controls, or alignment gaps. (#7)
+
 ## [0.10.1] - 2026-11-09
 
 ### Changed

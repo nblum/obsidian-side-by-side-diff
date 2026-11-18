@@ -290,6 +290,7 @@
 }
 
 .file-diff-sbs-group-header {
+	user-select: none;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -335,6 +336,7 @@
 }
 
 .file-diff-sbs-action-cell {
+	user-select: none;
 	display: flex;
 	flex-direction: row;
 	align-items: center;
@@ -380,6 +382,7 @@
 }
 
 .file-diff-sbs-code {
+	user-select: text;
 	display: block;
 	box-sizing: border-box;
 	flex: 1 1 auto;
@@ -389,6 +392,11 @@
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 	word-break: break-word;
+}
+
+.file-diff-sbs-grid[data-diff-selection-side="left"] .file-diff-sbs-code[data-diff-side="right"],
+.file-diff-sbs-grid[data-diff-selection-side="right"] .file-diff-sbs-code[data-diff-side="left"] {
+	user-select: none;
 }
 
 .file-diff-sbs-edit-grid {

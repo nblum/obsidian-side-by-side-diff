@@ -14,6 +14,9 @@ visible, can be reviewed and staged individually, and are written only through a
 
 - Two different text files are displayed in sync on the left and right.
 - Changes are highlighted line by line and inline within changed lines.
+- File text can be selected and copied directly in comparison mode. Selection stays in the pane where dragging
+  starts and copies only that file's text, preserving real blank lines and excluding line numbers, review controls,
+  the other file, and visual alignment gaps.
 - When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
   the following lines stay in sync.
 - The toolbar sits above the comparison and contains the editing actions.
