@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "Aplica-se a novas comparações. As comparações abertas mantêm sua direção. As propostas continuam sendo aplicadas ao original. Apenas o arquivo de destino pode ser editado.",
 	"settings.applyDirection.leftToRight": "Esquerda → direita",
 	"settings.applyDirection.rightToLeft": "Direita → esquerda",
-	"view.targetUnavailable": "O arquivo de destino não está mais disponível."
+	"view.targetUnavailable": "O arquivo de destino não está mais disponível.",
+	"view.pending.change": "Alteração aceita — ainda não salva",
+	"view.pending.deletion": "Exclusão pendente — ainda não salva"
 }

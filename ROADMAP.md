@@ -48,6 +48,8 @@ not a delivery sequence.
 - **Benefit:** Make open, accepted, and ignored changes visible throughout a review.
 - **Initial scope:** Add review counts and accessible status markers, keeping review progress distinct from
   whether changes have been saved.
+- **Current implementation:** Pending accepted target content has text-color markers and deletion previews;
+  broader review counts and status markers remain under consideration.
 - **Design:** [Review status concept](docs/concepts/review-statusanzeige.md). Reconcile the draft with existing
   undo behavior and current translation requirements before implementation.
 

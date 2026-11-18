@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "Applies to new comparisons. Open comparisons keep their direction. Proposals still apply to the original. Only the target file can be edited.",
 	"settings.applyDirection.leftToRight": "Left → right",
 	"settings.applyDirection.rightToLeft": "Right → left",
-	"view.targetUnavailable": "The target file is no longer available."
+	"view.targetUnavailable": "The target file is no longer available.",
+	"view.pending.change": "Accepted change — not saved yet",
+	"view.pending.deletion": "Pending deletion — not saved yet"
 }

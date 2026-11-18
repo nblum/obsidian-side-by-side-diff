@@ -16,6 +16,7 @@ import { DiffSession, hasUnsavedComparisonChanges } from "./diff-session";
 import { countGroupChangedRows, getActionableRowIndexes, groupChangeRows, GROUP_HEADER_THRESHOLD, type ChangeRowGroup } from "./diff-grouping";
 import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./diff-view-state";
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
+import { createPendingTargetPreview, type PendingTargetPreview } from "./pending-diff";
 import type { Language } from "./i18n";
 
 export type { PaneMode } from "./diff-view-state";
@@ -100,6 +101,8 @@ export class SideBySideDiffView extends ItemView {
   private previousChangeButton: HTMLButtonElement | null = null;
   private nextChangeButton: HTMLButtonElement | null = null;
   private directionButton: HTMLButtonElement | null = null;
+  private pendingTargetPreview: PendingTargetPreview | null = null;
+  private renderedPendingDeletions = new Set<number>();
 
   /** Exposes the current comparison state without allowing external mutation. */
   get state(): Readonly<DiffViewState> {
@@ -533,14 +536,21 @@ export class SideBySideDiffView extends ItemView {
     const startIndex = codes.indexOf(start);
     const endIndex = codes.indexOf(end);
     if (startIndex < 0 || endIndex < startIndex) return;
-    const lines = codes.slice(startIndex, endIndex + 1).filter((code) => code.dataset.diffPresent === "true").map((code) => {
+    const selectedCodes = codes.slice(startIndex, endIndex + 1);
+    const lines = selectedCodes.filter((code) => code.dataset.diffPresent === "true").map((code) => {
       const part = range.cloneRange();
       part.selectNodeContents(code);
       if (code === start) part.setStart(range.startContainer, range.startOffset);
       if (code === end) part.setEnd(range.endContainer, range.endOffset);
       return part.toString();
     });
-    if (lines.length === 0) return;
+    if (lines.length === 0) {
+      if (selectedCodes.some(code => code.dataset.diffPreview === "delete")) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
     event.clipboardData.setData("text/plain", lines.join("\n"));
     event.preventDefault();
     event.stopPropagation();
@@ -1418,6 +1428,12 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Builds toolbar, file headers and the aligned diff rows. */
   buildLayout(leftFile: ComparisonFile, rightFile: ComparisonFile, leftLines: string[], rightLines: string[]): void {
+    const targetPath = this.targetPath;
+    const pending = this.session.getPendingChanges().find(change => change.path === targetPath);
+    const savedTarget = targetPath === null ? undefined : this.session.getSaveBaseline(targetPath);
+    this.pendingTargetPreview = !this.state.editRight && pending && savedTarget !== undefined
+      ? createPendingTargetPreview(savedTarget, pending.content) : null;
+    this.renderedPendingDeletions = new Set();
     const paneLabels = this.getPaneLabels();
     const root = this.contentEl.createDiv({ cls: "file-diff-sbs-root" });
     // Actions reuse these rendered options even if the setting changes before a refresh.
@@ -1570,13 +1586,40 @@ export class SideBySideDiffView extends ItemView {
       this.renderDiffRow(grid, rows[index] ?? null, index);
       index += 1;
     }
+    this.buildPendingDeletions(grid, this.applyDirection === "left-to-right" ? rightLines.length : leftLines.length);
     this.updateChangeNavigationState();
+  }
+  /** Shows removed saved target lines as non-copyable preview rows, outside unresolved-change navigation. */
+  buildPendingDeletions(parent: HTMLElement, beforeLineIndex: number): void {
+    const deletions = this.pendingTargetPreview?.deletions.get(beforeLineIndex);
+    if (!deletions || this.renderedPendingDeletions.has(beforeLineIndex)) return;
+    this.renderedPendingDeletions.add(beforeLineIndex);
+    const targetSide = this.applyDirection === "left-to-right" ? "right" : "left";
+    for (const deletion of deletions) {
+      const row = parent.createDiv({ cls: "file-diff-sbs-row file-diff-sbs-pending-deletion" });
+      for (const side of ["left", "right"] as const) {
+        if (side === "right") row.createDiv({ cls: "file-diff-sbs-action-cell" });
+        const isTarget = side === targetSide;
+        const cell = this.buildCell(row, isTarget ? deletion.value : null, null, isTarget ? deletion.lineNumber : null, side, "equal");
+        if (isTarget) {
+          cell.dataset.diffPending = "delete";
+          cell.title = this.translate("view.pending.deletion");
+          const code = cell.querySelector<HTMLElement>(".file-diff-sbs-code");
+          if (code) {
+            code.dataset.diffPresent = "false";
+            code.dataset.diffPreview = "delete";
+          }
+        }
+      }
+    }
   }
   /** Renders one aligned row, substituting a dismissed change with its ignored, neutral form. */
   renderDiffRow(parent: HTMLElement, row: ComparisonRowModel | null, rowIndex: number): void {
     if (!row) {
       return;
     }
+    const targetValue = this.applyDirection === "left-to-right" ? row.right : row.left;
+    if (targetValue !== null) this.buildPendingDeletions(parent, this.applyDirection === "left-to-right" ? row.rightIndex : row.leftIndex);
     if (!row.equal && this.session.hasDismissedRow(getDiffRowKey(row))) {
       const ignoredRow = getIgnoredDiffRow(row);
       this.buildRow(parent, ignoredRow, rowIndex, false);
@@ -1829,10 +1872,20 @@ export class SideBySideDiffView extends ItemView {
     }
     const modelRow = "leftInlineTokens" in row ? row as ComparisonRowModel : null;
     const rowType = getDiffRowType(row);
-    this.buildCell(rowElement, row.left, row.right, row.leftLineNumber, "left", rowType, modelRow?.leftInlineTokens);
+    const leftCell = this.buildCell(rowElement, row.left, row.right, row.leftLineNumber, "left", rowType, modelRow?.leftInlineTokens);
     this.buildActionCell(rowElement, row, rowIndex);
-    this.buildCell(rowElement, row.right, row.left, row.rightLineNumber, "right", rowType, modelRow?.rightInlineTokens);
-
+    const rightCell = this.buildCell(rowElement, row.right, row.left, row.rightLineNumber, "right", rowType, modelRow?.rightInlineTokens);
+    const targetOnRight = this.applyDirection === "left-to-right";
+    const targetValue = targetOnRight ? row.right : row.left;
+    const targetIndex = targetOnRight ? row.rightIndex : row.leftIndex;
+    if (targetValue !== null && this.pendingTargetPreview?.changedLines.has(targetIndex) === true) {
+      const targetCell = targetOnRight ? rightCell : leftCell;
+      targetCell.dataset.diffOperation = "none";
+      targetCell.dataset.diffPending = "insert";
+      targetCell.title = this.translate("view.pending.change");
+      const code = targetCell.querySelector<HTMLElement>(".file-diff-sbs-code");
+      if (code) code.textContent = targetValue;
+    }
   }
   /** Adds the row metadata used by keyboard and button navigation. */
   markChangeTarget(element: HTMLElement, row: IndexedDiffRow, rowIndex: number): void {
@@ -1927,7 +1980,7 @@ export class SideBySideDiffView extends ItemView {
     }
   }
   /** Renders one side of a diff row. */
-  buildCell(parent: HTMLElement, value: string | null, counterpart: string | null, lineNumberValue: number | null, side: EditableSide, rowType: EditableRowType, inlineTokens?: InlineDiffToken[]): void {
+  buildCell(parent: HTMLElement, value: string | null, counterpart: string | null, lineNumberValue: number | null, side: EditableSide, rowType: EditableRowType, inlineTokens?: InlineDiffToken[]): HTMLElement {
     const cell = parent.createDiv({ cls: `file-diff-sbs-cell file-diff-sbs-${rowType}` });
     // Structural row types stay positional; review colors describe the planned merge instead.
     const sourceSide = this.applyDirection === "left-to-right" ? "left" : "right";
@@ -1942,6 +1995,7 @@ export class SideBySideDiffView extends ItemView {
     } else {
       appendInlineDiff(code, value, counterpart, side, inlineTokens);
     }
+    return cell;
   }
   /** Swaps the files while keeping the current diff view open. */
   async swapFiles(): Promise<void> {

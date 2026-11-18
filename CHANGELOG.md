@@ -6,6 +6,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Keep unsaved accepted changes visible in the target using green text for new content and red strikethrough
+  previews for removed content. These marks differ from open-diff background highlights, follow undo and both
+  apply directions, and clear after saving. Deleted previews are excluded from copying and saved file content.
 - Reverse the apply direction using the arrow icon between file headers, without swapping files.
   Row and block actions, ignore, undo, target permissions, and keyboard acceptance follow the selected direction.
   Read-only external snapshots can supply changes to a vault target. ([#8](https://github.com/nblum/obsidian-side-by-side-diff/issues/8))

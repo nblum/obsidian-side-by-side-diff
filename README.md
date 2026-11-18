@@ -29,6 +29,8 @@ Works locally, without an account or network requests. Requires **Obsidian 1.6.6
 
 Use the arrow icon between the file headers to reverse the apply direction without moving the files.
 Accepting a change does not save it immediately.
+Until saved, accepted target text is green and removed target lines remain visible in red with strikethrough.
+These text marks differ from the background highlights for open differences and disappear after saving or undoing.
 
 ![Comparing two files selected in the file explorer](assets/comparsion-record1.webp)
 

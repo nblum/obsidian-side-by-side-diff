@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "Si applica ai nuovi confronti. I confronti aperti mantengono la loro direzione. Le proposte vengono sempre applicate all’originale. È modificabile solo il file di destinazione.",
 	"settings.applyDirection.leftToRight": "Sinistra → destra",
 	"settings.applyDirection.rightToLeft": "Destra → sinistra",
-	"view.targetUnavailable": "Il file di destinazione non è più disponibile."
+	"view.targetUnavailable": "Il file di destinazione non è più disponibile.",
+	"view.pending.change": "Modifica accettata — non ancora salvata",
+	"view.pending.deletion": "Eliminazione in sospeso — non ancora salvata"
 }

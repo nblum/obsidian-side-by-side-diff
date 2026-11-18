@@ -189,7 +189,18 @@ test("selections containing only alignment gaps do not replace the clipboard", (
   assert.equal(fixture.prevented(), false);
 });
 
-
+test("deleted pending previews are excluded from mixed copies and cannot be copied alone as target content", () => {
+  const fixture = createCopyFixture("right", ["new", "old", "last"], 0, 4);
+  fixture.codes[1]!.dataset.diffPresent = "false";
+  Object.assign(fixture.codes[1]!.dataset, { diffPreview: "delete" });
+  fixture.view.handleCopy(fixture.event);
+  assert.equal(fixture.clipboard.get("text/plain"), "new\nlast");
+  const deleted = createCopyFixture("left", ["removed"], 0, 7);
+  Object.assign(deleted.codes[0]!.dataset, { diffPresent: "false", diffPreview: "delete" });
+  deleted.view.handleCopy(deleted.event);
+  assert.equal(deleted.clipboard.size, 0);
+  assert.equal(deleted.prevented(), true, "the native fallback must not copy deleted preview text");
+});
 
 test("rendered comparison cells distinguish real empty lines from alignment gaps for copying", () => {
   for (const side of ["left", "right"] as const) {

@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "Gilt für neue Vergleiche. Offene Vergleiche behalten ihre Richtung. Vorschläge werden weiterhin ins Original übernommen. Nur die Zieldatei ist bearbeitbar.",
 	"settings.applyDirection.leftToRight": "Links → rechts",
 	"settings.applyDirection.rightToLeft": "Rechts → links",
-	"view.targetUnavailable": "Die Zieldatei ist nicht mehr verfügbar."
+	"view.targetUnavailable": "Die Zieldatei ist nicht mehr verfügbar.",
+	"view.pending.change": "Übernommene Änderung – noch nicht gespeichert",
+	"view.pending.deletion": "Vorgemerkte Löschung – noch nicht gespeichert"
 }

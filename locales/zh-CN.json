@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "适用于新比较。已打开的比较保留其方向。建议仍应用到原始文件。只能编辑目标文件。",
 	"settings.applyDirection.leftToRight": "左 → 右",
 	"settings.applyDirection.rightToLeft": "右 → 左",
-	"view.targetUnavailable": "目标文件已不可用。"
+	"view.targetUnavailable": "目标文件已不可用。",
+	"view.pending.change": "已接受的更改，尚未保存",
+	"view.pending.deletion": "待删除的内容，尚未保存"
 }

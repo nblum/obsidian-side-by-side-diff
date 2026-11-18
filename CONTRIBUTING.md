@@ -83,6 +83,8 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - rendering and serializing actual target editor rows in both directions, including blank and whitespace-only lines
 - excluding visual alignment gaps when saving
 - copying comparison text with document focus while excluding alignment gaps
+- pending target previews for accepted insertions, replacements and deletions, including empty targets, both
+  directions, subsequent action indexes, undo, successful/conflicting saves, and copying without deleted previews
 - matching keys and placeholders across all locale dictionaries
 - selecting the next and previous change, including wraparound and resolved-row handling
 - honoring the configurable automatic advance after accepting or ignoring a change
@@ -104,6 +106,8 @@ For changes to the view or save logic, check at least these cases:
 - changed, inserted, and removed lines
 - inline differences within a line
 - green incoming source content and red outgoing target content, including color reversal after changing direction
+- accepted target changes with green text and red struck-through deletions on neutral backgrounds until save,
+  including copy, multiple accepts, undo, empty targets, and light/dark themes
 - `→`, `←`, `×`, `Swap`, `Refresh`, and reversing direction without moving the files
 - original/comparison identity after swapping, Source/Target badges, and the split-view navigation toolbar
 - swap above direction, the centered target-file edit icon moving between sides, and save/menu in the first row

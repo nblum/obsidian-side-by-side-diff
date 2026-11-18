@@ -109,6 +109,12 @@ visible, can be reviewed and staged individually, and are written only through a
 ### Accepting and ignoring changes
 
 - `→` or `←` stages a single change in the selected direction. Row and block tooltips name the actual target file.
+- Until explicitly saved, accepted additions and replacements use green text in the target. Removed or replaced
+  saved target lines remain visible in red with strikethrough. These previews use neutral backgrounds, distinct
+  from unresolved diff highlights, and apply to row and block acceptance in both directions.
+- Deleted preview lines carry no review actions or navigation targets and are excluded when copying target text
+  and saving. Source text stays unchanged. Undo restores the previous preview; successful saving clears it, while
+  failed or conflicting saves keep it visible.
 - `×` resolves a difference without modifying either file. Both sides keep their actual text and line numbers,
   including source-only lines. The ignored row loses its highlights and review actions in either direction.
 - With a highlighted change, `Alt+ArrowRight` accepts it in the selected direction and `Alt+ArrowLeft` ignores it.

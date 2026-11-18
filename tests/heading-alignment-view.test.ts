@@ -889,3 +889,132 @@ test("loading, rendering, editing and saving retain terminal line breaks only in
 		}
 	}
 });
+
+/** Traverses the rendered test DOM, including group wrappers and deleted-line previews. */
+function allElements(root: EditorElement): EditorElement[] {
+	return [root, ...root.children.flatMap(allElements)];
+}
+
+/** Uses real loading, rendering, merge, undo and guarded save methods against an in-memory vault. */
+async function createPendingPreviewView(direction: "left-to-right" | "right-to-left", source: string[], target: string[]) {
+	const left = direction === "left-to-right" ? source : target;
+	const right = direction === "left-to-right" ? target : source;
+	const { view, session, leftFile, rightFile } = createView(left, right);
+	const stored = new Map([[leftFile.path, left.join("\n")], [rightFile.path, right.join("\n")]]);
+	const root = new EditorElement();
+	Object.assign(view.app.vault, {
+		cachedRead: (file: TestFile) => Promise.resolve(stored.get(file.path)!),
+		process: (file: TestFile, transform: (value: string) => string) => {
+			stored.set(file.path, transform(stored.get(file.path)!));
+			return Promise.resolve();
+		}
+	});
+	Object.assign(view, {
+		contentEl: root, changeActions: new Map(),
+		renderDiff: module.exports.SideBySideDiffView.prototype.renderDiff,
+		renderDiffRow: module.exports.SideBySideDiffView.prototype.renderDiffRow
+	});
+	await view.setState({ ...view.state, direction }, { history: false });
+	const targetSide: "left" | "right" = direction === "left-to-right" ? "right" : "left";
+	const targetPath = targetSide === "right" ? rightFile.path : leftFile.path;
+	const sourcePath = targetSide === "right" ? leftFile.path : rightFile.path;
+	/** Extracts only real file text, using the same metadata as the clipboard handler. */
+	function displayedText(side: "left" | "right"): string {
+		return allElements(root).filter(el => el.classes.has("file-diff-sbs-code") && el.dataset.diffSide === side && el.dataset.diffPresent === "true").map(el => el.innerText).join("\n");
+	}
+	return { view, session, stored, root, targetSide, targetPath, sourcePath, displayedText };
+}
+
+test("pending target insertions, replacements and deletions remain marked until save or undo in both directions", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		for (const [source, target] of [
+			[["A", "new", "Z"], ["A", "old", "Z"]],
+			[["A", "new", "Z"], ["A", "Z"]],
+			[["A", "Z"], ["A", "old", "Z"]],
+			[["new"], []], [[], ["old"]],
+			[["A", "new-a", "new-b", "Z"], ["A", "old-a", "old-b", "old-c", "Z"]]
+		]) {
+			assert.ok(source && target);
+			const { view, session, stored, root, targetSide, targetPath, sourcePath, displayedText } = await createPendingPreviewView(direction, source, target);
+			const left = direction === "left-to-right" ? source : target;
+			const right = direction === "left-to-right" ? target : source;
+			const rows = createComparisonModelFromLines(left, right).rows;
+			const changed = rows.flatMap((row, index) => row.equal ? [] : [index]);
+			const grouped = changed.length > 1;
+			const apply = () => grouped ? view.applyGroupChange(0, rows.length - 1, direction) : view.applyRowChange(changed[0]!, direction);
+			await apply();
+			const pendingCells = allElements(root).filter(el => el.dataset.diffPending !== undefined);
+			assert.ok(pendingCells.length > 0);
+			for (const cell of pendingCells) {
+				assert.equal(cell.querySelector(".file-diff-sbs-code")?.dataset.diffSide, targetSide);
+				assert.equal(cell.dataset.diffOperation, "none", "accepted previews must use text styling, not open-diff backgrounds");
+			}
+			if (source.some(line => !target.includes(line))) assert.ok(pendingCells.some(cell => cell.dataset.diffPending === "insert"));
+			if (target.some(line => !source.includes(line))) assert.ok(pendingCells.some(cell => cell.dataset.diffPending === "delete"));
+			for (const row of allElements(root).filter(el => el.classes.has("file-diff-sbs-pending-deletion"))) {
+				assert.equal(row.dataset.diffRowIndex, undefined, "preview deletions must not change action indexes");
+				assert.equal(row.dataset.diffChange, undefined);
+				assert.equal(row.children[1]?.children.length, 0);
+				const code = row.children[targetSide === "right" ? 2 : 0]?.querySelector(".file-diff-sbs-code");
+				assert.equal(code?.dataset.diffPresent, "false", "deleted previews must never be copied as target content");
+			}
+			assert.equal(displayedText(targetSide), source.join("\n"));
+			assert.equal(displayedText(targetSide === "right" ? "left" : "right"), source.join("\n"));
+			assert.equal(stored.get(targetPath), target.join("\n"), "accept must still require an explicit save");
+			await view.undoLastChange();
+			assert.equal(allElements(root).some(el => el.dataset.diffPending !== undefined), false);
+			assert.equal(displayedText(targetSide), target.join("\n"));
+			assert.equal(session.hasPendingChanges(), false);
+			await apply();
+			assert.equal(await view.savePendingChanges(), true);
+			assert.equal(allElements(root).some(el => el.dataset.diffPending !== undefined), false);
+			assert.equal(stored.get(targetPath), source.join("\n"));
+			assert.equal(stored.get(sourcePath), source.join("\n"));
+		}
+	}
+});
+
+test("deleted preview rows do not shift the next merge button and undo retains earlier pending markers", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		const { view, root, targetSide, displayedText } = await createPendingPreviewView(direction, ["A", "new-a", "new-b", "Z"], ["A", "old-a", "old-b", "Z"]);
+		await view.applyRowChange(1, direction);
+		assert.equal(allElements(root).filter(el => el.classes.has("file-diff-sbs-pending-deletion")).length, 1);
+		const nextRow = allElements(root).find(el => el.classes.has("file-diff-sbs-row") && el.dataset.diffRowIndex === "2" && el.dataset.diffChange === "true");
+		assert.ok(nextRow);
+		const realApply = view.applyRowChange.bind(view);
+		let operation: Promise<void> | undefined;
+		view.applyRowChange = (index, selectedDirection) => { operation = realApply(index, selectedDirection); return operation; };
+		nextRow.children[1]?.children[0]?.handlers.get("click")?.();
+		assert.ok(operation);
+		await operation;
+		assert.equal(displayedText(targetSide), "A\nnew-a\nnew-b\nZ");
+		assert.equal(allElements(root).filter(el => el.dataset.diffPending === "insert").length, 2);
+		await view.undoLastChange();
+		assert.equal(displayedText(targetSide), "A\nnew-a\nold-b\nZ");
+		assert.equal(allElements(root).filter(el => el.dataset.diffPending === "insert").length, 1);
+	}
+});
+
+test("a failed guarded save retains the pending target markers and deletion previews", async () => {
+	const { view, root, stored, targetPath } = await createPendingPreviewView("right-to-left", ["A", "new", "Z"], ["A", "old", "Z"]);
+	await view.applyRowChange(1, "right-to-left");
+	stored.set(targetPath, "changed outside the comparison");
+	assert.equal(await view.savePendingChanges(), false);
+	assert.equal(allElements(root).filter(el => el.dataset.diffPending === "insert").length, 1);
+	assert.equal(allElements(root).filter(el => el.dataset.diffPending === "delete").length, 1);
+	assert.equal(stored.get(targetPath), "changed outside the comparison");
+});
+
+test("pending target text stays distinct from open diff backgrounds when the source changes again", async () => {
+	const { view, root, stored, sourcePath } = await createPendingPreviewView("left-to-right", ["A", "accepted text", "Z"], ["A", "old text", "Z"]);
+	await view.applyRowChange(1, "left-to-right");
+	stored.set(sourcePath, "A\nnewer source text\nZ");
+	await view.renderDiff();
+	const pendingCell = allElements(root).find(el => el.dataset.diffPending === "insert");
+	assert.ok(pendingCell);
+	assert.equal(pendingCell.dataset.diffOperation, "none");
+	const code = pendingCell.querySelector(".file-diff-sbs-code");
+	assert.equal(code?.innerText, "accepted text");
+	assert.equal(code?.querySelector(".file-diff-sbs-inline-right"), null);
+	assert.ok(allElements(root).some(el => el.dataset.diffChange === "true"), "the changed source still needs review");
+});

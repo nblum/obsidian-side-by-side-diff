@@ -204,5 +204,7 @@
 	"settings.applyDirection.description": "Geldt voor nieuwe vergelijkingen. Open vergelijkingen behouden hun richting. Voorstellen worden nog steeds op het origineel toegepast. Alleen het doelbestand kan worden bewerkt.",
 	"settings.applyDirection.leftToRight": "Links → rechts",
 	"settings.applyDirection.rightToLeft": "Rechts → links",
-	"view.targetUnavailable": "Het doelbestand is niet meer beschikbaar."
+	"view.targetUnavailable": "Het doelbestand is niet meer beschikbaar.",
+	"view.pending.change": "Overgenomen wijziging — nog niet opgeslagen",
+	"view.pending.deletion": "Verwijdering in afwachting — nog niet opgeslagen"
 }

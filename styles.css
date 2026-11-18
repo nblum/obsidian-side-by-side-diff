@@ -605,6 +605,17 @@
 	background: color-mix(in srgb, var(--color-red), transparent 84%);
 }
 
+.file-diff-sbs-cell[data-diff-pending="insert"] .file-diff-sbs-code {
+	color: var(--color-green);
+}
+
+.file-diff-sbs-cell[data-diff-pending="delete"] .file-diff-sbs-code,
+.file-diff-sbs-cell[data-diff-pending="delete"] .file-diff-sbs-line-number {
+	color: var(--color-red);
+	text-decoration: line-through;
+	text-decoration-color: var(--color-red);
+}
+
 .file-diff-sbs-inline-left,
 .file-diff-sbs-inline-right {
 	border-radius: 0.2rem;
