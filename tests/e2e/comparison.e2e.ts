@@ -9,6 +9,7 @@ const save = `${view} .file-diff-sbs-save-action`;
 const accept = `${view} [data-diff-change='true'] button[aria-keyshortcuts='Alt+ArrowRight']`;
 const ignore = `${view} [data-diff-change='true'] button[aria-keyshortcuts='Alt+ArrowLeft']`;
 const undo = `${view} button[aria-keyshortcuts='Ctrl+Z']`;
+const feedback = `${view} .file-diff-sbs-review-feedback`;
 const original = await readFile(new URL("./vault/Original.md", import.meta.url), "utf8");
 const comparison = await readFile(new URL("./vault/Comparison.md", import.meta.url), "utf8");
 
@@ -69,11 +70,19 @@ describe("comparison in Obsidian", () => {
   it("stages, undoes and explicitly saves a row without writing to the source", async () => {
     await $(accept).click();
     await expect($(save)).toBeEnabled();
+    await expect($(feedback)).toHaveText("Change staged. Save to write it.");
+    await expect($(feedback)).toHaveAttribute("role", "status");
+    await expect($(feedback)).toHaveAttribute("aria-live", "polite");
+    await expect($$(".notice")).toBeElementsArrayOfSize(0);
+    await expect($(save)).toBeClickable();
+    await browser.saveScreenshot(join(process.cwd(), "e2e-results/review-feedback.png"));
     await expect($(`${view} [data-diff-pending='insert']`)).toHaveText(expect.stringContaining("Original wording."));
     await expect($(`${view} [data-diff-pending='delete']`)).toHaveText(expect.stringContaining("Comparison wording."));
     assert.equal(await readSaved("Comparison.md"), comparison);
 
     await $(undo).click();
+    await expect($(feedback)).toHaveText("Undone.");
+    await expect($$(".notice")).toBeElementsArrayOfSize(0);
     await expect($(save)).toBeDisabled();
     await expect($$(accept)).toBeElementsArrayOfSize(1);
     await expect($(`${view} [data-diff-pending]`)).not.toExist();
@@ -81,9 +90,12 @@ describe("comparison in Obsidian", () => {
 
     await $(accept).click();
     await expect($(save)).toBeEnabled();
+    await expect($(feedback)).toHaveText("Change staged. Save to write it.");
+    await expect($$(".notice")).toBeElementsArrayOfSize(0);
     await saveFromToolbar();
     await browser.waitUntil(async () => await readSaved("Comparison.md") === original);
     await expect($(save)).toBeDisabled();
+    await expect($(feedback)).toHaveText("");
     await expect($(".notice-container")).toHaveText(expect.stringContaining("Changes saved."));
     await expect($(`${view} [data-diff-pending]`)).not.toExist();
     assert.equal(await readSaved("Original.md"), original);

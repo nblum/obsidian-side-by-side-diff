@@ -93,6 +93,7 @@ export class SideBySideDiffView extends ItemView {
   private rightEditorState: RightEditorState | null = null;
   private rightEditorDirty = false;
   private saveButton: HTMLButtonElement | null = null;
+  private reviewFeedbackEl: HTMLElement | null = null;
   private editInputSnapshot: EditInputSnapshot | null = null;
   private editSyncFrame: number | null = null;
   private pendingEditSyncPreferredIndex: number | null = null;
@@ -629,6 +630,7 @@ export class SideBySideDiffView extends ItemView {
     this.previousChangeButton = null;
     this.nextChangeButton = null;
     this.directionButton = null;
+    this.reviewFeedbackEl = null;
     this.changeActions.clear();
     this.contentEl.empty();
     this.contentEl.addClass("file-diff-sbs-view");
@@ -1273,8 +1275,8 @@ export class SideBySideDiffView extends ItemView {
       const targetLines = leftToRight ? nextRightLines : nextLeftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
       this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
-      new Notice(this.translate("notice.staged"));
       await this.renderDiff(scrollPosition);
+      this.showReviewFeedback("notice.staged");
       if (this.state.mode === "accept" && direction === "left-to-right") {
         this.session.markProposalChangeAccepted();
       }
@@ -1333,8 +1335,8 @@ export class SideBySideDiffView extends ItemView {
       const targetLines = leftToRight ? rightLines : leftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
       this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
-      new Notice(this.translate("notice.staged"));
       await this.renderDiff(scrollPosition);
+      this.showReviewFeedback("notice.staged");
       if (this.state.mode === "accept" && direction === "left-to-right") {
         this.session.markProposalChangeAccepted();
       }
@@ -1541,6 +1543,10 @@ export class SideBySideDiffView extends ItemView {
       undoButton.disabled = !this.session.canUndo();
       undoButton.addEventListener("click", () => { void this.undoLastChange(); });
     }
+    this.reviewFeedbackEl = reviewActions.createSpan({
+      cls: "file-diff-sbs-review-feedback",
+      attr: { role: "status", "aria-live": "polite", "aria-atomic": "true" }
+    });
     const navigation = reviewActions.createDiv({ cls: "file-diff-sbs-navigation" });
     const previousChangeButton = navigation.createEl("button", { cls: "clickable-icon" });
     previousChangeButton.setAttribute("aria-label", this.translate("actions.previousChange"));
@@ -1961,7 +1967,13 @@ export class SideBySideDiffView extends ItemView {
     const scrollPosition = this.getScrollPosition();
     this.session.undo();
     await this.renderDiff(scrollPosition);
-    new Notice(this.translate("notice.undone"));
+    this.showReviewFeedback("notice.undone");
+  }
+  /** Reports routine review actions locally without stacking global Obsidian notices. */
+  private showReviewFeedback(key: "notice.staged" | "notice.undone"): void {
+    if (this.reviewFeedbackEl) {
+      this.reviewFeedbackEl.textContent = this.translate(key);
+    }
   }
   /** Moves to the next open change after accepting or ignoring one when enabled. */
   advanceAfterResolvedChange(resolvedPosition: number | null): void {

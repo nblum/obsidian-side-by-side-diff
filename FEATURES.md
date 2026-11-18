@@ -28,6 +28,9 @@ visible, can be reviewed and staged individually, and are written only through a
   changes. It changes to `Comparison mode` while editing. The source is never editable.
 - `Undo`, `Previous change`, and `Next change` use accessible icon buttons with tooltips and retain their shortcuts.
 - `Undo` and change navigation sit below the file headers, directly above the split content.
+- Accepting a row or block and undoing a review action show localized feedback beside the review controls in a
+  polite live region, without global Obsidian notices. Feedback clears when the view is rebuilt, including after
+  a successful save or refresh. Save confirmations, errors, and conflicts retain their global notices.
 - `Next change` and `Previous change` navigate through changes and scroll the selected row into view.
 - The same navigation is available with `Alt+ArrowDown` and `Alt+ArrowUp`.
 - After accepting or ignoring a change, the view automatically advances to the next open change by default. This can be disabled in the settings.

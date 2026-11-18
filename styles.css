@@ -98,6 +98,14 @@
 	margin-left: auto;
 }
 
+.file-diff-sbs-review-feedback {
+	flex: 1 1 10rem;
+	min-width: 0;
+	color: var(--text-muted);
+	font-size: var(--font-small);
+	overflow-wrap: anywhere;
+}
+
 .file-diff-sbs-save-action {
 	margin-left: auto;
 }

@@ -25,6 +25,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Changed
 
+- Show feedback for accepting rows or blocks and undoing directly beside the review controls, preventing routine
+  notifications from stacking over the save button. Save confirmations, errors, and conflicts keep their Obsidian notices.
 - Clarify Original/Comparison file identity with names, paths, and Source/Target badges. Keep save and the file menu
   in the first row, stack the swap and direction icons between the headers, and center the edit-mode icon beside
   the target file. Undo and change navigation use icon buttons with tooltips directly above the split content.

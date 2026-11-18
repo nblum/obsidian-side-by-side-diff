@@ -63,6 +63,7 @@ class EditorElement {
 
 const renderedIcons = new WeakMap<object, string>();
 const renderedTooltips = new WeakMap<object, string>();
+const notices: string[] = [];
 const bundle = await esbuild.build({ ...PLUGIN_BUNDLE_OPTIONS, entryPoints: ["src/diff-view.ts"], write: false, logLevel: "silent" });
 const output = bundle.outputFiles?.[0];
 assert.ok(output);
@@ -80,7 +81,9 @@ runInNewContext(output.text, {
 		if (name.startsWith("node:")) return createRequire(import.meta.url)(name);
 		assert.equal(name, "obsidian");
 		return {
-			ItemView: class { async setState() {} }, Notice: class {}, Modal: class {}, SuggestModal: class {}, TFile: TestFile, FileSystemAdapter: class {},
+			ItemView: class { async setState() {} },
+			Notice: class { constructor(message: string) { notices.push(message); } },
+			Modal: class {}, SuggestModal: class {}, TFile: TestFile, FileSystemAdapter: class {},
 			setIcon: (element: object, icon: string) => { renderedIcons.set(element, icon); },
 			setTooltip: (element: object, tooltip: string) => { renderedTooltips.set(element, tooltip); }
 		};
@@ -924,6 +927,34 @@ async function createPendingPreviewView(direction: "left-to-right" | "right-to-l
 	}
 	return { view, session, stored, root, targetSide, targetPath, sourcePath, displayedText };
 }
+
+test("row and block acceptance and undo use inline feedback while saves retain global notices", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		for (const grouped of [false, true]) {
+			notices.length = 0;
+			const { view, root } = await createPendingPreviewView(direction, ["A", "new-a", "new-b", "Z"], ["A", "old-a", "old-b", "Z"]);
+			const feedback = () => root.querySelector(".file-diff-sbs-review-feedback")?.textContent;
+			assert.equal(feedback(), "");
+			await view.undoLastChange();
+			assert.equal(feedback(), "", "an unavailable undo must not report success");
+			const accept = () => grouped ? view.applyGroupChange(1, 2, direction) : view.applyRowChange(1, direction);
+			await accept();
+			assert.equal(feedback(), "notice.staged");
+			assert.deepEqual(notices, [], "accepting rows or blocks must not create global notices");
+			await view.undoLastChange();
+			assert.equal(feedback(), "notice.undone");
+			assert.deepEqual(notices, [], "undo must not create global notices");
+			await view.renderDiff();
+			assert.equal(feedback(), "", "refresh must clear stale action feedback");
+			await view.applyRowChange(999, direction);
+			assert.equal(feedback(), "", "an unavailable row must not report success");
+			await accept();
+			assert.equal(await view.savePendingChanges(), true);
+			assert.equal(feedback(), "", "a successful save must clear the staged feedback");
+			assert.deepEqual(notices, ["notice.saved"]);
+		}
+	}
+});
 
 test("pending target insertions, replacements and deletions remain marked until save or undo in both directions", async () => {
 	for (const direction of ["left-to-right", "right-to-left"] as const) {
