@@ -110,6 +110,16 @@ test("ignoring a model row does not retain stale rendering metadata", () => {
 	assert.equal("leftInlineTokens" in ignoredRow, false);
 });
 
+test("ignored rows retain both files' literal content and line numbers, including one-sided and blank lines", () => {
+	for (const [left, right] of [["A\nold", "A\nnew"], ["A\nkeep", "A"], ["A", "A\nignore"], ["A\n\nZ", "A\nZ"], ["A\n  \nZ", "A\nZ"]]) {
+		const row = getRows(left!, right!).find((candidate) => !candidate.equal);
+		assert.ok(row);
+		const ignored = getIgnoredDiffRow(row);
+		assert.ok(ignored);
+		assert.deepEqual(ignored, { ...row, equal: true });
+	}
+});
+
 test("line synchronization plans gaps on the shorter right pane at the edit position", () => {
 	const plan = getLineSyncPlan(5, 3, 2);
 

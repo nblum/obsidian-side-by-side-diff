@@ -271,9 +271,110 @@ test("browser identity rejects a second external handle for the left entry witho
 test("snapshot fallback can merge into the vault but never stages an external write", async () => {
   const { view, session, contents } = createSafetyView();
   await view.dropMarkdown([{ name: "snapshot.md", text: () => Promise.resolve("snapshot") } as File]);
+  assert.equal(view.canApplyChange(), false);
   await view.applyGroupChange(0, 10, "left-to-right");
   assert.equal(session.hasPendingChanges(), false);
-  await view.applyGroupChange(0, 10, "right-to-left");
+  await view.reverseApplyDirection();
+  assert.equal(view.state.leftPath, "left.md");
+  assert.equal(view.canApplyChange(), true);
+  await view.applyGroupChange(0, 10, view.applyDirection);
   assert.equal(await view.writePendingChanges(), "saved");
   assert.equal(contents.get("left.md"), "snapshot");
+});
+
+test("reverse acceptance refuses an external source changed after display", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "sbs-reverse-source-"));
+  try {
+    const path = join(dir, "outside.md");
+    for (const grouped of [false, true]) {
+      await writeFile(path, "external source");
+      const { view, session, rendered } = createSafetyView();
+      await view.dropMarkdown([nativeDrop(path, "external source")], Promise.resolve(diskFileHandle(path)));
+      await view.reverseApplyDirection();
+      await writeFile(path, "changed elsewhere");
+      if (grouped) await view.applyGroupChange(0, 10, view.applyDirection);
+      else await view.applyRowChange(0, view.applyDirection);
+      assert.equal(session.hasPendingChanges(), false);
+      assert.equal(rendered().right, "changed elsewhere");
+      assert.ok(notices.includes("notice.comparisonChanged"));
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("direct editing and close-save modify only the current target and preserve its line endings", async () => {
+  for (const direction of ["left-to-right", "right-to-left"] as const) {
+    for (const closing of [false, true]) {
+      const { view, session, contents } = createSafetyView();
+      contents.set("left.md", "left\r\noriginal\r\n");
+      contents.set("right.md", "right\noriginal\n");
+      const target = direction === "left-to-right" ? "right.md" : "left.md";
+      const source = target === "right.md" ? "left.md" : "right.md";
+      const sourceBefore = contents.get(source);
+      await view.setState({ ...view.state, direction, editRight: true }, { history: false });
+      assert.equal(session.getSaveBaseline(target), contents.get(target));
+      assert.equal(session.getSaveBaseline(source), undefined);
+      Object.assign(view, {
+        rightEditorState: { editor: {}, initialValue: contents.get(target) },
+        serializeRightEditor: () => "edited\ntext\n"
+      });
+      assert.equal(await (closing ? view.saveChangesBeforeClose() : view.saveRightEdits()), true);
+      assert.equal(contents.get(target), direction === "right-to-left" ? "edited\r\ntext\r\n" : "edited\ntext\n");
+      assert.equal(contents.get(source), sourceBefore);
+    }
+  }
+});
+
+test("block accepts with changing line counts stage only the target, undo together, and save explicitly", async () => {
+  for (const direction of ["left-to-right", "right-to-left"] as const) {
+    for (const [left, right] of [
+      ["anchor\r\nnew-a\r\nnew-b\r\nnew-c\r\nnew-d\r\nend", "anchor\nold\nend"],
+      ["anchor\r\nnew\r\nend", "anchor\nold-a\nold-b\nold-c\nold-d\nend"],
+      ["anchor\r\nend", "anchor\nextra-a\nextra-b\nextra-c\nextra-d\nend"]
+    ]) {
+      assert.ok(left !== undefined && right !== undefined);
+      const { view, session, contents } = createSafetyView();
+      contents.set("left.md", left);
+      contents.set("right.md", right);
+      await view.setState({ ...view.state, direction }, { history: false });
+      const target = direction === "left-to-right" ? "right.md" : "left.md";
+      const source = target === "right.md" ? "left.md" : "right.md";
+      const sourceBefore = contents.get(source)!;
+      const targetBefore = contents.get(target)!;
+      const expected = sourceBefore.replace(/\r?\n/g, targetBefore.includes("\r\n") ? "\r\n" : "\n");
+      await view.applyGroupChange(1, 4, view.applyDirection);
+      assert.deepEqual(session.getPendingChanges(), [{ path: target, content: expected }]);
+      assert.equal(contents.get(source), sourceBefore);
+      assert.equal(contents.get(target), targetBefore, "accepting must not write the target yet");
+      assert.equal(session.undo(), true);
+      assert.equal(session.hasPendingChanges(), false);
+      assert.equal(session.undo(), false, "one block must remain one undo step");
+      await view.applyGroupChange(1, 4, view.applyDirection);
+      assert.equal(await view.savePendingChanges(), true);
+      assert.equal(contents.get(target), expected);
+      assert.equal(contents.get(source), sourceBefore);
+      assert.equal(session.hasPendingChanges(), false);
+    }
+  }
+});
+
+test("a read-only source allows editing the vault target; a read-only target remains blocked", async () => {
+  const { view } = createSafetyView();
+  await view.dropMarkdown([{ name: "snapshot.md", text: () => Promise.resolve("source") } as File]);
+  await view.enableRightEditMode();
+  assert.equal(view.state.editRight, false);
+  await view.reverseApplyDirection();
+  await view.enableRightEditMode();
+  assert.equal(view.state.editRight, true);
+  assert.equal(view.targetPath, "left.md");
+});
+
+test("reverse direct editing refuses external modifications to the target before a save", async () => {
+  const { view, contents } = createSafetyView();
+  await view.setState({ ...view.state, direction: "right-to-left", editRight: true }, { history: false });
+  Object.assign(view, { rightEditorState: { editor: {}, initialValue: contents.get("left.md") }, serializeRightEditor: () => "edited" });
+  const sourceBefore = contents.get("right.md");
+  contents.set("left.md", "changed elsewhere");
+  assert.equal(await view.saveRightEdits(), false);
+  assert.equal(contents.get("left.md"), "changed elsewhere");
+  assert.equal(contents.get("right.md"), sourceBefore);
 });

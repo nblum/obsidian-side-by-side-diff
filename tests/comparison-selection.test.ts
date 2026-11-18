@@ -137,6 +137,8 @@ test("copying either comparison side preserves partial lines, whitespace and rea
   }
 });
 
+
+
 test("copying a partial single line uses both selection boundaries", () => {
   const fixture = createCopyFixture("right", ["before changed after"], 7, 14);
   fixture.view.handleCopy(fixture.event);
@@ -166,18 +168,21 @@ test("selections containing only alignment gaps do not replace the clipboard", (
   assert.equal(fixture.prevented(), false);
 });
 
+
+
 test("rendered comparison cells distinguish real empty lines from alignment gaps for copying", () => {
   for (const side of ["left", "right"] as const) {
     for (const value of ["text", "", null]) {
       const code = { dataset: {} as Record<string, string>, textContent: "" };
       const lineNumber = { textContent: "" };
-      const cell = { createSpan: ({ cls }: { cls: string }) => cls === "file-diff-sbs-code" ? code : lineNumber };
+      const cell = { dataset: {} as Record<string, string>, createSpan: ({ cls }: { cls: string }) => cls === "file-diff-sbs-code" ? code : lineNumber };
       const parent = { createDiv: () => cell };
       const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
       view.buildCell(parent as unknown as HTMLElement, value, null, value === null ? null : 1, side, "equal");
       assert.equal(code.dataset.diffSide, side);
       assert.equal(code.dataset.diffPresent, String(value !== null));
       assert.equal(lineNumber.textContent, value === null ? "" : "1");
+      assert.equal(cell.dataset.diffOperation, "none");
     }
   }
 });

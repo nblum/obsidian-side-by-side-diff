@@ -6,13 +6,34 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Reverse the apply direction using the arrow icon between file headers, without swapping files.
+  Row and block actions, ignore, undo, target permissions, and keyboard acceptance follow the selected direction.
+  Read-only external snapshots can supply changes to a vault target. ([#8](https://github.com/nblum/obsidian-side-by-side-diff/issues/8))
+- Configure a default apply direction for new comparisons in settings. Open comparisons retain their direction,
+  and proposal acceptance remains directed into the original.
 - Select and copy text from either file in comparison mode. Selection stays in the pane where dragging starts
   and copies only that file's text, without line numbers, review controls, or alignment gaps. (#7)
 
+### Changed
+
+- Clarify Original/Comparison file identity with names, paths, and Source/Target badges. Keep save and the file menu
+  in the first row, stack the swap and direction icons between the headers, and center the edit-mode icon beside
+  the target file. Undo and change navigation use icon buttons with tooltips directly above the split content.
+- Remove the redundant apply-direction hint row in comparison mode; file roles, arrows, and action tooltips
+  already show the source, target, and effect of ignoring a change.
+- Direct editing follows the target when direction changes, including left-side editing, guarded saves, and
+  preserved target line endings. The source stays read-only.
+
 ### Fixed
 
+- Keep both files' text and line numbers visible when ignoring rows or blocks. Clear review highlights and actions
+  without making the read-only source appear edited; source-only and blank lines remain visible in either direction.
 - Open the comparison after selecting the original in the file picker. Obsidian closes suggestion dialogs before
   delivering the choice; accepting a file is no longer mistaken for cancellation.
+- Match the original-file preview before selecting a comparison to the comparison view's neutral cells,
+  including its background, line spacing, and row borders.
+- Make comparison line and inline highlights follow the apply direction: incoming source content is green, while
+  target content to be removed or replaced is red. Alignment gaps and ignored changes remain neutral.
 
 ## [0.10.1] - 2026-11-09
 

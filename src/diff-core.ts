@@ -294,18 +294,15 @@ export function applyAlignedRowChange(
 	return { leftLines: nextLeftLines, rightLines: nextRightLines };
 }
 
-/** Turns a dismissed row into a neutral row that keeps the right-side content visible. */
-export function getIgnoredDiffRow(row: IndexedDiffRow): IndexedDiffRow | null {
-	if (row.right === null) {
-		return null;
-	}
+/** Resolves a row visually while preserving the literal content and positions of both files. */
+export function getIgnoredDiffRow(row: IndexedDiffRow): IndexedDiffRow {
 	return {
-		left: null,
+		left: row.left,
 		right: row.right,
 		equal: true,
 		leftIndex: row.leftIndex,
 		rightIndex: row.rightIndex,
-		leftLineNumber: null,
+		leftLineNumber: row.leftLineNumber,
 		rightLineNumber: row.rightLineNumber,
 	};
 }

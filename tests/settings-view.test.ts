@@ -50,9 +50,64 @@ runInNewContext(bundle.outputFiles[0].text, {
   }
 });
 
+test("legacy settings render the saved direction and persist changes through the actual dropdown callback", async () => {
+  for (const initial of ["left-to-right", "right-to-left"] as const) {
+    const settings = { ...DEFAULT_SETTINGS, defaultApplyDirection: initial };
+    const persisted: string[] = [];
+    const tab = Object.create(module.exports.FileDiffSettingsTab.prototype) as FileDiffSettingsTab;
+    Object.assign(tab, {
+      containerEl: { empty: () => { legacySettings.length = 0; } },
+      plugin: {
+        settings,
+        translate: (key: string) => key,
+        saveSettings: () => { persisted.push(settings.defaultApplyDirection); return Promise.resolve(); }
+      }
+    });
+    tab.display();
+    const control = legacySettings.find(setting => setting.name === "settings.applyDirection.name")?.control;
+    assert.ok(control?.change);
+    assert.equal(control.value, initial);
+    assert.deepEqual(control.options, {
+      "left-to-right": "settings.applyDirection.leftToRight",
+      "right-to-left": "settings.applyDirection.rightToLeft"
+    });
+    const selected = initial === "left-to-right" ? "right-to-left" : "left-to-right";
+    await control.change(selected);
+    assert.equal(settings.defaultApplyDirection, selected);
+    assert.deepEqual(persisted, [selected]);
+    await control.change("invalid");
+    assert.equal(settings.defaultApplyDirection, selected);
+    assert.deepEqual(persisted, [selected]);
+    tab.display();
+    assert.equal(legacySettings.find(setting => setting.name === "settings.applyDirection.name")?.control?.value, selected);
+  }
+});
 
-
-
+test("the default-direction setting offers both directions and persists only valid selections", async () => {
+  const settings = { ...DEFAULT_SETTINGS };
+  const persisted: string[] = [];
+  const tab = Object.create(module.exports.FileDiffSettingsTab.prototype) as FileDiffSettingsTab;
+  Object.assign(tab, { plugin: {
+    settings,
+    translate: (key: string) => key,
+    saveSettings: () => { persisted.push(settings.defaultApplyDirection); return Promise.resolve(); }
+  } });
+  const definition = tab.getSettingDefinitions().find(item => "name" in item && item.name === "settings.applyDirection.name");
+  assert.ok(definition && "control" in definition);
+  assert.equal(definition.control.type, "dropdown");
+  assert.equal(definition.control.key, "defaultApplyDirection");
+  assert.equal(definition.control.defaultValue, "left-to-right");
+  assert.ok("options" in definition.control);
+  assert.deepEqual(Object.keys(definition.control.options).sort(), ["left-to-right", "right-to-left"]);
+  await tab.setControlValue("defaultApplyDirection", "right-to-left");
+  assert.equal(settings.defaultApplyDirection, "right-to-left");
+  await tab.setControlValue("defaultApplyDirection", "invalid");
+  await tab.setControlValue("defaultApplyDirection", true);
+  assert.equal(settings.defaultApplyDirection, "right-to-left");
+  assert.deepEqual(persisted, ["right-to-left"]);
+  await tab.setControlValue("defaultApplyDirection", "left-to-right");
+  assert.deepEqual(persisted, ["right-to-left", "left-to-right"]);
+});
 
 test("the legacy ribbon toggle restores its value, updates visibility and persists both states", async () => {
   for (const initial of [true, false]) {

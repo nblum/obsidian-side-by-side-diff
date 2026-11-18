@@ -1,10 +1,12 @@
 import type { LanguagePreference } from "./i18n.ts";
+import type { DiffDirection } from "./diff-core.ts";
 import { normalizeRecentFilePaths } from "./recent-files.ts";
 
 /** Describes persisted options that influence plugin behavior and presentation. */
 export interface PluginSettings {
 	showRibbonIcon: boolean;
 	autoAdvanceAfterChange: boolean;
+	defaultApplyDirection: DiffDirection;
 	alignMarkdownByHeadings: boolean;
 	changeCopySuffix: string;
 	language: LanguagePreference;
@@ -16,6 +18,7 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
 	showRibbonIcon: true,
 	autoAdvanceAfterChange: true,
+	defaultApplyDirection: "left-to-right",
 	alignMarkdownByHeadings: false,
 	changeCopySuffix: "_changes_",
 	language: "auto",
@@ -29,6 +32,11 @@ export function isLanguagePreference(value: unknown): value is LanguagePreferenc
 		|| value === "es" || value === "pt-BR" || value === "pt-PT" || value === "nl" || value === "zh-CN";
 }
 
+/** Accepts only the two supported merge directions from persisted settings or controls. */
+export function isDiffDirection(value: unknown): value is DiffDirection {
+	return value === "left-to-right" || value === "right-to-left";
+}
+
 /** Replaces path-invalid suffix characters with safe underscores. */
 export function sanitizeCopySuffix(value: string): string {
 	return (value.length > 0 ? value : DEFAULT_SETTINGS.changeCopySuffix).replace(/[\\/:*?"<>|]/g, "_");
@@ -40,6 +48,7 @@ export function normalizePluginSettings(value: unknown): PluginSettings {
 	return {
 		showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
 		autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
+		defaultApplyDirection: isDiffDirection(storedSettings.defaultApplyDirection) ? storedSettings.defaultApplyDirection : DEFAULT_SETTINGS.defaultApplyDirection,
 		alignMarkdownByHeadings: typeof storedSettings.alignMarkdownByHeadings === "boolean" ? storedSettings.alignMarkdownByHeadings : DEFAULT_SETTINGS.alignMarkdownByHeadings,
 		changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
 		language: isLanguagePreference(storedSettings.language) ? storedSettings.language : DEFAULT_SETTINGS.language,

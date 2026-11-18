@@ -75,7 +75,8 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - inserting, removing, and replacing individual lines
 - block changes between duplicate anchor lines and deterministic large-file fallback behavior
 - row types, line numbers, and inline tokens through the comparison model
-- ignoring changes while the right-hand content stays visible
+- ignoring changes while both files' text and line numbers stay visible, with neutral highlights and one-step undo
+  for rows and blocks in both apply directions
 - alignment with differing line counts
 - preserving line endings and trailing blank lines
 - distinguishing intentional empty lines from visual alignment gaps
@@ -84,6 +85,8 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - selecting the next and previous change, including wraparound and resolved-row handling
 - honoring the configurable automatic advance after accepting or ignoring a change
 - protecting pending changes when entering edit mode or swapping panes
+- block acceptance with changing line counts, target line endings, one-step undo, and explicit saving in both directions
+- default-direction persistence through both declarative and legacy settings controls
 - the registered ribbon callback opening an active text file without a comparison file, or selecting/cancelling
   the first file when no text file is active, including binary-file filtering
 - Obsidian's close-before-choice suggestion lifecycle, followed by constructing the registered diff view,
@@ -94,13 +97,20 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 
 For changes to the view or save logic, check at least these cases:
 
+- original-file preview before comparison selection, including matching neutral styles, wrapping, and copying
 - identical files
 - changed, inserted, and removed lines
 - inline differences within a line
-- `→`, `×`, `Swap`, and `Refresh`
+- green incoming source content and red outgoing target content, including color reversal after changing direction
+- `→`, `←`, `×`, `Swap`, `Refresh`, and reversing direction without moving the files
+- original/comparison identity after swapping, Source/Target badges, and the split-view navigation toolbar
+- swap above direction, the centered target-file edit icon moving between sides, and save/menu in the first row
+- undo and previous/next icons with tooltips and keyboard navigation
+- both default apply directions in settings, retained directions in open/restored reviews, and fixed proposal direction
+- read-only external files as sources for reverse merges, with read-only targets still blocked
 - saving via the button and via `Ctrl/Cmd + S`
 - disabled save button with no open changes
-- edit mode with multi-line selection, deletion, Backspace, and `Enter`
+- edit mode on both target sides with multi-line selection, deletion, Backspace, `Enter`, source read-only, and target-only saves
 - confirmation prompt when closing with unsaved changes
 - creating, reusing, and applying a change copy
 - ribbon visibility and suffix in settings

@@ -29,6 +29,40 @@ class TestFile {
 	get name(): string { return this.path; }
 }
 
+/** Models editor nodes so rendering and serialization run together, without layout or observers. */
+class EditorElement {
+	children: EditorElement[] = [];
+	dataset: Record<string, string> = {};
+	classes = new Set<string>();
+	classList = { contains: (value: string) => this.classes.has(value) };
+	ownerDocument = { defaultView: null };
+	private ownText = "";
+	handlers = new Map<string, () => void>();
+	get textContent(): string { return this.ownText + this.children.map(child => child.textContent).join(""); }
+	set textContent(value: string) { this.ownText = value; this.children = []; }
+	get innerText(): string { return this.textContent; }
+	createEl(_tag: string, options: { cls?: string; text?: string } = {}): EditorElement { return this.createSpan(options); }
+	createDiv(options: { cls?: string; text?: string } = {}): EditorElement { return this.createSpan(options); }
+	createSpan(options: { cls?: string; text?: string } = {}): EditorElement {
+		const child = new EditorElement();
+		child.addClass(...(options.cls?.split(" ") ?? []));
+		child.textContent = options.text ?? "";
+		this.children.push(child);
+		return child;
+	}
+	addClass(...classes: string[]): void { classes.forEach(value => this.classes.add(value)); }
+	empty(): void { this.children = []; this.textContent = ""; }
+	setAttribute(): void {}
+	addEventListener(event: string, callback: () => void): void { this.handlers.set(event, callback); }
+	instanceOf(type: typeof EditorElement): boolean { return this instanceof type; }
+	querySelector(selector: string): EditorElement | null {
+		return this.children.find(child => child.classes.has(selector.slice(1)))
+			?? this.children.map(child => child.querySelector(selector)).find(Boolean) ?? null;
+	}
+}
+
+const renderedIcons = new WeakMap<object, string>();
+const renderedTooltips = new WeakMap<object, string>();
 const bundle = await esbuild.build({ ...PLUGIN_BUNDLE_OPTIONS, entryPoints: ["src/diff-view.ts"], write: false, logLevel: "silent" });
 const output = bundle.outputFiles?.[0];
 assert.ok(output);
@@ -40,11 +74,16 @@ runInNewContext(output.text, {
 	console,
 	URL,
 	Buffer,
+	HTMLElement: EditorElement,
 	require: (name: string) => {
 		if (name === "electron") return {};
 		if (name.startsWith("node:")) return createRequire(import.meta.url)(name);
 		assert.equal(name, "obsidian");
-		return { ItemView: class { async setState() {} }, Notice: class {}, Modal: class {}, SuggestModal: class {}, TFile: TestFile, FileSystemAdapter: class {} };
+		return {
+			ItemView: class { async setState() {} }, Notice: class {}, Modal: class {}, SuggestModal: class {}, TFile: TestFile, FileSystemAdapter: class {},
+			setIcon: (element: object, icon: string) => { renderedIcons.set(element, icon); },
+			setTooltip: (element: object, tooltip: string) => { renderedTooltips.set(element, tooltip); }
+		};
 	}
 });
 
@@ -60,7 +99,8 @@ function createView(left: string[], right: string[], enabled = true, leftExtensi
 		createEl: () => element,
 		createSpan: () => element,
 		addEventListener: () => {},
-		setAttribute: () => {}
+		setAttribute: () => {},
+		addClass: () => {}
 	};
 	const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
 	Object.assign(view, {
@@ -69,7 +109,7 @@ function createView(left: string[], right: string[], enabled = true, leftExtensi
 		renderToken: 0,
 		externalMarkdown: null,
 		retainedExternalMarkdown: null,
-		plugin: { settings, translate: (key: string) => key },
+		plugin: { settings, translate: (key: string) => key, rememberRecentRightFile: () => Promise.resolve() },
 		viewState: { leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" },
 		contentEl: element,
 		app: { vault: {
@@ -90,7 +130,7 @@ function createView(left: string[], right: string[], enabled = true, leftExtensi
 		renderDiff: () => Promise.resolve()
 	});
 	view.buildLayout(leftFile as unknown as TFile, rightFile as unknown as TFile, left, right);
-	return { view, rendered, session, settings, rightFile };
+	return { view, rendered, session, settings, leftFile, rightFile };
 }
 
 test("the view enables heading alignment only for two Markdown files with the setting enabled", () => {
@@ -102,6 +142,23 @@ test("the view enables heading alignment only for two Markdown files with the se
 		const { rendered } = createView(left, right, enabled, leftExtension, rightExtension);
 		const active = enabled && leftExtension.toLowerCase() === "md" && rightExtension.toLowerCase() === "md";
 		assert.deepEqual(JSON.parse(JSON.stringify(rendered)), createComparisonModelFromLines(left, right, { alignMarkdownByHeadings: active }).rows);
+	}
+});
+
+test("the original preview before comparison selection uses neutral comparison cells and preserves literal lines", () => {
+	const lines = ["# Original", "", "  spaced\ttext  ", "long wrapped line ".repeat(20)];
+	const { view } = createView(lines, []);
+	const pane = new EditorElement();
+	view.buildSingleFilePane(pane as unknown as HTMLElement, lines);
+	assert.equal(pane.children.length, lines.length);
+	for (const [index, cell] of pane.children.entries()) {
+		assert.ok(cell.classes.has("file-diff-sbs-cell"), "the preview must share comparison cell typography, background and borders");
+		assert.equal(cell.dataset.diffOperation, "none", "there is no change to highlight before selecting a comparison");
+		assert.equal(cell.querySelector(".file-diff-sbs-line-number")?.textContent, String(index + 1));
+		const code = cell.querySelector(".file-diff-sbs-code");
+		assert.equal(code?.innerText, lines[index]);
+		assert.equal(code?.dataset.diffSide, "left");
+		assert.equal(code?.dataset.diffPresent, "true", "empty lines in the original are actual content");
 	}
 });
 
@@ -430,5 +487,338 @@ test("dropping another external file after a manual swap preserves the external 
 		assert.deepEqual({ ...view.getState() }, { leftPath: null, rightPath: null, editRight: false, mode: "compare" });
 	} finally {
 		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("reverse merging stages insertions, replacements and removals only in the left target", async () => {
+	for (const [left, right] of [
+		[["A", "old", "Z"], ["A", "new", "Z"]],
+		[["A", "Z"], ["A", "inserted", "Z"]],
+		[["A", "removed", "Z"], ["A", "Z"]]
+	]) {
+		assert.ok(left && right);
+		const { view, session, rendered, leftFile, rightFile } = createView(left, right);
+		await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
+		const targetBaseline = `${left.join("\r\n")}\r\n`;
+		Object.assign(view, { readComparisonFile: (file: TestFile) => Promise.resolve(file === leftFile ? targetBaseline : right.join("\n")) });
+		const index = rendered.findIndex(row => !row.equal);
+		await view.applyRowChange(index, view.applyDirection);
+		assert.equal(session.getDisplayedContent(leftFile.path, ""), `${right.join("\r\n")}\r\n`);
+		assert.equal(session.getSaveBaseline(leftFile.path), targetBaseline);
+		assert.equal(session.getPendingChanges().some(change => change.path === rightFile.path), false);
+		assert.equal(session.undo(), true);
+		assert.equal(session.hasPendingChanges(), false);
+	}
+});
+
+test("reverse block acceptance skips ignored rows and remains one undo step", async () => {
+	const { view, session, rendered, leftFile, rightFile } = createView(["old-a", "old-b", "old-c", "old-d"], ["new-a", "new-b", "new-c", "new-d"]);
+	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
+	const { getDiffRowKey } = await import("../src/diff-core.ts");
+	session.dismissRow(getDiffRowKey(rendered[1]!));
+	await view.applyGroupChange(0, 3, view.applyDirection);
+	assert.equal(session.getDisplayedContent(leftFile.path, ""), "new-a\nold-b\nnew-c\nnew-d");
+	assert.equal(session.getPendingChanges().some(change => change.path === rightFile.path), false);
+	assert.equal(session.undo(), true);
+	assert.equal(session.hasPendingChanges(), false);
+	assert.equal(session.hasDismissedRow(getDiffRowKey(rendered[1]!)), true);
+});
+
+test("ignoring rows or blocks preserves both rendered files, clears highlights and actions, and undoes in both directions", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		for (const grouped of [false, true]) {
+			for (const [left, right] of [
+				[["A", "old text", "Z"], ["A", "new text", "Z"]],
+				[["A", "left-only", "", "  ", "Z"], ["A", "Z"]],
+				[["A", "Z"], ["A", "right-only", "", "  ", "Z"]]
+			]) {
+				assert.ok(left && right);
+				const { view, session, rendered } = createView(left, right);
+				await view.setState({ ...view.state, direction }, { history: false });
+				const root = new EditorElement();
+				Object.assign(view, {
+					changeActions: new Map(),
+					renderDiffRow: module.exports.SideBySideDiffView.prototype.renderDiffRow,
+					renderDiff: () => {
+						root.children = [];
+						rendered.forEach((row, index) => view.renderDiffRow(root as unknown as HTMLElement, row, index));
+						return Promise.resolve();
+					}
+				});
+				await view.renderDiff();
+				const changedIndex = rendered.findIndex(row => !row.equal);
+				assert.ok(changedIndex >= 0);
+				const ignoredIndexes = grouped ? rendered.flatMap((row, index) => row.equal ? [] : [index]) : [changedIndex];
+				if (grouped) await view.dismissGroup(rendered, changedIndex);
+				else await view.dismissRow(rendered[changedIndex]!, changedIndex);
+				assert.equal(root.children.length, rendered.length, "ignoring must not remove source-only rows");
+				for (const [index, rowElement] of root.children.entries()) {
+					const model = rendered[index]!;
+					const cells = [rowElement.children[0]!, rowElement.children[2]!];
+					for (const [side, cell] of cells.entries()) {
+						const value = side === 0 ? model.left : model.right;
+						const code = cell.querySelector(".file-diff-sbs-code");
+						assert.equal(code?.innerText, value ?? " ", `${direction}: ignored content must still match its file`);
+						assert.equal(code?.dataset.diffPresent, String(value !== null));
+						assert.equal(cell.querySelector(".file-diff-sbs-line-number")?.textContent, String((side === 0 ? model.leftLineNumber : model.rightLineNumber) ?? ""));
+						if (ignoredIndexes.includes(index)) {
+							assert.equal(cell.dataset.diffOperation, "none");
+							assert.equal(code?.querySelector(".file-diff-sbs-inline-left"), null);
+							assert.equal(code?.querySelector(".file-diff-sbs-inline-right"), null);
+						}
+					}
+					if (ignoredIndexes.includes(index)) {
+						assert.equal(rowElement.dataset.diffChange, undefined);
+						assert.equal(rowElement.children[1]?.children.length, 0);
+					}
+				}
+				assert.equal(session.hasPendingChanges(), false, "ignoring must not stage edits to either file");
+				await view.undoLastChange();
+				assert.equal(root.children[changedIndex]?.dataset.diffChange, "true");
+				assert.equal(root.children[changedIndex]?.children[1]?.children.length, 2);
+				assert.equal(session.canUndo(), false, "ignoring a block must be one undo step");
+			}
+		}
+	}
+});
+
+test("direction reversal preserves file identities, protects pending changes and reopens ignored decisions", async () => {
+	const { view, session } = createView(["old"], ["new"]);
+	session.dismissRow("previous decision");
+	await view.reverseApplyDirection();
+	assert.equal(view.applyDirection, "right-to-left");
+	assert.equal(view.state.leftPath, "left.md");
+	assert.equal(view.state.rightPath, "right.md");
+	assert.equal(view.getPaneLabels().left, "view.labels.original");
+	assert.equal(session.getDismissedRowCount(), 0);
+	assert.equal(session.canUndo(), false);
+	session.stageChange("left.md", "new", "old");
+	await view.reverseApplyDirection();
+	assert.equal(view.applyDirection, "right-to-left");
+	assert.equal(session.getDisplayedContent("left.md", ""), "new");
+	assert.equal(session.canUndo(), true);
+	session.undo();
+	await view.reverseApplyDirection();
+	assert.equal(view.applyDirection, "left-to-right");
+});
+
+test("proposal workflows cannot reverse merging and direct editing follows the selected target", async () => {
+	for (const mode of ["accept", "proposal"]) {
+		const { view, session } = createView(["old"], ["new"]);
+		await view.setState({ ...view.state, mode, direction: "right-to-left" }, { history: false });
+		await view.reverseApplyDirection();
+		assert.equal(view.applyDirection, "left-to-right");
+		await view.applyRowChange(0, "right-to-left");
+		await view.applyGroupChange(0, 0, "right-to-left");
+		assert.equal(session.hasPendingChanges(), false);
+	}
+	const { view } = createView(["old"], ["new"]);
+	await view.setState({ ...view.state, direction: "right-to-left", editRight: true }, { history: false });
+	await view.reverseApplyDirection();
+	assert.equal(view.applyDirection, "right-to-left");
+	assert.equal(view.state.editRight, true);
+	assert.equal(view.targetPath, "left.md");
+});
+
+test("row buttons and keyboard acceptance use the displayed direction and target", async () => {
+	const { view, rendered } = createView(["old"], ["new"]);
+	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
+	const buttons: { text: string; title?: string; disabled?: boolean; click: (() => void) | undefined; setAttribute: () => void; addEventListener: (name: string, handler: () => void) => void }[] = [];
+	const cell = { createEl: (_tag: string, options: { text: string }) => {
+		const button = { text: options.text, setAttribute: () => {}, addEventListener: (_name: string, handler: () => void) => { button.click = handler; }, click: undefined as (() => void) | undefined };
+		buttons.push(button);
+		return button;
+	} };
+	const directions: string[] = [];
+	Object.assign(view, {
+		changeActions: new Map(),
+		applyRowChange: (_index: number, direction: string) => { directions.push(direction); return Promise.resolve(); },
+		contentEl: { querySelector: () => ({ dataset: { diffRowIndex: "0" } }) }
+	});
+	view.buildActionCell({ createDiv: () => cell } as unknown as HTMLElement, rendered[0]!, 0);
+	assert.equal(buttons[0]!.text, "←");
+	assert.equal(buttons[0]!.disabled, false);
+	buttons[0]!.click!();
+	assert.equal(view.handleActiveChangeAction("accept"), true);
+	assert.deepEqual(directions, ["right-to-left", "right-to-left"]);
+});
+
+test("comparison highlights distinguish incoming source content from content removed from the target", async () => {
+	/** Captures the real renderer's cell metadata without substituting its color decisions. */
+	function element() {
+		return {
+			dataset: {} as Record<string, string>,
+			textContent: "",
+			createSpan: element,
+			addClass: () => {}
+		};
+	}
+	for (const [left, right] of [
+		[["same"], ["same"]],
+		[["keep", "incoming"], ["keep"]],
+		[["keep"], ["keep", "outgoing"]],
+		[["keep", "old words"], ["keep", "new words"]],
+		[[""], []],
+		[[], [""]]
+	]) {
+		assert.ok(left && right);
+		const { view, rendered } = createView(left, right);
+		for (const direction of ["left-to-right", "right-to-left"] as const) {
+			assert.equal(view.applyDirection, direction);
+			for (const row of rendered) {
+				for (const side of ["left", "right"] as const) {
+					const cell = element();
+					const value = row[side];
+					view.buildCell({ createDiv: () => cell } as unknown as HTMLElement, value, row[side === "left" ? "right" : "left"], row[side === "left" ? "leftLineNumber" : "rightLineNumber"], side, row.type, row[side === "left" ? "leftInlineTokens" : "rightInlineTokens"]);
+					const sourceSide = direction === "left-to-right" ? "left" : "right";
+					const expected = row.equal || value === null ? "none" : side === sourceSide ? "insert" : "delete";
+					assert.equal(cell.dataset.diffOperation, expected, `${direction}: ${side} ${String(value)}`);
+				}
+			}
+			await view.reverseApplyDirection();
+		}
+	}
+});
+
+test("compact header keeps save/menu on top, swap above direction, and edit exclusively beside the target", async () => {
+	/** Records control ancestry and dispatches the real view's registered click handlers. */
+	class LayoutElement {
+		children: LayoutElement[] = [];
+		classes = new Set<string>();
+		attributes = new Map<string, string>();
+		handlers = new Map<string, () => void>();
+		disabled = false;
+		text = "";
+		constructor(options: { cls?: string; text?: string } = {}) {
+			this.addClass(...(options.cls?.split(" ") ?? []));
+			this.text = options.text ?? "";
+		}
+		/** Adds a child while retaining the control's layout parent. */
+		createDiv(options: { cls?: string; text?: string } = {}): LayoutElement { return this.createEl("div", options); }
+		/** Creates the same lightweight node for spans and controls. */
+		createEl(_tag: string, options: { cls?: string; text?: string } = {}): LayoutElement {
+			const child = new LayoutElement(options);
+			this.children.push(child);
+			return child;
+		}
+		/** Captures labels generated inside a toolbar. */
+		createSpan(options: { cls?: string; text?: string } = {}): LayoutElement { return this.createEl("span", options); }
+		/** Supports Obsidian's class helper without a browser DOM. */
+		addClass(...classes: string[]): void { classes.forEach(value => this.classes.add(value)); }
+		/** Retains accessible control names for the assertions. */
+		setAttribute(key: string, value: string): void { this.attributes.set(key, value); }
+		/** Stores the real control callback for invocation below. */
+		addEventListener(event: string, callback: () => void): void { this.handlers.set(event, callback); }
+		/** Finds a control or toolbar by its stable layout class. */
+		find(cls: string): LayoutElement | undefined { return this.classes.has(cls) ? this : this.children.map(child => child.find(cls)).find(Boolean); }
+	}
+	const { view, leftFile, rightFile } = createView(["old"], ["new"]);
+	const root = new LayoutElement();
+	const clicked: string[] = [];
+	Object.assign(view, {
+		contentEl: root,
+		swapFiles: () => { clicked.push("swap"); return Promise.resolve(); },
+		reverseApplyDirection: () => { clicked.push("reverse"); return Promise.resolve(); },
+		enableRightEditMode: () => { clicked.push("edit"); return Promise.resolve(); },
+		savePendingChanges: () => { clicked.push("save"); return Promise.resolve(true); }
+	});
+	view.buildLayout(leftFile as unknown as TFile, rightFile as unknown as TFile, ["old"], ["new"]);
+	assert.equal(root.find("file-diff-sbs-action-toolbar"), undefined);
+	const top = root.find("file-diff-sbs-toolbar-actions");
+	assert.ok(top);
+	assert.equal(top.children.length, 2);
+	assert.ok(top.children[0]?.classes.has("file-diff-sbs-save-action"));
+	assert.equal(top.children[1]?.attributes.get("aria-label"), "actions.fileMenu");
+	const center = root.find("file-diff-sbs-direction");
+	assert.ok(center);
+	assert.equal(center.children[0]?.attributes.get("aria-label"), "actions.swap");
+	assert.equal(center.children[1]?.attributes.get("aria-label"), "actions.reverseDirection");
+	assert.equal(renderedIcons.get(center.children[0]!), "arrow-left-right");
+	assert.equal(renderedTooltips.get(center.children[0]!), "actions.swapTitle");
+	assert.equal(renderedIcons.get(center.children[1]!), "arrow-right");
+	assert.equal(renderedTooltips.get(center.children[1]!), "actions.reverseDirection");
+	const right = root.find("file-diff-sbs-right-file");
+	assert.ok(right);
+	assert.equal(right.find("file-diff-sbs-file-edit-button")?.attributes.get("aria-label"), "actions.edit");
+	center.children[0]?.handlers.get("click")?.();
+	center.children[1]?.handlers.get("click")?.();
+	right.find("file-diff-sbs-file-edit-button")?.handlers.get("click")?.();
+	top.children[0]?.handlers.get("click")?.();
+	assert.deepEqual(clicked, ["swap", "reverse", "edit", "save"]);
+	root.children = [];
+	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
+	view.buildLayout(leftFile as unknown as TFile, rightFile as unknown as TFile, ["old"], ["new"]);
+	assert.ok(root.find("file-diff-sbs-left-file")?.find("file-diff-sbs-file-edit-button"));
+	assert.equal(root.find("file-diff-sbs-right-file")?.find("file-diff-sbs-file-edit-button"), undefined);
+	assert.equal(root.find("file-diff-sbs-hint"), undefined);
+	assert.equal(renderedIcons.get(root.find("file-diff-sbs-direction")!.children[1]!), "arrow-left");
+	const review = root.find("file-diff-sbs-review-toolbar");
+	assert.ok(review?.children[0]?.children[0]);
+	assert.equal(review.children[0].children[0].attributes.get("aria-label"), "actions.undo");
+	assert.equal(review.children[0].children[0].text, "");
+	assert.equal(renderedIcons.get(review.children[0].children[0]), "undo-2");
+	assert.equal(renderedTooltips.get(review.children[0].children[0]), "actions.undoTitle");
+	const navigation = root.find("file-diff-sbs-navigation");
+	assert.deepEqual(navigation?.children.map(button => button.attributes.get("aria-label")), ["actions.previousChange", "actions.nextChange"]);
+	assert.ok(navigation?.children.every(button => button.text === ""));
+	assert.deepEqual(navigation?.children.map(button => renderedIcons.get(button)), ["arrow-up", "arrow-down"]);
+	assert.deepEqual(navigation?.children.map(button => renderedTooltips.get(button)), ["actions.previousChangeTitle", "actions.nextChangeTitle"]);
+
+});
+
+test("new vault selections and external drops use the default without changing an open review", async () => {
+	const { view, settings, leftFile, rightFile } = createView(["old"], ["new"]);
+	settings.defaultApplyDirection = "right-to-left";
+	await view.setState({ leftPath: leftFile.path, rightPath: rightFile.path, mode: "compare", editRight: false }, { history: false });
+	assert.equal(view.applyDirection, "right-to-left");
+	settings.defaultApplyDirection = "left-to-right";
+	assert.equal(view.applyDirection, "right-to-left");
+	await view.setState({ ...view.state, editRight: true }, { history: false });
+	assert.equal(view.applyDirection, "right-to-left");
+	await view.applyRightFile(leftFile as unknown as TFile, rightFile as unknown as TFile);
+	assert.equal(view.applyDirection, "left-to-right");
+	settings.defaultApplyDirection = "right-to-left";
+	await view.dropMarkdown([droppedMarkdown("snapshot.md", "source")]);
+	assert.equal(view.applyDirection, "right-to-left");
+	assert.equal(view.canApplyChange(), true);
+});
+
+test("the editor normalizes its rows around the target while preserving physical file positions", async () => {
+	/** Supplies only the DOM operations needed before observer initialization. */
+	class EditElement {
+		children: EditElement[] = [];
+		classes = new Set<string>();
+		ownerDocument = { defaultView: null };
+		createDiv(options: { cls: string }): EditElement {
+			const node = new EditElement();
+			node.addClass(...options.cls.split(" "));
+			this.children.push(node);
+			return node;
+		}
+		addClass(...classes: string[]): void { classes.forEach(value => this.classes.add(value)); }
+		setAttribute(): void {}
+	}
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		const { view, rendered } = createView(["A", "left-only", "Z"], ["A", "Z", "right-only"]);
+		await view.setState({ ...view.state, direction, editRight: true }, { history: false });
+		const sourceRows: ComparisonRowModel[] = [];
+		const targetRows: ComparisonRowModel[] = [];
+		Object.assign(view, {
+			buildEditableLeftCell: (_parent: unknown, row: ComparisonRowModel) => { sourceRows.push(row); },
+			buildEditableRightLine: (_parent: unknown, row: ComparisonRowModel) => { targetRows.push(row); },
+			synchronizeEditablePanes: () => {}
+		});
+		const grid = new EditElement();
+		view.buildEditableModeLayout(grid as unknown as HTMLElement, rendered);
+		const targetIndex = direction === "left-to-right" ? 1 : 0;
+		assert.ok(grid.children[targetIndex]?.classes.has("file-diff-sbs-edit-target-pane"));
+		assert.ok(grid.children[1-targetIndex]?.classes.has("file-diff-sbs-edit-reference-pane"));
+		const sourceSide = direction === "left-to-right" ? "left" : "right";
+		const targetSide = sourceSide === "left" ? "right" : "left";
+		assert.deepEqual(sourceRows.map(row => row.left), rendered.map(row => row[sourceSide]));
+		assert.deepEqual(targetRows.map(row => row.right), rendered.map(row => row[targetSide]));
+		assert.deepEqual(targetRows.map(row => row.rightLineNumber), rendered.map(row => row[targetSide === "left" ? "leftLineNumber" : "rightLineNumber"]));
+		assert.equal(view.state.leftPath, "left.md");
+		assert.equal(view.state.rightPath, "right.md");
 	}
 });

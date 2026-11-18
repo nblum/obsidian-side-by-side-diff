@@ -10,7 +10,7 @@ and choose which changes to keep. Use it to review a revised draft, compare vers
 
 - **See the differences:** synchronized panes, a line-by-line diff, and inline highlighting within changed lines.
 - **Choose what to keep:** accept or ignore individual changes or whole blocks.
-- **Edit and save deliberately:** edit the right-hand file directly; changes are written only when you save.
+- **Edit and save deliberately:** edit the target file directly; changes are written only when you save.
 - **Review a separate draft:** create a proposal copy and later merge selected changes back into the original.
 - **Compare external Markdown:** drop a `.md` file from your computer without importing it into your vault.
 
@@ -23,11 +23,12 @@ Works locally, without an account or network requests. Requires **Obsidian 1.6.6
 1. [Add to Obsidian](obsidian://show-plugin?id=side-by-side-diff), or search for `Side-by-Side Diff`
    under **Settings → Community plugins → Browse**. Install and enable the plugin.
 2. Select two text files in Obsidian's file explorer, right-click, and choose `Compare files`.
-3. Review the highlighted differences. Use `→` to stage a change from the **left file into the right file**,
-   or `×` to ignore it and keep the right-hand content for that change.
+3. Review the highlighted differences. The arrow stages a change from **Source** into **Target** (left to right
+   by default). Use `×` to ignore it; both files and their displayed text remain unchanged while the highlight clears.
 4. Click `Save changes` or press `Ctrl/Cmd+S` to write your staged changes.
 
-Use `Swap` before reviewing if you want to reverse the direction. Accepting a change does not save it immediately.
+Use the arrow icon between the file headers to reverse the apply direction without moving the files.
+Accepting a change does not save it immediately.
 
 ![Comparing two files selected in the file explorer](assets/comparsion-record1.webp)
 
@@ -61,9 +62,16 @@ command palette. The introduction also opens once after an update if you have no
 
 ### Compare
 
-The left and right files are displayed in sync. Line changes and differences within a line are highlighted. Use
-`Swap` to switch the files and their direction. If changes are pending, the plugin asks whether to save or discard
-them first.
+The left and right files are displayed in sync. The file headers identify the **Original** and **Comparison**,
+their paths, and the current **Source** and **Target**. `Undo` and change navigation sit directly above the content.
+The arrow icon between the headers reverses the apply direction while preserving file positions. Green marks source
+content to be added; red marks target content to be removed or replaced. The colors follow the selected direction.
+The `Swap` icon sits above the direction arrow. The pencil icon beside the target file opens edit mode and moves
+with the target when direction changes; saving and
+the file-actions menu stay in the first toolbar row.
+Save or undo pending changes before reversing; ignored decisions are reopened for the new direction.
+The direction is restored with a saved vault comparison. `Swap` exchanges the files' positions; their Original and
+Comparison labels follow the files. If changes are pending, it asks whether to save or discard them first.
 
 Select text in either file and press `Ctrl/Cmd+C` to copy it in comparison mode. Selection stays in the pane where
 you start dragging and copies only that file's text, excluding line numbers, review controls, and visual alignment gaps.
@@ -87,7 +95,8 @@ trash; canceling keeps the copy available.
 
 ## Edit and save
 
-In normal diff mode, use `Edit mode` to make the right-hand side editable. The left-hand file remains read-only. If
+In normal diff mode, use the target's pencil icon to enter `Edit mode`. Only the target can be edited: right for
+left-to-right merging, left for right-to-left merging. The source stays read-only. If
 comparison changes are pending, the plugin asks whether to save or discard them before entering edit mode. Multi-line
 selection, deletion, Backspace, and `Enter` for new lines are supported.
 
@@ -101,13 +110,15 @@ Open a comparison with a vault note, then drag one `.md` file from your computer
 The dropped file opens on the **right**, replacing the previous right-hand file; the left-hand note stays in place.
 You can also drop a vault file onto the **Drop files** card below **Select right file** to select it on the right.
 
-Review and accept changes as usual, or use `Edit mode` to edit the external file directly.
-**Saving writes to the external file on your computer**, without importing it into the vault.
+Review and accept changes as usual. When the external file is the target, its pencil icon opens direct editing.
+**Saving writes to the selected target**: an external target is saved on your computer without importing it into
+the vault; reversing the direction makes the vault file the editable target.
 Existing line endings are preserved. If the file has changed or been deleted, saving is canceled so you can
 review its current contents. If it changes before you accept a suggestion, the comparison refreshes for another review.
 
 Drop the file again after reopening the view; external file contents and paths are not stored between sessions.
-If writable browser file handles are unavailable, you can compare a read-only snapshot but cannot edit or save it.
+If writable browser file handles are unavailable, you can compare a read-only snapshot and reverse the apply direction
+to merge it into the vault file. The snapshot itself cannot be edited or saved.
 External saving depends on the Obsidian installer’s browser runtime; updating only Obsidian’s app version may not
 update that runtime. Reinstalling with a recent installer can enable support.
 Matching vault paths and external browser handles are rejected as the same file. Aliases through symlinks or
@@ -124,13 +135,15 @@ The following shortcuts are available while a comparison view has focus:
 | --- | --- |
 | `Alt+ArrowDown` | Go to the next change |
 | `Alt+ArrowUp` | Go to the previous change |
-| `Alt+ArrowRight` | Accept the highlighted change |
+| `Alt+ArrowRight` | Accept the highlighted change in the selected apply direction |
 | `Alt+ArrowLeft` | Ignore the highlighted change |
 | `Ctrl/Cmd+Z` | Undo the most recent accept or ignore action, until saving |
 | `Ctrl/Cmd+S` | Save staged changes |
 
 ## Settings and language
 
+- **Default apply direction:** choose **Left → right** or **Right → left** for new comparisons. Open or restored
+  comparisons keep their own direction. Proposal acceptance stays directed into the original file.
 - **Markdown sections:** enable **Align Markdown by headings** to keep matching sections aligned when reviewing
   two `.md` files. This is off by default.
 - **Review navigation:** after accepting or ignoring a change, the view moves to the next open change automatically.

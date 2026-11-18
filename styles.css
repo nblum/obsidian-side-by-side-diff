@@ -1,5 +1,6 @@
 .file-diff-sbs-view {
 	height: 100%;
+	container-type: inline-size;
 }
 
 .file-diff-sbs-root {
@@ -24,13 +25,34 @@
 	background: var(--background-secondary);
 }
 
-.file-diff-sbs-action-toolbar {
+.file-diff-sbs-review-toolbar {
 	display: flex;
 	align-items: center;
 	min-width: 0;
 	padding: 0.45rem 0.8rem;
 	border-bottom: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
+}
+
+.file-diff-sbs-comparison-toolbar {
+	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.file-diff-sbs-toolbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.file-diff-sbs-review-toolbar {
+	background: var(--background-primary);
+}
+
+.file-diff-sbs-hint {
+	padding: 0.45rem 0.8rem;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: var(--font-small);
 }
 
 .file-diff-sbs-title {
@@ -66,11 +88,14 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.4rem;
+	width: 100%;
 }
 
 .file-diff-sbs-navigation {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 0.4rem;
+	margin-left: auto;
 }
 
 .file-diff-sbs-save-action {
@@ -87,20 +112,105 @@
 .file-diff-sbs-file-header {
 	display: flex;
 	min-width: 0;
-	align-items: baseline;
-	gap: 0.55rem;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.file-diff-sbs-header-file {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.file-diff-sbs-header-file > .file-diff-sbs-file-header {
+	flex: 1;
+}
+
+.file-diff-sbs-file-edit-button {
+	flex-shrink: 0;
 }
 
 .file-diff-sbs-side-label {
-	color: var(--text-muted);
-	font-size: var(--font-smallest);
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
 	font-weight: 600;
 }
 
+.file-diff-sbs-file-labels {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.file-diff-sbs-role {
+	padding: 0.1rem 0.4rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	color: var(--text-muted);
+	font-size: var(--font-smallest);
+}
+
+.file-diff-sbs-role-target,
+.file-diff-sbs-role-edit {
+	border-color: var(--interactive-accent);
+	color: var(--text-accent);
+}
+
+.file-diff-sbs-file-name {
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+
 .file-diff-sbs-file-path {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	color: var(--text-muted);
+	font-size: var(--font-smallest);
+	overflow-wrap: anywhere;
+}
+
+.file-diff-sbs-comparison-header {
+	grid-template-columns: minmax(0, 1fr) 2.8rem minmax(0, 1fr);
+	align-items: start;
+}
+
+.file-diff-sbs-direction {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	align-self: center;
+}
+
+.file-diff-sbs-direction-button,
+.file-diff-sbs-swap-button {
+	padding: 0.4rem;
+}
+
+@container (max-width: 600px) {
+	.file-diff-sbs-toolbar {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.file-diff-sbs-comparison-toolbar {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.file-diff-sbs-comparison-toolbar > .file-diff-sbs-summary {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
+
+	.file-diff-sbs-toolbar-actions {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	.file-diff-sbs-comparison-header {
+		gap: 0.3rem;
+		grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+	}
 }
 
 .file-diff-sbs-identical-message {
@@ -229,14 +339,10 @@
 }
 
 .file-diff-sbs-single-pane {
+	min-width: 0;
+	background: var(--background-secondary);
 	font-family: var(--font-monospace);
 	font-size: var(--font-smaller);
-}
-
-.file-diff-sbs-single-row {
-	display: flex;
-	min-height: 1.55em;
-	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .file-diff-sbs-picker-pane {
@@ -412,12 +518,15 @@
 	min-width: 0;
 }
 
-.file-diff-sbs-edit-pane:not(.file-diff-sbs-edit-right-pane) {
+.file-diff-sbs-edit-reference-pane {
 	background: var(--background-secondary);
 }
 
-.file-diff-sbs-edit-right-pane {
+.file-diff-sbs-edit-pane + .file-diff-sbs-edit-pane {
 	border-left: 1px solid var(--background-modifier-border);
+}
+
+.file-diff-sbs-edit-target-pane {
 	background: var(--background-primary);
 }
 
@@ -482,17 +591,31 @@
 	background: color-mix(in srgb, var(--color-yellow), transparent 88%);
 }
 
+.file-diff-sbs-cell[data-diff-operation="none"] {
+	background: var(--background-secondary);
+}
+
+.file-diff-sbs-cell[data-diff-operation="insert"] {
+	--file-diff-sbs-inline-color: var(--color-green);
+	background: color-mix(in srgb, var(--color-green), transparent 84%);
+}
+
+.file-diff-sbs-cell[data-diff-operation="delete"] {
+	--file-diff-sbs-inline-color: var(--color-red);
+	background: color-mix(in srgb, var(--color-red), transparent 84%);
+}
+
 .file-diff-sbs-inline-left,
 .file-diff-sbs-inline-right {
 	border-radius: 0.2rem;
 }
 
 .file-diff-sbs-inline-left {
-	background: color-mix(in srgb, var(--color-red), transparent 65%);
+	background: color-mix(in srgb, var(--file-diff-sbs-inline-color, var(--color-red)), transparent 65%);
 }
 
 .file-diff-sbs-inline-right {
-	background: color-mix(in srgb, var(--color-green), transparent 65%);
+	background: color-mix(in srgb, var(--file-diff-sbs-inline-color, var(--color-green)), transparent 65%);
 }
 
 .file-diff-sbs-message {

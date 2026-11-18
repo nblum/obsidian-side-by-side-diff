@@ -12,14 +12,18 @@ test("parses only supported persisted comparison state", () => {
 		leftPath: "left.md",
 		rightPath: null,
 		editRight: true,
-		mode: "accept"
+		mode: "accept",
+		direction: "left-to-right",
+		originalSide: "left"
 	});
 
 	assert.deepEqual(parseDiffViewState({ mode: "unknown", editRight: "true" }), {
 		leftPath: null,
 		rightPath: null,
 		editRight: false,
-		mode: "compare"
+		mode: "compare",
+		direction: "left-to-right",
+		originalSide: "left"
 	});
 });
 
@@ -28,7 +32,9 @@ test("swaps paths and proposal direction while leaving edit mode disabled", () =
 		leftPath: "right.md",
 		rightPath: "left.md",
 		editRight: false,
-		mode: "accept"
+		mode: "accept",
+		direction: "left-to-right",
+		originalSide: "right"
 	});
 });
 
@@ -37,7 +43,9 @@ test("keeps regular comparisons regular when swapping panes", () => {
 		leftPath: "right.md",
 		rightPath: "left.md",
 		editRight: false,
-		mode: "compare"
+		mode: "compare",
+		direction: "left-to-right",
+		originalSide: "right"
 	});
 });
 
@@ -46,6 +54,36 @@ test("restores a safe empty state for malformed workspace data", () => {
 		leftPath: null,
 		rightPath: null,
 		editRight: false,
-		mode: "compare"
+		mode: "compare",
+		direction: "left-to-right",
+		originalSide: "left"
 	});
+});
+
+test("restores direction and original identity independently of file positions", () => {
+	const state = parseDiffViewState({ leftPath: "draft.md", rightPath: "original.md", direction: "right-to-left", originalSide: "right" });
+	assert.equal(state.direction, "right-to-left");
+	assert.equal(state.originalSide, "right");
+	const swapped = swapDiffViewState(state);
+	assert.equal(swapped.direction, "right-to-left");
+	assert.equal(swapped.originalSide, "left");
+	assert.equal(swapped.leftPath, "original.md");
+});
+
+test("proposal workflows and invalid workspace directions retain safe defaults", () => {
+	for (const mode of ["proposal", "accept"]) {
+		assert.equal(parseDiffViewState({ mode, direction: "right-to-left" }).direction, "left-to-right");
+	}
+	assert.equal(parseDiffViewState({ direction: "invalid", originalSide: 12 }).direction, "left-to-right");
+	assert.equal(parseDiffViewState({ originalSide: 12 }).originalSide, "left");
+});
+
+test("a default direction initializes new comparisons without overriding saved review directions", () => {
+	assert.equal(parseDiffViewState({}, "right-to-left").direction, "right-to-left");
+	assert.equal(parseDiffViewState({ direction: "invalid" }, "right-to-left").direction, "right-to-left");
+	assert.equal(parseDiffViewState({ direction: "left-to-right" }, "right-to-left").direction, "left-to-right");
+	assert.equal(parseDiffViewState({ direction: "right-to-left" }, "left-to-right").direction, "right-to-left");
+	for (const mode of ["proposal", "accept"]) {
+		assert.equal(parseDiffViewState({ mode }, "right-to-left").direction, "left-to-right");
+	}
 });

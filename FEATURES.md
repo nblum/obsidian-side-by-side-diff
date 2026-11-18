@@ -13,23 +13,42 @@ visible, can be reviewed and staged individually, and are written only through a
 ### Comparison view
 
 - Two different text files are displayed in sync on the left and right.
-- Changes are highlighted line by line and inline within changed lines.
+- Changes are highlighted line by line and inline within changed lines. In comparison mode, green marks source
+  content to be inserted, and red marks target content to be removed or replaced. Both line and inline colors follow
+  the apply direction; alignment gaps and ignored changes stay neutral. Direct editing uses reference-versus-edited-content colors.
 - File text can be selected and copied directly in comparison mode. Selection stays in the pane where dragging
   starts and copies only that file's text, preserving real blank lines and excluding line numbers, review controls,
   the other file, and visual alignment gaps.
 - When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
   the following lines stay in sync.
-- The toolbar sits above the comparison and contains the editing actions.
+- The first toolbar row contains the comparison title, change count, save action, and a file-actions menu with
+  `Refresh`; there is no separate action row.
+- `Swap` is an icon with a tooltip above the direction icon between the file headers. The edit-mode icon sits
+  at the right edge of the target's file header, vertically centered, and moves with the target when direction
+  changes. It changes to `Comparison mode` while editing. The source is never editable.
+- `Undo`, `Previous change`, and `Next change` use accessible icon buttons with tooltips and retain their shortcuts.
+- `Undo` and change navigation sit below the file headers, directly above the split content.
 - `Next change` and `Previous change` navigate through changes and scroll the selected row into view.
 - The same navigation is available with `Alt+ArrowDown` and `Alt+ArrowUp`.
 - After accepting or ignoring a change, the view automatically advances to the next open change by default. This can be disabled in the settings.
-- The view shows the file names in the pane headers, along with `Comparison`, `Original`, or `Proposal` depending
-  on context.
+- Pane headers show the file name, vault-relative path, and `Original` / `Comparison` or `Proposal` identity.
+  Original and Comparison labels follow their files when swapping. Separate Source and Target badges identify
+  which file supplies changes and which will be changed. Direct editing identifies the editable target file.
+- Comparison mode omits a separate apply-direction hint row; source/target badges, arrows, and action tooltips
+  provide that context next to the affected files and controls.
+- In ordinary comparisons, the arrow icon between the headers has a `Reverse apply direction` tooltip. It changes
+  merge direction without swapping files. Merge highlights update to match the new source and target. Left to right
+  is the factory default; **Default apply direction** initializes new comparisons. Explicit saved directions take
+  precedence over that setting. Proposal and acceptance workflows retain their fixed direction.
+- Direction reversal is unavailable during direct editing or with pending changes. After saving or undoing pending
+  changes, reversal reopens ignored rows and clears their undo history for a fresh review in the new direction.
 - `Swap` swaps both files and, for proposals, reverses the direction of acceptance. Pending changes are saved or
   discarded only after confirmation.
 - `Refresh` is available in the file context menu and reloads an open comparison view.
 - The scroll position is preserved when staging, ignoring, or saving a change.
 - The right-file selector remembers up to five recently selected files and shows them in a separate recent-files group.
+- Before a comparison file is selected, the original preview uses the comparison view's neutral cell background,
+  line spacing, row borders, and selectable text.
 - Selecting exactly two text files in the file explorer and choosing `Compare files` from the context menu opens the
   comparison view with both files directly.
 
@@ -45,6 +64,8 @@ visible, can be reviewed and staged individually, and are written only through a
 - Single-row and block acceptance, ignore, undo, and heading alignment work with external targets as well.
 - If browser file handles or their write methods are unavailable, the drop remains a read-only snapshot with an
   explanatory message and swapping is disabled. Permission denial or save failures preserve pending changes.
+- A read-only external snapshot can supply changes to a vault target by reversing direction. Merge controls check
+  the actual target's writability; a read-only target remains blocked for both row and block actions.
 - Pending changes require the existing save/discard confirmation before a new dropped snapshot replaces them.
 - Invalid drops and failed native reads preserve the comparison, including pending edits and review decisions
   when a read fails during save/discard confirmation. Newer selections invalidate older pending drops.
@@ -87,9 +108,10 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Accepting and ignoring changes
 
-- `→` accepts a single change into the view only, at first.
-- `×` ignores only the left-hand diff part; the right-hand content stays visible and unchanged.
-- With a highlighted change, `Alt+ArrowRight` accepts it and `Alt+ArrowLeft` ignores it.
+- `→` or `←` stages a single change in the selected direction. Row and block tooltips name the actual target file.
+- `×` resolves a difference without modifying either file. Both sides keep their actual text and line numbers,
+  including source-only lines. The ignored row loses its highlights and review actions in either direction.
+- With a highlighted change, `Alt+ArrowRight` accepts it in the selected direction and `Alt+ArrowLeft` ignores it.
 - `Undo` (toolbar button or `Ctrl/Cmd+Z`) reverts the most recent accept or ignore action, whether it touched a
   single row or a whole block, as long as it has not been written to disk yet.
 - The undo history is cleared once its actions are saved, discarded, or the compared files are changed; undo entries
@@ -103,8 +125,10 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Edit mode
 
-- In normal diff mode, the right-hand side can be edited directly via `Edit mode`.
-- The left-hand side remains read-only.
+- In normal diff mode, only the current merge target can be edited directly via its `Edit mode` icon.
+- The editor opens on the right for left-to-right merging and on the left for right-to-left merging, without moving
+  the files. The source remains read-only. Save baselines, line endings, explicit saves and close-save handling all
+  follow the actual target. A read-only external source does not block editing a writable vault target.
 - Pending comparison changes are saved or discarded only after confirmation when entering edit mode.
 - The edit area is a shared multi-line input field.
 - Multi-line selection, deletion, Backspace, and `Enter` for new blank lines work as expected.
@@ -172,6 +196,10 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
   are replaced automatically.
 - **Automatically go to the next change**: After accepting or ignoring a change, scroll to the next open change;
   enabled by default.
+- **Default apply direction**: Use **Left → right** (factory default) or **Right → left** for new vault comparisons,
+  right-file selections, and external drops. Open comparisons retain their captured direction, including when
+  settings or language change. Restored comparisons retain an explicit saved direction. Proposal workflows keep
+  their fixed direction; only the target file is editable in either direction.
 - **Align Markdown by headings**: Use matching ATX headings as section boundaries when both files are Markdown;
   disabled by default. Refresh or reopen an existing comparison to apply a changed setting.
 

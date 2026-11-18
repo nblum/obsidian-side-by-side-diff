@@ -16,7 +16,8 @@ test("normalizes incomplete persisted settings using safe defaults", () => {
 		changeCopySuffix: "draft_",
 		language: "auto",
 		recentRightFilePaths: ["first.md", "second.md"],
-		introductionSeen: false
+		introductionSeen: false,
+		defaultApplyDirection: "left-to-right"
 	});
 });
 
@@ -38,7 +39,8 @@ test("preserves valid settings while sanitizing every path separator", () => {
 		alignMarkdownByHeadings: false,
 		language: "de",
 		recentRightFilePaths: ["one.md"],
-		introductionSeen: false
+		introductionSeen: false,
+		defaultApplyDirection: "left-to-right"
 	});
 });
 
@@ -68,4 +70,14 @@ test("heading alignment is opt-in and preserves unrelated persisted settings", (
 	assert.equal(normalizePluginSettings({ alignMarkdownByHeadings: false }).alignMarkdownByHeadings, false);
 	const stored = { ...DEFAULT_SETTINGS, showRibbonIcon: false, language: "en", recentRightFilePaths: ["synthetic.md"], alignMarkdownByHeadings: true };
 	assert.deepEqual(normalizePluginSettings(stored), stored);
+});
+
+test("apply direction defaults to left-to-right and accepts only supported persisted directions", () => {
+	assert.equal(DEFAULT_SETTINGS.defaultApplyDirection, "left-to-right");
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		assert.equal(normalizePluginSettings({ defaultApplyDirection: direction }).defaultApplyDirection, direction);
+	}
+	for (const invalid of ["left", "right", "", null, true, 42]) {
+		assert.equal(normalizePluginSettings({ defaultApplyDirection: invalid }).defaultApplyDirection, "left-to-right");
+	}
 });
