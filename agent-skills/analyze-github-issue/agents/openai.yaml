@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Side-by-Side Diff GitHub Issue"
+  short_description: "Analyze an issue and propose changes for approval"
+  default_prompt: "Use $analyze-github-issue to analyze the Side-by-Side Diff GitHub issue I provide, propose an implementation or fix, and wait for my approval before making changes."

@@ -23,6 +23,8 @@ instructions and keep task-specific procedures in `agent-skills/`.
 
 Read the relevant skill before acting on a matching request:
 
+- `agent-skills/analyze-github-issue/SKILL.md` for investigating a GitHub issue and proposing an implementation
+  or fix before user approval to implement.
 - `agent-skills/implement-side-by-side-diff/SKILL.md` for implementing features or enhancements using
   `docs/implementation-checklist.md`.
 - `agent-skills/fix-side-by-side-diff-bug/SKILL.md` for fixing a reported bug with a regression test and changelog

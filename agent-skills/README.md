@@ -8,6 +8,9 @@ directs an agent here only when a task matches a documented workflow.
 ```text
 agent-skills/
 ├── README.md
+├── analyze-github-issue/
+│   ├── SKILL.md
+│   └── agents/openai.yaml
 ├── implement-side-by-side-diff/
 │   ├── SKILL.md
 │   └── agents/openai.yaml
@@ -27,6 +30,8 @@ agent-skills/
 
 ## Available Skills
 
+- `analyze-github-issue` investigates an issue, proposes an implementation or fix, and waits for user approval
+  before making changes.
 - `implement-side-by-side-diff` implements features and enhancements using the shared
   [implementation checklist](../docs/implementation-checklist.md).
 - `fix-side-by-side-diff-bug` fixes a reported bug with a regression test and a changelog entry.
