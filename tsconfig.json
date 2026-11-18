@@ -16,7 +16,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node", "webdriverio", "expect-webdriverio"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "wdio*.conf.mts"],
+  "exclude": ["tests/e2e"]
 }

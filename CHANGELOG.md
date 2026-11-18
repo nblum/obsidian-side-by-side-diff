@@ -6,6 +6,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Added end-to-end tests in an isolated Obsidian instance for file selection, comparison, staging, undo,
+  ignore, both merge directions, direct editing, keyboard saves, save conflicts, and unsaved-change confirmation.
+  CI checks the oldest supported public Obsidian release (`1.6.7`) and the latest stable version.
 - Compare the active text file directly with another open tab or a text file in the file explorer using
   `Compare with active file` in its context menu, including hidden tabs. The active file opens on the left and
   the clicked file on the right, without a file picker. ([#9](https://github.com/nblum/obsidian-side-by-side-diff/issues/9))

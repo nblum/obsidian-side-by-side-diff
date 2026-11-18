@@ -21,6 +21,10 @@ reusable template, not the status of a particular issue.
 - [ ] **New tests:** Add focused coverage for new behavior and meaningful edge cases. For a bug, demonstrate that
   its regression test fails before the fix and passes afterward. Reuse existing test adapters and fixtures where
   practical; record any manual checks needed for behavior the automated tests cannot exercise.
+- [ ] **End-to-end tests (required):** Always add or extend tests in `tests/e2e/` for every implemented feature,
+  enhancement, or bug fix. Exercise the affected user workflow in a real, isolated Obsidian instance, including
+  relevant edge cases. For a bug, add an E2E regression test that fails before the fix and passes afterward.
+  E2E coverage is required in addition to focused unit tests.
 
 ## Documentation
 
@@ -39,6 +43,8 @@ reusable template, not the status of a particular issue.
 Run the required checks from [CONTRIBUTING.md](../CONTRIBUTING.md#tests), including a build for plugin-source
 changes, and run `git diff --check`. Keep generated `main.js` out of Git. For UI or save changes, use the
 [manual checklist](../CONTRIBUTING.md#manual-checklist) and report which environment was actually checked.
+For every implementation change, also run `npm run test:e2e` and report the Obsidian version and results.
+If E2E execution is unavailable, leave that validation pending and explain the blocker.
 
 Report the checklist status, validation results, and remaining gaps. Distinguish browser checks from an Obsidian
 check; leave unperformed checks pending. Creating commits, publishing, or posting to GitHub requires the user's

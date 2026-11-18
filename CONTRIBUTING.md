@@ -50,6 +50,7 @@ tests, and reviews of the changelog, feature reference, README, and roadmap.
 - `src/diff-core.ts` – deterministic diff and line-synchronization logic
 - `src/i18n.ts` – translation loading and language resolution
 - `tests/` – TypeScript unit tests for the modules above
+- `tests/e2e/` – UI workflows in a real, isolated Obsidian instance
 - `main.js` – generated Obsidian entry point; ignored by Git and rebuilt before local installation or release
 
 ## Tests
@@ -70,7 +71,47 @@ view, so line numbers, row types, alignment gaps, and inline tokens can be teste
 
 These are the same checks that run in CI (`.github/workflows/ci.yml`) on every push and pull request.
 
-The tests cover the deterministic diff, synchronization, and translation rules, including:
+### End-to-end tests in Obsidian
+
+Run the desktop E2E suite separately from the fast unit tests:
+
+```bash
+npm run test:e2e
+```
+
+This builds the production plugin, then uses
+[WDIO Obsidian Service](https://jesse-r-s-hines.github.io/wdio-obsidian-service/wdio-obsidian-service/README.html)
+to download Obsidian and its matching WebDriver into the ignored `.obsidian-cache/` directory. The first run
+requires network access. Use a current Node.js 22.x or 24.x release for the WebdriverIO dependencies.
+Every test opens a fresh temporary copy of `tests/e2e/vault/` with isolated application configuration and English
+plugin settings. Tests never open your personal vault or modify the committed fixtures.
+
+By default the suite uses Obsidian `1.6.7`, the oldest public release after the plugin's Insider-only minimum
+`1.6.6`. No Insider account is needed. To check the latest stable app or another public version instead (POSIX shell):
+
+```bash
+OBSIDIAN_VERSION=latest npm run test:e2e
+OBSIDIAN_VERSION=1.6.7 npm run test:e2e
+```
+
+Linux needs a graphical session and Electron's system libraries. On a headless machine, install Xvfb and
+Openbox, then run:
+
+```bash
+xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" sh -c 'openbox & npm run test:e2e'
+```
+
+The suite exercises both file pickers, inline differences, staging, undo, ignore, merging in both directions,
+explicit saving, external-change conflicts, the unsaved-change prompt when swapping, and direct editing and
+keyboard saving into either target pane. Saved content is checked directly on disk. Failed tests save an
+application screenshot alongside runner logs in `e2e-results/`.
+CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian, uploading failure
+artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
+selection/clipboard interaction, or external file drop.
+
+### Unit test coverage
+
+The unit tests cover the deterministic diff, synchronization, and translation rules, including:
 
 - inserting, removing, and replacing individual lines
 - block changes between duplicate anchor lines and deterministic large-file fallback behavior

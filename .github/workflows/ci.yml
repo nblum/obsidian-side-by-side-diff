@@ -37,3 +37,49 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+
+  e2e:
+    name: Obsidian E2E (${{ matrix.obsidian }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        obsidian: ["1.6.7", latest]
+    env:
+      OBSIDIAN_VERSION: ${{ matrix.obsidian }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Obsidian and WebDriver downloads
+        uses: actions/cache@v4
+        with:
+          path: .obsidian-cache
+          key: obsidian-${{ runner.os }}-${{ matrix.obsidian }}-${{ hashFiles('package-lock.json', 'manifest.json') }}
+
+      - name: Set up virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb openbox libnss3 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64
+
+      - name: Test in Obsidian
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" sh -c 'openbox & npm run test:e2e'
+
+      - name: Upload E2E logs and failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.obsidian }}
+          path: e2e-results/
+          if-no-files-found: ignore
+          retention-days: 7

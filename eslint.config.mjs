@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
 	{
-		ignores: ["main.js", "node_modules/**", ".idea/**", ".claude/**"],
+		ignores: ["main.js", "node_modules/**", ".idea/**", ".claude/**", ".obsidian-cache/**", "e2e-results/**"],
 	},
 	eslint.configs.recommended,
 	{
@@ -17,8 +17,14 @@ export default tseslint.config(
 	},
 	...tseslint.configs.strictTypeChecked.map((config) => ({
 		...config,
-		files: ["src/**/*.ts"],
+		files: ["src/**/*.ts", "tests/e2e/**/*.ts", "wdio*.conf.mts"],
 	})),
+	{
+		files: ["tests/e2e/**/*.ts", "wdio*.conf.mts"],
+		languageOptions: {
+			parserOptions: { projectService: true },
+		},
+	},
 	{
 		files: ["src/**/*.ts"],
 		plugins: {
