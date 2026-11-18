@@ -9,6 +9,7 @@
 	"commands.previousChange": "上一处更改",
 	"commands.showIntroduction": "显示使用指南",
 	"menu.compareActiveFile": "与其他文件比较",
+	"menu.compareWithActiveFile": "与当前活动文件比较",
 	"menu.compareSelectedFiles": "比较文件",
 	"menu.proposeChanges": "提出修改建议",
 	"menu.acceptChanges": "接受更改",

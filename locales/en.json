@@ -9,6 +9,7 @@
 	"commands.previousChange": "Previous change",
 	"commands.showIntroduction": "Show introduction",
 	"menu.compareActiveFile": "Compare with another file",
+	"menu.compareWithActiveFile": "Compare with active file",
 	"menu.compareSelectedFiles": "Compare files",
 	"menu.proposeChanges": "Suggest changes",
 	"menu.acceptChanges": "Accept changes",

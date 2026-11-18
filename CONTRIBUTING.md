@@ -96,12 +96,21 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - Obsidian's close-before-choice suggestion lifecycle, followed by constructing the registered diff view,
   rendering the original and opening the comparison-file picker from its actual search button
 - ribbon visibility restored on load and updated/persisted through declarative and legacy settings controls
+- direct tab comparisons for hidden, visible and deferred file tabs, menu-time file capture, binary/same-file
+  exclusions, native menu preservation, unload cleanup, and the public-event fallback
+- direct file explorer comparisons with an active text file, including closed comparison files and folder,
+  binary-file and same-file exclusions
 
 ## Manual checklist
 
 For changes to the view or save logic, check at least these cases:
 
 - original-file preview before comparison selection, including matching neutral styles, wrapping, and copying
+- `Compare with active file` from a hidden tab and a visible inactive split tab, including restored tabs not yet
+  activated: active file on the left, clicked file on the right, no picker, no duplicate menu action; no action for
+  the same file, binary files, or non-file tabs; native tab actions retained after disabling the plugin
+- `Compare with active file` in the file explorer with a different text file active, including a comparison file
+  not open in a tab; no action for folders, binaries, the active file, or without an active text file
 - identical files
 - changed, inserted, and removed lines
 - inline differences within a line

@@ -51,6 +51,13 @@ visible, can be reviewed and staged individually, and are written only through a
   line spacing, row borders, and selectable text.
 - Selecting exactly two text files in the file explorer and choosing `Compare files` from the context menu opens the
   comparison view with both files directly.
+- Right-clicking another file's tab and choosing `Compare with active file` opens the active file on the left and
+  the clicked tab's file on the right without a picker. The action works for hidden and visible inactive tabs,
+  including restored tabs not yet activated. It is offered only for two different vault text files; active-file,
+  binary-file and non-file tabs have no direct comparison action. The pair is captured when the menu opens.
+- `Compare with active file` is also available in the file explorer's context menu for a different text file when
+  a vault text file is active. It opens the active file on the left and the clicked file on the right without a
+  picker, even if the clicked file is not open in a tab. Folders and binary files are excluded.
 
 ### External Markdown sources
 
@@ -186,6 +193,8 @@ visible, can be reviewed and staged individually, and are written only through a
 | Command palette | `Next change` / `Previous change` |
 | Ribbon | `Compare two files` |
 | File context menu | `Compare with another file` for any text file, whether open or closed |
+| Other text-file tab's context menu, with a different text file active | `Compare with active file` |
+| File explorer context menu for another text file, with a text file active | `Compare with active file` |
 | File context menu | `Suggest changes` |
 | File context menu, when available | `Accept changes` |
 | File context menu with an open comparison view | `Refresh` |

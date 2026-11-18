@@ -6,6 +6,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Compare the active text file directly with another open tab or a text file in the file explorer using
+  `Compare with active file` in its context menu, including hidden tabs. The active file opens on the left and
+  the clicked file on the right, without a file picker. ([#9](https://github.com/nblum/obsidian-side-by-side-diff/issues/9))
 - Keep unsaved accepted changes visible in the target using green text for new content and red strikethrough
   previews for removed content. These marks differ from open-diff background highlights, follow undo and both
   apply directions, and clear after saving. Deleted previews are excluded from copying and saved file content.

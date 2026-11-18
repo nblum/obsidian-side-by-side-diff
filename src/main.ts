@@ -1,5 +1,5 @@
 import { Notice, Plugin, TFile, moment, requireApiVersion } from "obsidian";
-import type { Command, TAbstractFile } from "obsidian";
+import type { Command, Menu, TAbstractFile } from "obsidian";
 import { FilePickerModal, IntroductionModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
@@ -9,6 +9,7 @@ import type { Language, Translator } from "./i18n";
 import type { ChangeNavigationDirection } from "./diff-navigation";
 import { rememberRecentFilePath } from "./recent-files";
 import { validateComparisonProtocolRequest } from "./protocol";
+import { extendTabMenus } from "./tab-context-menu";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -38,14 +39,28 @@ export class FileDiffSideBySidePlugin extends Plugin {
     );
     this.updateRibbonVisibility();
     this.addSettingTab(new FileDiffSettingsTab(this.app, this));
+    const restoreTabMenus = extendTabMenus((menu, view) => {
+      // getState also identifies files in deferred views of tabs not opened this session.
+      const path: unknown = view.getState().file;
+      const file = typeof path === "string" ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (isTextFile(file)) {
+        this.addCompareWithActiveFile(menu, file);
+      }
+    });
+    if (restoreTabMenus) {
+      this.register(restoreTabMenus);
+    }
     this.registerEvent(
-      this.app.workspace.on("file-menu", (menu, file) => {
+      this.app.workspace.on("file-menu", (menu, file, source) => {
         if (!isTextFile(file)) {
           return;
         }
         menu.addItem((item) => {
           item.setTitle(this.translate("menu.compareActiveFile")).setIcon(ICON_ID).onClick(() => { void this.compareActiveFile(file); });
         });
+        if (source === "file-explorer-context-menu" || (!restoreTabMenus && source === "tab-header")) {
+          this.addCompareWithActiveFile(menu, file);
+        }
         // Keep proposal and refresh actions scoped to the active document.
         if (file.path !== this.app.workspace.getActiveFile()?.path) {
           return;
@@ -115,6 +130,16 @@ export class FileDiffSideBySidePlugin extends Plugin {
       })
     ];
     this.app.workspace.onLayoutReady(() => { void this.showIntroductionIfNeeded(); });
+  }
+  /** Adds a direct comparison with the active text file, capturing both menu-time files. */
+  addCompareWithActiveFile(menu: Menu, file: TFile): void {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!isTextFile(activeFile) || activeFile.path === file.path) {
+      return;
+    }
+    menu.addItem((item) => {
+      item.setTitle(this.translate("menu.compareWithActiveFile")).setIcon(ICON_ID).onClick(() => { void this.openDiffView(activeFile, file); });
+    });
   }
   /** Opens the introduction once for installations that have not seen it yet. */
   async showIntroductionIfNeeded(): Promise<void> {

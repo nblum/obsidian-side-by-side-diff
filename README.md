@@ -51,6 +51,9 @@ These text marks differ from the background highlights for open differences and 
 ## Other ways to open a comparison
 
 With a note open, choose `Compare with another file` from its document menu, then select the other file.
+For two files already open in tabs, keep the original active, right-click the other tab, and choose
+`Compare with active file`. The active file opens on the left and the clicked file on the right, without a picker.
+The same action is available when right-clicking another text file in the file explorer while a text file is active.
 You can also use the comparison icon in the left ribbon or the command palette commands
 `Compare current file with another file` and `Compare two files`.
 The right-file selector lists your five most recently selected right-hand files first.
