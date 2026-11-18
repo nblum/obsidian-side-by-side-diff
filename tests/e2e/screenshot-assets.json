@@ -1,0 +1,14 @@
+[
+  { "filename": "compare-mode.webp", "description": "Comparison with inline changes and grouped actions" },
+  { "filename": "file-selection.png", "description": "Original preview and comparison-file selector" },
+  { "filename": "file-menu.webp", "description": "Compare with another file in a note's context menu" },
+  { "filename": "compare-two-files-menu.png", "description": "Compare files from a two-file selection" },
+  { "filename": "grouped-changes.png", "description": "A change block with Accept all and Ignore all" },
+  { "filename": "inline-edit.png", "description": "Direct editing of the target file" },
+  { "filename": "pending-changes.webp", "description": "Accepted target text, removed previews and inline feedback before saving" },
+  { "filename": "ignored-changes.webp", "description": "Ignoring a change preserves both displayed texts" },
+  { "filename": "reverse-direction.webp", "description": "Right-to-left merging without swapping file identities" },
+  { "filename": "unsaved-changes.webp", "description": "Save-or-discard confirmation before swapping" },
+  { "filename": "identical-files.webp", "description": "Comparison after explicitly saving all accepted changes" },
+  { "filename": "comparsion-record1.webp", "description": "Animated walkthrough: select two files, compare, accept, and save" }
+]

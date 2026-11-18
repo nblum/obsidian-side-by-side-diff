@@ -109,6 +109,56 @@ CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian, 
 artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
 selection/clipboard interaction, or external file drop.
 
+### Refreshing documentation screenshots
+
+The opt-in capture suite drives real Obsidian workflows with a dedicated two-note vault. Normal `npm test`,
+`npm run test:e2e`, and CI never run this suite or rewrite tracked images.
+
+Generate a preview gallery:
+
+```bash
+npm run screenshots
+```
+
+Open `e2e-results/screenshots/index.html` to review the captures. To regenerate and replace the documentation
+assets in one command:
+
+```bash
+npm run screenshots:update
+```
+
+The update command captures the complete set, validates every image, copies the files listed in
+`tests/e2e/screenshot-assets.json` to `assets/`, and rebuilds the plugin so the introduction embeds the refreshed
+images. A failed capture or missing image stops publication. Review `git diff --stat -- assets/` and visually
+inspect the images before committing.
+
+The capture environment uses Obsidian `1.15.1`, the default light theme, English plugin text, a 1280 × 900 viewport,
+and device scale 1. Use the same OS and installed fonts for consistent rendering; Linux is the reference
+environment. `OBSIDIAN_VERSION` can override the pinned app version deliberately. The temporary vault is isolated
+from personal data, and the committed fixtures are never written to. The usual E2E graphical-session and download
+requirements apply; use the Xvfb/Openbox wrapper above with `npm run screenshots:update` on headless Linux.
+
+| Asset | Captured state |
+| --- | --- |
+| `compare-mode.webp` | Comparison, inline differences, and grouped actions |
+| `file-selection.png` | Original preview and right-file selection |
+| `file-menu.webp` | Single-file comparison context menu |
+| `compare-two-files-menu.png` | Native two-file selection and comparison menu |
+| `grouped-changes.png` | A block with Accept all / Ignore all |
+| `inline-edit.png` | Editable target beside the read-only source |
+| `pending-changes.webp` | Accepted text, deletion previews, and inline feedback |
+| `ignored-changes.webp` | Ignored differences with both files preserved |
+| `reverse-direction.webp` | Left target and right source |
+| `unsaved-changes.webp` | Save-or-discard confirmation |
+| `identical-files.webp` | Identical contents after explicitly saving |
+| `comparsion-record1.webp` | Animated selection → comparison → acceptance → save walkthrough |
+
+The walkthrough keeps its existing filename and animated WebP format so README links remain valid. Cropped
+views show the plugin or menu; walkthrough frames omit the footer with the random temporary-vault name.
+`keyboard-shortcuts.webp`, the teaser artwork, and SVG icons are illustrations and are maintained separately.
+To add a state, add its capture and assertions in `tests/e2e/documentation.capture.ts` and register its filename
+and description in `tests/e2e/screenshot-assets.json`. The suite fails if any registered capture is missing.
+
 ### Unit test coverage
 
 The unit tests cover the deterministic diff, synchronization, and translation rules, including:

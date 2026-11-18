@@ -6,6 +6,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Added a reusable documentation capture suite with an isolated sample vault, a preview gallery, and an explicit
+  asset-update command. It refreshes comparison and onboarding screenshots plus the animated README walkthrough.
+  Added an illustrated guide covering selection, review states, merge direction, editing, and saving.
 - Added end-to-end tests in an isolated Obsidian instance for file selection, comparison, staging, undo,
   ignore, both merge directions, direct editing, keyboard saves, save conflicts, and unsaved-change confirmation.
   CI checks the oldest supported public Obsidian release (`1.6.7`) and the latest stable version.

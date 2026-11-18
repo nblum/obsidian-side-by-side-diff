@@ -28,6 +28,10 @@ reusable template, not the status of a particular issue.
 
 ## Documentation
 
+- [ ] **Screenshots:** For UI changes, review the affected documentation images with `npm run screenshots`.
+  When an image needs updating, use `npm run screenshots:update`, inspect the generated gallery and changed
+  assets, and keep capture scenarios aligned with the documented workflows. See the
+  [screenshot workflow](../CONTRIBUTING.md#refreshing-documentation-screenshots).
 - [ ] **Changelog:** Add a user-facing entry under `## [Unreleased]` in [CHANGELOG.md](../CHANGELOG.md), using the
   appropriate change category and linking the issue when relevant. Do not change release metadata.
 - [ ] **Features:** Review [FEATURES.md](../FEATURES.md) and update the implemented behavior and acceptance

@@ -39,6 +39,7 @@ Obsidian notifications.
 ## In this guide
 
 - [Other ways to open a comparison](#other-ways-to-open-a-comparison)
+- [Illustrated walkthrough](docs/visual-guide.md)
 - [Compare, suggest, and accept changes](#compare-suggest-and-accept-changes)
 - [Edit and save](#edit-and-save)
 - [Compare external Markdown](#compare-external-markdown)
@@ -62,6 +63,11 @@ The right-file selector lists your five most recently selected right-hand files 
 
 ![Side-by-Side Diff file menu](assets/file-menu.webp)
 
+After choosing the original, its text stays visible on the left. Use **Open file search** to choose the comparison
+on the right, or use the **Drop files** card.
+
+![Original preview and comparison-file selector](assets/file-selection.png)
+
 For a walkthrough, open **Settings → Side-by-Side Diff → Introduction** or run `Show introduction` from the
 command palette. The introduction also opens once after an update if you have not seen it yet.
 
@@ -79,6 +85,7 @@ the file-actions menu stay in the first toolbar row.
 Save or undo pending changes before reversing; ignored decisions are reopened for the new direction.
 The direction is restored with a saved vault comparison. `Swap` exchanges the files' positions; their Original and
 Comparison labels follow the files. If changes are pending, it asks whether to save or discard them first.
+See the [right-to-left example](docs/visual-guide.md#reverse-the-apply-direction) for the resulting file roles and colors.
 
 Select text in either file and press `Ctrl/Cmd+C` to copy it in comparison mode. Selection stays in the pane where
 you start dragging and copies only that file's text, excluding line numbers, review controls, and visual alignment gaps.
@@ -86,6 +93,15 @@ you start dragging and copies only that file's text, excluding line numbers, rev
 Contiguous changed lines, as well as changes separated only by blank lines, are grouped into one block; a block with more than three changed lines
 gets `Accept all` / `Ignore all` controls to resolve it in one step. `Undo` (button or `Ctrl/Cmd+Z`) reverts the last
 accept or ignore action, single row or whole block, until it is saved.
+
+![A grouped change block with Accept all and Ignore all](assets/grouped-changes.png)
+
+Accepted changes stay staged until you save. In this example, the target shows its previous line in red with
+strikethrough and the incoming text in green. The feedback beside `Undo` confirms that the change is staged.
+
+![Accepted target text and deletion preview before saving](assets/pending-changes.webp)
+
+Ignoring preserves both versions; see the [ignored-change example](docs/visual-guide.md#ignore-a-change).
 
 ### Suggest changes
 
@@ -110,6 +126,9 @@ selection, deletion, Backspace, and `Enter` for new lines are supported.
 Changes are never written automatically while typing or clicking a diff action. The file is updated only after using
 `Save changes` or `Ctrl/Cmd + S`. Before saving, the plugin checks for external file changes and cancels instead of
 overwriting newer content. Closing a view with unsaved changes opens a confirmation dialog.
+The [save-or-discard example](docs/visual-guide.md#handle-unsaved-changes) shows the same protection before swapping files.
+
+![Editing the target file beside the read-only source](assets/inline-edit.png)
 
 ## Compare external Markdown
 
@@ -205,6 +224,7 @@ appreciated.
 
 ## Documentation and development
 
+- [Illustrated walkthrough](docs/visual-guide.md) – file selection, review states, editing, and explicit saving
 - [Full feature reference](FEATURES.md) – supported behavior and detailed requirements
 - [Roadmap](ROADMAP.md) – candidate and planned features, with links to detailed concepts
 - [Contributing](CONTRIBUTING.md) – development setup, build commands, tests, and validation

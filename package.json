@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "test:e2e": "npm run build && wdio run ./wdio.conf.mts",
+    "screenshots": "npm run build && wdio run ./wdio.screenshots.conf.mts",
+    "screenshots:update": "npm run screenshots && node scripts/update-screenshots.mjs && npm run build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
     "validate:manifest": "node scripts/validate-manifest.mjs",
     "release": "node scripts/release.mjs"
@@ -29,6 +31,8 @@
     "eslint-plugin-obsidianmd": "^0.4.0",
     "globals": "^17.6.0",
     "obsidian": "latest",
+    "puppeteer-core": "^24.43.1",
+    "sharp": "^0.34.5",
     "tsx": "^4.23.15",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.59.1",
