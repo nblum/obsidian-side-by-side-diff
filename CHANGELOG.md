@@ -4,6 +4,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-18
+
 ### Added
 
 - Added a reusable documentation capture suite with an isolated sample vault, a preview gallery, and an explicit
