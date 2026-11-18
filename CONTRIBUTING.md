@@ -84,6 +84,11 @@ The tests cover the deterministic diff, synchronization, and translation rules, 
 - selecting the next and previous change, including wraparound and resolved-row handling
 - honoring the configurable automatic advance after accepting or ignoring a change
 - protecting pending changes when entering edit mode or swapping panes
+- the registered ribbon callback opening an active text file without a comparison file, or selecting/cancelling
+  the first file when no text file is active, including binary-file filtering
+- Obsidian's close-before-choice suggestion lifecycle, followed by constructing the registered diff view,
+  rendering the original and opening the comparison-file picker from its actual search button
+- ribbon visibility restored on load and updated/persisted through declarative and legacy settings controls
 
 ## Manual checklist
 

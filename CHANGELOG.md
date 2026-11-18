@@ -9,6 +9,11 @@ All notable changes to Side-by-Side Diff are documented here.
 - Select and copy text from either file in comparison mode. Selection stays in the pane where dragging starts
   and copies only that file's text, without line numbers, review controls, or alignment gaps. (#7)
 
+### Fixed
+
+- Open the comparison after selecting the original in the file picker. Obsidian closes suggestion dialogs before
+  delivering the choice; accepting a file is no longer mistaken for cancellation.
+
 ## [0.10.1] - 2026-11-09
 
 ### Changed

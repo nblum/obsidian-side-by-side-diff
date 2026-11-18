@@ -386,6 +386,11 @@ export class FilePickerModal extends SuggestModal<TFile> {
     heading.setAttribute("aria-level", "3");
     element.before(heading);
   }
+  /** Marks acceptance before SuggestModal closes, so onClose cannot resolve it as cancellation. */
+  override selectSuggestion(file: TFile, event: MouseEvent | KeyboardEvent): void {
+    this.finished = true;
+    super.selectSuggestion(file, event);
+  }
   /** Resolves the picker with the selected file. */
   onChooseSuggestion(file: TFile): void {
     this.finished = true;
