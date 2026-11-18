@@ -28,6 +28,7 @@ All notable changes to Side-by-Side Diff are documented here.
 
 - Keep both files' text and line numbers visible when ignoring rows or blocks. Clear review highlights and actions
   without making the read-only source appear edited; source-only and blank lines remain visible in either direction.
+- Exclude alignment gaps when copying comparison text even when keyboard focus is outside the split content.
 - Open the comparison after selecting the original in the file picker. Obsidian closes suggestion dialogs before
   delivering the choice; accepting a file is no longer mistaken for cancellation.
 - Match the original-file preview before selecting a comparison to the comparison view's neutral cells,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import esbuild from "esbuild";
 import type { SideBySideDiffView } from "../src/diff-view.ts";
+import type { WorkspaceLeaf } from "obsidian";
 import { PLUGIN_BUNDLE_OPTIONS } from "../scripts/bundle-options.mjs";
 
 /** Supplies element identity and ancestry for pointer event tests without a browser. */
@@ -12,12 +13,21 @@ class SelectionElement {
   closest(selector: string): SelectionElement | null { return this.ancestors.get(selector) ?? null; }
 }
 
+/** Routes DOM events to their actual registration target for the document-level copy test. */
+class TestItemView {
+  app: unknown;
+  contentEl: EventTarget;
+  constructor(leaf: { app: unknown; contentEl: EventTarget }) { this.app = leaf.app; this.contentEl = leaf.contentEl; }
+  registerDomEvent(target: EventTarget, type: string, handler: EventListener): void { target.addEventListener(type, handler); }
+  registerEvent(): void {}
+}
+
 const bundle = await esbuild.build({ ...PLUGIN_BUNDLE_OPTIONS, entryPoints: ["src/diff-view.ts"], write: false, logLevel: "silent" });
 assert.ok(bundle.outputFiles?.[0]);
 const module = { exports: {} as { SideBySideDiffView: typeof SideBySideDiffView } };
 runInNewContext(bundle.outputFiles[0].text, {
   module, exports: module.exports, Element: SelectionElement,
-  require: () => ({ ItemView: class {}, Modal: class {}, SuggestModal: class {} })
+  require: () => ({ ItemView: TestItemView, Modal: class {}, SuggestModal: class {} })
 });
 
 /** Tracks pane activation and stale-selection removal when a new pointer selection starts. */
@@ -137,7 +147,18 @@ test("copying either comparison side preserves partial lines, whitespace and rea
   }
 });
 
-
+test("copying with document focus still excludes alignment gaps from the selected comparison file", () => {
+  const fixture = createCopyFixture("right", ["source", null, "", "source-only"], 0, 11);
+  const documentTarget = Object.assign(new EventTarget(), { getSelection: () => fixture.selection, defaultView: null });
+  const contentTarget = Object.assign(new EventTarget(), fixture.view.contentEl, { ownerDocument: documentTarget });
+  const leaf = { app: { vault: { on: () => ({}) } }, contentEl: contentTarget };
+  new module.exports.SideBySideDiffView(leaf as unknown as WorkspaceLeaf, {} as ConstructorParameters<typeof SideBySideDiffView>[1]);
+  const event = new Event("copy", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: fixture.event.clipboardData });
+  documentTarget.dispatchEvent(event);
+  assert.equal(fixture.clipboard.get("text/plain"), "source\n\nsource-only");
+  assert.equal(event.defaultPrevented, true);
+});
 
 test("copying a partial single line uses both selection boundaries", () => {
   const fixture = createCopyFixture("right", ["before changed after"], 7, 14);

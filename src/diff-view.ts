@@ -178,7 +178,7 @@ export class SideBySideDiffView extends ItemView {
     });
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
-    this.registerDomEvent(this.contentEl, "copy", (event) => { this.handleCopy(event); });
+    this.registerDomEvent(this.contentEl.ownerDocument, "copy", (event) => { this.handleCopy(event); });
     this.registerDomEvent(this.contentEl, "pointerdown", (event) => { this.handleSelectionStart(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
