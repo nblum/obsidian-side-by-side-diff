@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Side-by-Side Diff"
+  short_description: "Implement features with the project checklist"
+  default_prompt: "Use $implement-side-by-side-diff to implement the requested feature or issue using the project implementation checklist."

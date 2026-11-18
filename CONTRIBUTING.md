@@ -26,6 +26,9 @@ files in `src/`, run `npm run build` first, then reload the plugin view or Obsid
 3. Look for existing tests and similar flows before adding new logic.
 4. Keep the change limited to the affected area.
 
+Use the [implementation checklist](docs/implementation-checklist.md) to track coding, styles, existing and new
+tests, and reviews of the changelog, feature reference, README, and roadmap.
+
 ## Working style
 
 - Follow the existing patterns and naming in the plugin.

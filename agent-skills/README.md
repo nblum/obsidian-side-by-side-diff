@@ -8,6 +8,9 @@ directs an agent here only when a task matches a documented workflow.
 ```text
 agent-skills/
 ├── README.md
+├── implement-side-by-side-diff/
+│   ├── SKILL.md
+│   └── agents/openai.yaml
 ├── fix-side-by-side-diff-bug/
 │   ├── SKILL.md
 │   └── agents/openai.yaml
@@ -24,6 +27,8 @@ agent-skills/
 
 ## Available Skills
 
+- `implement-side-by-side-diff` implements features and enhancements using the shared
+  [implementation checklist](../docs/implementation-checklist.md).
 - `fix-side-by-side-diff-bug` fixes a reported bug with a regression test and a changelog entry.
 - `commit-side-by-side-diff` creates focused commits without pushing, tagging, or publishing.
 - `check-github-pr` reviews a plugin PR, reports findings and validation gaps, and guides requested fixes through
