@@ -2,8 +2,11 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type {} from "wdio-obsidian-service";
 
+export const obsidianChromeArgs = ["--window-size=1440,1000"];
+
 export const config: WebdriverIO.Config = {
   runner: "local",
+  autoXvfb: false,
   framework: "mocha",
   specs: ["./tests/e2e/**/*.e2e.ts"],
   maxInstances: 1,
@@ -18,7 +21,7 @@ export const config: WebdriverIO.Config = {
       vault: "tests/e2e/vault",
       copy: true,
     },
-    "goog:chromeOptions": { args: ["--window-size=1440,1000"] },
+    "goog:chromeOptions": { args: obsidianChromeArgs },
   }],
   services: ["obsidian"],
   reporters: ["spec"],

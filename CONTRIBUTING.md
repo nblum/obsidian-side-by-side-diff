@@ -94,12 +94,18 @@ OBSIDIAN_VERSION=latest npm run test:e2e
 OBSIDIAN_VERSION=1.6.7 npm run test:e2e
 ```
 
-Linux needs a graphical session and Electron's system libraries. On a headless machine, install Xvfb and
-Openbox, then run:
+On Linux, E2E tests use a private Xvfb display with Openbox by default, even when a desktop display is available.
+Install `xvfb`, `openbox`, `xauth`, and Electron's system libraries once. The runner also recognizes locally
+extracted tools under the ignored `.obsidian-cache/headless/usr/` directory. It exits with a dependency message
+if a required tool is missing; it never falls back to opening windows on your desktop.
+
+For a visible debug run in your current graphical session (POSIX shell):
 
 ```bash
-xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" sh -c 'openbox & npm run test:e2e'
+E2E_HEADED=1 npm run test:e2e
 ```
+
+Windows and macOS continue to use a visible application session.
 
 The suite exercises both file pickers, inline differences, staging, undo, ignore, merging in both directions,
 explicit saving, external-change conflicts, the unsaved-change prompt when swapping, and direct editing and
@@ -136,7 +142,8 @@ The capture environment uses Obsidian `1.15.1`, the default light theme, English
 and device scale 1. Use the same OS and installed fonts for consistent rendering; Linux is the reference
 environment. `OBSIDIAN_VERSION` can override the pinned app version deliberately. The temporary vault is isolated
 from personal data, and the committed fixtures are never written to. The usual E2E graphical-session and download
-requirements apply; use the Xvfb/Openbox wrapper above with `npm run screenshots:update` on headless Linux.
+requirements apply. Screenshot commands use the same default headless runner on Linux;
+`E2E_HEADED=1 npm run screenshots` enables a visible debug capture.
 
 | Asset | Captured state |
 | --- | --- |

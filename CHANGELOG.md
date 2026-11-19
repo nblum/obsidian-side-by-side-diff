@@ -4,6 +4,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Run Linux Obsidian E2E tests and documentation captures on a private virtual display by default. Set
+  `E2E_HEADED=1` for a visible debug run.
+
 ### Added
 
 - Added **Help** to the open comparison's file-actions menu, showing the README and bundled screenshots in an

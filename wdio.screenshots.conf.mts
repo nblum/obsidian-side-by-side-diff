@@ -1,4 +1,4 @@
-import { config as e2eConfig } from "./wdio.conf.mts";
+import { config as e2eConfig, obsidianChromeArgs } from "./wdio.conf.mts";
 
 /** Opt-in documentation captures, separate from the behavioral E2E suite and CI. */
 export const config: WebdriverIO.Config = {
@@ -13,6 +13,7 @@ export const config: WebdriverIO.Config = {
       vault: "tests/e2e/documentation-vault",
       copy: true,
     },
+    "goog:chromeOptions": { args: obsidianChromeArgs },
   }],
   mochaOpts: { ui: "bdd", timeout: 120_000 },
 };

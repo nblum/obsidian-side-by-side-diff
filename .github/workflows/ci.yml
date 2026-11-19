@@ -70,10 +70,10 @@ jobs:
       - name: Set up virtual display
         run: |
           sudo apt-get update
-          sudo apt-get install --yes xvfb openbox libnss3 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64
+          sudo apt-get install --yes xvfb openbox xauth libnss3 libatk-bridge2.0-0t64 libgtk-3-0t64 libgbm1 libasound2t64
 
       - name: Test in Obsidian
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1440x1000x24" sh -c 'openbox & npm run test:e2e'
+        run: npm run test:e2e
 
       - name: Upload E2E logs and failure screenshots
         if: failure()
