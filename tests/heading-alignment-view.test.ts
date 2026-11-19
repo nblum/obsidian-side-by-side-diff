@@ -1097,3 +1097,50 @@ test("only the active change receives a position badge, updated after navigation
 	view.updateChangeNavigationState();
 	assert.ok(frames.every(row => row.badges.length === 0));
 });
+
+test("Keep both renders actual target/source text, stages one undo step and never reports different saved files as identical", async () => {
+	for (const direction of ["left-to-right", "right-to-left"] as const) {
+		const source = ["A", "s1", "s2", "s3", "s4", "Z"];
+		const target = ["A", "t1", "t2", "t3", "t4", "Z"];
+		const expected = "A\nt1\nt2\nt3\nt4\n\ns1\ns2\ns3\ns4\nZ";
+		const { view, session, stored, root, targetPath, sourcePath, targetSide, displayedText } = await createPendingPreviewView(direction, source, target);
+		Object.assign(view, {
+			buildResolvedMessage: module.exports.SideBySideDiffView.prototype.buildResolvedMessage,
+			buildIdenticalMessage: module.exports.SideBySideDiffView.prototype.buildIdenticalMessage
+		});
+		await view.applyGroupChange(1, 4, direction, "keep-both");
+		assert.equal(displayedText(targetSide), expected);
+		assert.equal(displayedText(targetSide === "right" ? "left" : "right"), source.join("\n"));
+		assert.equal(stored.get(targetPath), target.join("\n"));
+		assert.equal(stored.get(sourcePath), source.join("\n"));
+		assert.deepEqual(session.getReviewCounts(), { open: 0, accepted: 4, ignored: 0 });
+		await view.undoLastChange();
+		assert.equal(displayedText(targetSide), target.join("\n"));
+		assert.equal(session.hasPendingChanges(), false);
+		await view.applyGroupChange(1, 4, direction, "keep-both");
+		assert.equal(await view.savePendingChanges(), true);
+		assert.equal(stored.get(targetPath), expected);
+		assert.equal(session.hasEqualContents(), false);
+		assert.equal(allElements(root).some(el => el.textContent === "messages.identical.title"), false);
+		assert.equal(allElements(root).some(el => el.textContent === "messages.resolved.title"), true);
+	}
+});
+
+test("retained variants never offer proposal-copy cleanup until a later explicit merge makes the files equal", async () => {
+	const { view, session } = await createPendingPreviewView("left-to-right", ["A", "s1", "s2", "Z"], ["A", "t1", "t2", "Z"]);
+	let cleanup = 0;
+	Object.assign(view, {
+		viewState: { ...view.state, mode: "accept" },
+		isChangeCopyFile: () => true,
+		confirmDeleteChangeCopy: () => { cleanup += 1; }
+	});
+	await view.applyGroupChange(1, 2, "left-to-right", "keep-both");
+	assert.equal(await view.savePendingChanges(), true);
+	assert.equal(cleanup, 0);
+	session.resetReview();
+	await view.renderDiff();
+	await view.applyGroupChange(0, 99, "left-to-right");
+	assert.equal(await view.savePendingChanges(), true);
+	assert.equal(session.hasEqualContents(), true);
+	assert.equal(cleanup, 1);
+});

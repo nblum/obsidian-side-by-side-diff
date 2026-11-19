@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Appliquer la modification de gauche à droite",
 	"actions.dismiss": "Ignorer la modification de gauche et conserver le côté droit inchangé",
 	"actions.acceptGroup": "Tout accepter",
+	"actions.keepBothGroup": "Garder les deux",
+	"actions.keepBothGroupTarget": "Garder les deux versions dans « {name} » : cible, ligne vide, puis source",
 	"actions.acceptGroupTitle": "Appliquer toutes les modifications de ce bloc de gauche à droite",
 	"actions.acceptGroupProposalTitle": "Appliquer toutes les propositions de ce bloc à l'original",
 	"actions.dismissGroup": "Tout ignorer",

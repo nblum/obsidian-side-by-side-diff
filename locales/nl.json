@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Wijziging van links naar rechts accepteren",
 	"actions.dismiss": "Wijziging links negeren en de rechterkant ongewijzigd laten",
 	"actions.acceptGroup": "Alles accepteren",
+	"actions.keepBothGroup": "Beide behouden",
+	"actions.keepBothGroupTarget": "Beide versies behouden in ‘{name}’: doeltekst, lege regel en daarna brontekst",
 	"actions.acceptGroupTitle": "Alle wijzigingen in deze groep van links naar rechts accepteren",
 	"actions.acceptGroupProposalTitle": "Alle voorstellen in deze groep in het origineel accepteren",
 	"actions.dismissGroup": "Alles negeren",

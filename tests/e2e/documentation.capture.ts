@@ -110,6 +110,11 @@ describe("documentation screenshots (opt-in)", () => {
     await expect($(`${view} [data-review-status='open'] .file-diff-sbs-review-marker`)).not.toExist();
     await capture("compare-mode.webp");
     await capture("grouped-changes.png", `${view} .file-diff-sbs-group`);
+    await $(`${view} .file-diff-sbs-keep-both`).click();
+    await expect($(`${view} .file-diff-sbs-summary`)).toHaveText("Open: 1 · Accepted: 4 · Ignored: 0");
+    await capture("kept-variants.webp");
+    await $(undo).click();
+    await expect($$(accept)).toBeElementsArrayOfSize(5);
     await browser.executeObsidianCommand("side-by-side-diff:next-change");
     await browser.executeObsidianCommand("side-by-side-diff:next-change");
     await expect($(`${view} .file-diff-sbs-change-position`)).toHaveText("2/5");

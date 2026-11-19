@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Aceptar el cambio de izquierda a derecha",
 	"actions.dismiss": "Ignorar el cambio izquierdo y mantener el derecho sin cambios",
 	"actions.acceptGroup": "Aceptar todo",
+	"actions.keepBothGroup": "Conservar ambas",
+	"actions.keepBothGroupTarget": "Conservar ambas versiones en «{name}»: destino, línea en blanco y después origen",
 	"actions.acceptGroupTitle": "Aceptar todos los cambios de este bloque de izquierda a derecha",
 	"actions.acceptGroupProposalTitle": "Aceptar todas las propuestas de este bloque en el original",
 	"actions.dismissGroup": "Ignorar todo",

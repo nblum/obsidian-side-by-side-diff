@@ -1,5 +1,5 @@
-import { ReviewState, type ReviewCounts, type ReviewStatus } from "./review-state.ts";
-import type { DiffDirection } from "./diff-core.ts";
+import { ReviewState, type ReviewCounts, type ReviewStatus, type ReviewStateSnapshot } from "./review-state.ts";
+import { joinLines, type DiffDirection } from "./diff-core.ts";
 import type { ComparisonOptions, ComparisonRowModel } from "./diff-model.ts";
 import { captureSaveBaseline, migrateSaveEntry, refreshSaveBaseline } from "./save-guard.ts";
 
@@ -12,7 +12,7 @@ export interface PendingChange {
 /** Captures review decisions with the alignment to which they belong. */
 interface ReviewSnapshot {
 	readonly review: ReviewState;
-	readonly statuses: readonly (ReviewStatus | null)[];
+	readonly state: ReviewStateSnapshot;
 }
 
 /** Records how to reverse one accept or ignore action, however many rows it touched. */
@@ -68,7 +68,7 @@ export class DiffSession {
 
 	/** Captures statuses alongside the existing atomic undo action. */
 	private snapshotReview(): ReviewSnapshot | null {
-		return this.review === null ? null : { review: this.review, statuses: this.review.snapshot() };
+		return this.review === null ? null : { review: this.review, state: this.review.snapshot() };
 	}
 
 	/** Returns whether a diff row has been dismissed in the current session. */
@@ -136,6 +136,26 @@ export class DiffSession {
 		this.pendingContents.set(path, content);
 	}
 
+	/** Stages both variants with the target first, preserving the review ledger and existing undo stack. */
+	public stageKeepBoth(path: string, currentContent: string, baseline: string, indexes: readonly number[]): boolean {
+		if (this.review === null) return false;
+		const reviewSnapshot = this.snapshotReview();
+		if (!this.review.keepBoth(indexes)) return false;
+		const lines = this.review.getTargetLines();
+		let content = joinLines(lines, currentContent);
+		// A literal final blank line needs its own terminator, even in a previously unterminated target.
+		if (lines.at(-1) === "" && !/(?:\r\n|\r|\n)$/.test(currentContent)) {
+			content += currentContent.match(/\r\n|\r|\n/)?.[0] ?? "\n";
+		}
+		captureSaveBaseline(this.saveBaselines, path, baseline);
+		this.undoStack.push({ type: "stage", path, previousContent: this.pendingContents.get(path), reviewSnapshot });
+		this.pendingContents.set(path, content);
+		return true;
+	}
+
+	/** Prevents cleanup or identical-file actions from confusing resolved differences with equality. */
+	public hasEqualContents(): boolean { return this.review?.hasEqualContents() ?? false; }
+
 	/** Returns whether an accept or ignore action can be undone. */
 	public canUndo(): boolean {
 		return this.undoStack.length > 0;
@@ -160,7 +180,7 @@ export class DiffSession {
 			}
 		}
 		if (entry.reviewSnapshot !== null && entry.reviewSnapshot.review === this.review) {
-			this.review.restore(entry.reviewSnapshot.statuses);
+			this.review.restore(entry.reviewSnapshot.state);
 		} else if (entry.type === "dismiss") {
 			this.review?.reopen(entry.rowKeys);
 		}

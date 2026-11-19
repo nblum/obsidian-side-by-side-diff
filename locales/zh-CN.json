@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "从左向右应用更改",
 	"actions.dismiss": "忽略左侧更改并保持右侧不变",
 	"actions.acceptGroup": "全部接受",
+	"actions.keepBothGroup": "保留两者",
+	"actions.keepBothGroupTarget": "在“{name}”中保留两个版本：先目标文本，再空行，最后来源文本",
 	"actions.acceptGroupTitle": "从左向右应用此分组中的所有更改",
 	"actions.acceptGroupProposalTitle": "将此分组中的所有修改建议应用到原文件",
 	"actions.dismissGroup": "全部忽略",

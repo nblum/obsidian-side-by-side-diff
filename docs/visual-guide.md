@@ -59,6 +59,17 @@ block in one step; a single **Undo** reverses that step. Accept all skips change
 
 ![Grouped changes with Accept all and Ignore all controls](../assets/grouped-changes.png)
 
+## Keep both versions
+
+Choose **Keep both** in a block header when you need text from both versions. For each open fragment, the target
+keeps its current text, followed by one blank line and the source text. Ignored or already accepted rows stay as
+chosen; unchanged blank lines separate fragments and are not copied twice. The action follows the current merge
+direction and remains staged until you save. One **Undo** restores the whole block.
+
+![Target retaining its original paragraph and the incoming source paragraph before saving](../assets/kept-variants.webp)
+
+After saving, both files may still differ. A completed review does not offer identical-file cleanup in that case.
+
 ## Review staged changes before saving
 
 Accepting a change updates the target preview. New target text is green; the previous target line remains visible

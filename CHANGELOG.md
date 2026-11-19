@@ -11,6 +11,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Add **Keep both** to change-block headers with content in both versions. Stage target text first, a blank line,
+  then source text in either merge direction, preserving previously resolved rows and literal whitespace. Undo
+  reverses the whole action; saving stays explicit. Retained variants never trigger identical-file trash actions
+  or proposal-copy cleanup while compared contents still differ.
+
 - Show a position badge such as `5/12` on the top border of the active change frame only. It follows navigation
   among open changes, updates during review, and has a localized accessible label without entering file content.
 

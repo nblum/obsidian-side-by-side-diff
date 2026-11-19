@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Accept change from left to right",
 	"actions.dismiss": "Ignore the left change and keep the right side unchanged",
 	"actions.acceptGroup": "Accept all",
+	"actions.keepBothGroup": "Keep both",
+	"actions.keepBothGroupTarget": "Keep both versions in “{name}”: target first, a blank line, then source",
 	"actions.acceptGroupTitle": "Accept every change in this block from left to right",
 	"actions.acceptGroupProposalTitle": "Accept every proposal in this block into the original",
 	"actions.dismissGroup": "Ignore all",

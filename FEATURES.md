@@ -119,6 +119,16 @@ visible, can be reviewed and staged individually, and are written only through a
 - The block header disappears once every row in the block has been resolved, whether through the block controls or
   through individual per-row actions.
 - `Accept all` never re-applies a row the user has already ignored individually within the same block.
+- The same headers offer **Keep both** when open rows contain text from both versions. For each uninterrupted
+  open fragment, it stages the current target version, one additional blank line when both variants have content,
+  and then the source version. Unchanged rows and previously accepted or ignored entries remain in place and
+  separate fragments; unchanged blank bridges are not duplicated. Pure additions/removals use the usual controls.
+- Keep both follows the selected merge direction and the actual target's write permission, including writable
+  external targets and read-only external sources. It preserves literal whitespace, Markdown hard breaks and the
+  target's line-ending style. Literal final blank lines receive the terminator needed to preserve them.
+- Each original open row is counted as accepted once; retained target lines and separators do not create review
+  entries. The entire block action is one undo step. Later decisions, partial saves, failed saves and Undo preserve
+  the kept variants and remaining review identities. File writes still require an explicit save.
 
 ### Review status and progress
 
@@ -197,7 +207,9 @@ visible, can be reviewed and staged individually, and are written only through a
   comparison entry points, file selection, navigation, change groups, feedback, documentation, and a closing
   thank-you note with a "Buy me a coffee" Ko-fi support link. It can be reopened through the settings page or the
   command palette.
-- Identical files show a dedicated message.
+- Identical files show a dedicated message. Review completion after Keep both can leave files different and
+  shows the processed-suggestions message instead. Identical-file trash actions and proposal-copy cleanup require
+  equal compared content, independently of accepted/ignored review counts.
 - From that message, one of the files can be moved to the Obsidian trash after confirmation. The file is not
   permanently deleted and can be restored.
 - When a compared file is renamed or deleted, the open view reacts to the vault change.

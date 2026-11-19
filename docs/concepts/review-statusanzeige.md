@@ -33,13 +33,20 @@ that review, including repeated identical lines. Accepting a row projects the so
 updates target indexes without re-aligning the remaining rows. This keeps earlier ignored decisions and later
 merge actions attached to their original entries after insertions and deletions.
 
+Keep both adds retained target rows and a separator before the source projection of each uninterrupted open
+fragment. These extra rows have no review-entry identity; projected row indexes map back to their original
+entries so later navigation and actions retain the right indexes. Undo snapshots contain both decisions and
+retained fragments. Ignored/accepted rows and unchanged blank bridges split fragments rather than being copied.
+
 Rendering and row/block actions use the same projected rows and alignment options. No file is written by a
 review decision. Literal content, line endings, guarded saving, and external target permissions retain their
 existing behavior. Both merge directions use the same model. Proposal acceptance retains its fixed direction.
 
 ## Lifecycle
 
-- Accept and ignore update only open entries. Block acceptance skips previously ignored entries.
+- Accept, Keep both and ignore update only open entries. Block actions skip previously resolved entries.
+- After Keep both, completion and equality remain separate even after saving. Identical-file and proposal-copy
+  cleanup require equal compared content, including retained target rows.
 - Existing Undo restores content and review statuses together. A block action is one undo step.
 - Next/previous and automatic advance visit only open changes. Automatic advance still follows its setting.
 - Failed or conflicting saves preserve pending content and review status.

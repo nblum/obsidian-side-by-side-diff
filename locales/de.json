@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Änderung von links nach rechts übernehmen",
 	"actions.dismiss": "Linke Änderung ignorieren und die rechte Seite unverändert lassen",
 	"actions.acceptGroup": "Alle übernehmen",
+	"actions.keepBothGroup": "Beide behalten",
+	"actions.keepBothGroupTarget": "Beide Fassungen in „{name}“ behalten: zuerst Zieltext, eine Leerzeile, dann Quelltext",
 	"actions.acceptGroupTitle": "Alle Änderungen in diesem Block von links nach rechts übernehmen",
 	"actions.acceptGroupProposalTitle": "Alle Vorschläge in diesem Block ins Original übernehmen",
 	"actions.dismissGroup": "Alle ignorieren",

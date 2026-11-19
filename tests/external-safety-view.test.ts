@@ -378,3 +378,43 @@ test("reverse direct editing refuses external modifications to the target before
   assert.equal(contents.get("left.md"), "changed elsewhere");
   assert.equal(contents.get("right.md"), sourceBefore);
 });
+
+test("Keep both respects read-only external targets and can retain a snapshot in a writable vault target", async () => {
+  const { view, session, contents } = createSafetyView();
+  const original = contents.get("left.md");
+  assert.ok(original);
+  await view.dropMarkdown([{ name: "snapshot.md", text: () => Promise.resolve("snapshot") } as File]);
+  await view.applyGroupChange(0, 10, "left-to-right", "keep-both");
+  assert.equal(session.hasPendingChanges(), false);
+  await view.reverseApplyDirection();
+  await view.applyGroupChange(0, 10, "right-to-left", "keep-both");
+  assert.equal(contents.get("left.md"), original);
+  assert.equal(await view.savePendingChanges(), true);
+  assert.equal(contents.get("left.md"), `${original}\n\nsnapshot`);
+  assert.equal(session.hasEqualContents(), false);
+});
+
+test("Keep both revalidates native external input and preserves staged variants after a conflicting save", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "sbs-keep-both-"));
+  try {
+    const path = join(dir, "outside.md");
+    const target = "anchor\nold-a\nold-b\nend";
+    await writeFile(path, target);
+    const { view, session } = createSafetyView();
+    await view.dropMarkdown([nativeDrop(path, target)], Promise.resolve(diskFileHandle(path)));
+    await view.applyGroupChange(1, 2, "left-to-right", "keep-both");
+    assert.equal(await readFile(path, "utf8"), target);
+    assert.equal(session.getPendingChanges()[0]?.content, "anchor\nold-a\nold-b\n\nnew-a\nnew-b\nend");
+    await writeFile(path, "edited elsewhere");
+    assert.equal(await view.savePendingChanges(), false);
+    assert.equal(await readFile(path, "utf8"), "edited elsewhere");
+    assert.deepEqual(session.getReviewCounts(), { open: 0, accepted: 2, ignored: 0 });
+
+    const fresh = createSafetyView();
+    await fresh.view.dropMarkdown([nativeDrop(path, "edited elsewhere")], Promise.resolve(diskFileHandle(path)));
+    await writeFile(path, "new unseen version");
+    await fresh.view.applyGroupChange(0, 10, "left-to-right", "keep-both");
+    assert.equal(fresh.session.hasPendingChanges(), false);
+    assert.ok(notices.includes("notice.comparisonChanged"));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

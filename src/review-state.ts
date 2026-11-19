@@ -1,5 +1,6 @@
 import { getDiffRowKey, indexDiffRows, type DiffDirection, type IndexedDiffRow } from "./diff-core.ts";
 import { createComparisonModelFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model.ts";
+import { canKeepBoth, createKeepBothPlan } from "./keep-both.ts";
 
 export type ReviewStatus = "open" | "accepted" | "ignored";
 export interface ReviewCounts {
@@ -8,9 +9,17 @@ export interface ReviewCounts {
 	readonly ignored: number;
 }
 
+/** Captures decisions and retained variants together for atomic row/block undo. */
+export interface ReviewStateSnapshot {
+	readonly statuses: readonly (ReviewStatus | null)[];
+	readonly retainedTargets: readonly (readonly [number, readonly string[]])[];
+}
+
 /** Keeps original aligned row identities while accepted target lines are inserted or removed. */
 export class ReviewState {
 	private cachedRows: ComparisonRowModel[] | null = null;
+	private projectedEntries: (number | null)[] = [];
+	private retainedTargets = new Map<number, readonly string[]>();
 	private ignoredKeys: Set<string> | null = null;
 	private statuses: (ReviewStatus | null)[];
 	private originalRows: ComparisonRowModel[];
@@ -28,18 +37,29 @@ export class ReviewState {
 	/** Projects accepted content without re-aligning or losing target-only deletion entries. */
 	getRows(): ComparisonRowModel[] {
 		if (this.cachedRows !== null) return this.cachedRows;
-		this.cachedRows = indexDiffRows(this.originalRows.map((row, index) => {
-			if (this.statuses[index] !== "accepted") return row;
+		const projected: ComparisonRowModel[] = [];
+		this.projectedEntries = [];
+		this.originalRows.forEach((row, index) => {
+			for (const value of this.retainedTargets.get(index) ?? []) {
+				projected.push({ ...row, left: this.direction === "left-to-right" ? null : value,
+					right: this.direction === "left-to-right" ? value : null, equal: true,
+					type: "equal", leftInlineTokens: [], rightInlineTokens: [] });
+				this.projectedEntries.push(null);
+			}
 			const value = this.direction === "left-to-right" ? row.left : row.right;
-			return { ...row, left: value, right: value, equal: true, type: "equal" as const, leftInlineTokens: [], rightInlineTokens: [] };
-		})) as ComparisonRowModel[];
+			projected.push(this.statuses[index] === "accepted"
+				? { ...row, left: value, right: value, equal: true, type: "equal", leftInlineTokens: [], rightInlineTokens: [] }
+				: row);
+			this.projectedEntries.push(index);
+		});
+		this.cachedRows = indexDiffRows(projected) as ComparisonRowModel[];
 		return this.cachedRows;
 	}
 
 	/** Rebases on explicitly saved content without re-aligning still-open or ignored entries. */
 	commit(): void {
 		const rows = this.getRows();
-		const statuses = this.statuses;
+		const statuses = rows.map((_row, index) => this.getStatus(index));
 		this.originalRows = [];
 		this.statuses = [];
 		rows.forEach((row, index) => {
@@ -48,7 +68,38 @@ export class ReviewState {
 			this.originalRows.push(row);
 			this.statuses.push(statuses[index] === "accepted" ? null : statuses[index] ?? null);
 		});
+		this.retainedTargets.clear();
 		this.invalidate();
+	}
+
+	/** Returns literal current target lines, excluding visual alignment gaps. */
+	getTargetLines(): string[] {
+		const side = this.direction === "left-to-right" ? "right" : "left";
+		return this.getRows().flatMap(row => row[side] === null ? [] : [row[side]]);
+	}
+
+	/** Checks file equality independently of resolved review states and retained target variants. */
+	hasEqualContents(): boolean {
+		const rows = this.getRows();
+		const left = rows.flatMap(row => row.left === null ? [] : [row.left]);
+		return this.matchesSide(rows, left, "right");
+	}
+
+	/** Retains target fragments before accepted source fragments in one undoable decision. */
+	keepBoth(indexes: readonly number[]): boolean {
+		const rows = this.getRows();
+		const open = indexes.filter(index => this.getStatus(index) === "open");
+		const runs = createKeepBothPlan(rows, open, this.direction);
+		if (!canKeepBoth(runs)) return false;
+		for (const run of runs) {
+			const first = run.rowIndexes[0];
+			const entry = first === undefined ? null : this.projectedEntries[first];
+			if (entry === null || entry === undefined) continue;
+			this.retainedTargets.set(entry, [...run.targetLines,
+				...(run.targetLines.length > 0 && run.sourceLines.length > 0 ? [""] : [])]);
+		}
+		this.accept(open);
+		return true;
 	}
 
 	/** Detects new file contents so decisions cannot accidentally attach to unrelated rows. */
@@ -65,17 +116,31 @@ export class ReviewState {
 	}
 
 	/** Returns a defensive snapshot for the session's existing undo stack. */
-	snapshot(): (ReviewStatus | null)[] { return [...this.statuses]; }
+	snapshot(): ReviewStateSnapshot {
+		return { statuses: [...this.statuses], retainedTargets: [...this.retainedTargets].map(([index, lines]) => [index, [...lines]]) };
+	}
 
 	/** Restores exactly the statuses belonging to one undone row or block action. */
-	restore(statuses: readonly (ReviewStatus | null)[]): void { this.statuses = [...statuses]; this.invalidate(); }
+	restore(snapshot: ReviewStateSnapshot): void {
+		this.statuses = [...snapshot.statuses];
+		this.retainedTargets = new Map(snapshot.retainedTargets.map(([index, lines]) => [index, [...lines]]));
+		this.invalidate();
+	}
 
 	/** Returns a status only for an original changed row. */
-	getStatus(index: number): ReviewStatus | null { return this.statuses[index] ?? null; }
+	getStatus(index: number): ReviewStatus | null {
+		this.getRows();
+		const entry = this.projectedEntries[index];
+		return entry === null || entry === undefined ? null : this.statuses[entry] ?? null;
+	}
 
 	/** Accepts only open entries; ignored rows remain untouched by block acceptance. */
 	accept(indexes: readonly number[]): void {
-		for (const index of indexes) if (this.statuses[index] === "open") this.statuses[index] = "accepted";
+		this.getRows();
+		for (const index of indexes) {
+			const entry = this.projectedEntries[index];
+			if (entry !== null && entry !== undefined && this.statuses[entry] === "open") this.statuses[entry] = "accepted";
+		}
 		this.invalidate();
 	}
 
@@ -84,7 +149,8 @@ export class ReviewState {
 		if (keys.length === 0) return;
 		const selected = new Set(keys);
 		this.getRows().forEach((row, index) => {
-			if (this.statuses[index] === "open" && selected.has(getDiffRowKey(row))) this.statuses[index] = "ignored";
+			const entry = this.projectedEntries[index];
+			if (entry !== null && entry !== undefined && this.statuses[entry] === "open" && selected.has(getDiffRowKey(row))) this.statuses[entry] = "ignored";
 		});
 		this.invalidate();
 	}
@@ -94,7 +160,8 @@ export class ReviewState {
 		if (keys.length === 0) return;
 		const selected = new Set(keys);
 		this.getRows().forEach((row, index) => {
-			if (this.statuses[index] === "ignored" && selected.has(getDiffRowKey(row))) this.statuses[index] = "open";
+			const entry = this.projectedEntries[index];
+			if (entry !== null && entry !== undefined && this.statuses[entry] === "ignored" && selected.has(getDiffRowKey(row))) this.statuses[entry] = "open";
 		});
 		this.invalidate();
 	}
@@ -110,7 +177,7 @@ export class ReviewState {
 
 	/** Returns ignored keys at their current target positions for saving and swapping. */
 	getIgnoredKeys(): string[] {
-		return this.getRows().flatMap((row, index) => this.statuses[index] === "ignored" ? [getDiffRowKey(row)] : []);
+		return this.getRows().flatMap((row, index) => this.getStatus(index) === "ignored" ? [getDiffRowKey(row)] : []);
 	}
 
 	/** Counts original changed rows, independently of rendered elements and disk writes. */

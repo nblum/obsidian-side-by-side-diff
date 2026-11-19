@@ -25,6 +25,15 @@ for implementation. Once shipped, update the feature reference and changelog and
 - **Reference:** [Implemented behavior](FEATURES.md#review-status-and-progress) and
   [review status design](docs/concepts/review-statusanzeige.md).
 
+### Keep both variants of a changed block
+
+- **Status:** Implemented; pending release.
+- **Benefit:** Preserve both versions of open block fragments without manual copying.
+- **Scope:** Existing block headers offer Keep both when both versions contain text. Retain target text first,
+  one blank separator, then source text in either merge direction. Previously resolved rows and unchanged bridges
+  split fragments and remain untouched. Staging, one-step undo, write permissions and guarded saving are reused.
+- **Reference:** [Grouped change blocks](FEATURES.md#grouped-change-blocks).
+
 ## Later
 
 No features are currently assigned to this group.
@@ -43,13 +52,6 @@ not a delivery sequence.
 - **Decisions:** Handle missing originals and multiple conflict copies; revalidate files before actions; decide
   when to offer moving a conflict copy to the trash. Finishing a review, especially after ignoring changes, does
   not establish that the files are identical. This remains a manual two-way merge without a shared ancestor.
-
-### Keep both variants of a changed block
-
-- **Benefit:** Preserve useful content from both versions without copying and pasting it manually.
-- **Initial scope:** Add a distinct **Keep both** block action that stages both variants into the right file and
-  participates in undo. Keep the existing **Accept all** meaning: accept every applicable change in the block.
-- **Decisions:** Define the order and separator between variants and how previously resolved rows are handled.
 
 ### Optional single-column diff layout
 

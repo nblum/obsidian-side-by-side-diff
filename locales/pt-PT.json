@@ -116,6 +116,8 @@
 	"actions.copyLeftToRight": "Aceitar alteração da esquerda para a direita",
 	"actions.dismiss": "Ignorar a alteração à esquerda e manter o lado direito inalterado",
 	"actions.acceptGroup": "Aceitar tudo",
+	"actions.keepBothGroup": "Manter ambas",
+	"actions.keepBothGroupTarget": "Manter ambas as versões em «{name}»: destino, linha em branco e depois origem",
 	"actions.acceptGroupTitle": "Aceitar todas as alterações deste bloco da esquerda para a direita",
 	"actions.acceptGroupProposalTitle": "Aceitar todas as propostas deste bloco no original",
 	"actions.dismissGroup": "Ignorar tudo",

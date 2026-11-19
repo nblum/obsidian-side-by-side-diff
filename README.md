@@ -98,7 +98,13 @@ Contiguous changed lines, as well as changes separated only by blank lines, are 
 gets `Accept all` / `Ignore all` controls to resolve it in one step. `Undo` (button or `Ctrl/Cmd+Z`) reverts the last
 accept or ignore action, single row or whole block, until it is saved.
 
-![A grouped change block with Accept all and Ignore all](assets/grouped-changes.png)
+![A grouped change block with Accept all, Keep both, and Ignore all](assets/grouped-changes.png)
+
+When both versions contain text, the block header also offers **Keep both**. It retains the existing target text,
+adds a blank line, then appends the source version in the selected merge direction. Previously accepted or ignored
+rows and unchanged separator lines split the action into independent open fragments and remain untouched.
+The result stays staged, and one Undo reverses the entire block action. Added-only or removed-only blocks retain
+their usual accept/ignore controls.
 
 Accepted changes stay staged until you save. In this example, the target shows its previous line in red with
 strikethrough and the incoming text in green. The feedback beside `Undo` confirms that the change is staged.

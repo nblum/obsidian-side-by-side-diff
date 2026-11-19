@@ -152,7 +152,8 @@ requirements apply. Screenshot commands use the same default headless runner on 
 | `file-selection.png` | Original preview and right-file selection |
 | `file-menu.webp` | Single-file comparison context menu |
 | `compare-two-files-menu.png` | Native two-file selection and comparison menu |
-| `grouped-changes.png` | A block with Accept all / Ignore all |
+| `grouped-changes.png` | A block with Accept all / Keep both / Ignore all |
+| `kept-variants.webp` | Target text followed by the source variant before explicitly saving |
 | `inline-edit.png` | Editable target beside the read-only source |
 | `pending-changes.webp` | Accepted text, deletion previews, and inline feedback |
 | `ignored-changes.webp` | Ignored differences with both files preserved |
@@ -184,6 +185,8 @@ The unit tests cover the deterministic diff, synchronization, and translation ru
 - copying comparison text with document focus while excluding alignment gaps
 - pending target previews for accepted insertions, replacements and deletions, including empty targets, both
   directions, subsequent action indexes, undo, successful/conflicting saves, and copying without deleted previews
+- keeping both target/source fragments in either direction, ignored/accepted boundaries, blank bridges, literal
+  final blank lines, CRLF and Markdown hard breaks, subsequent actions/undo, partial saves and cleanup exclusions
 - session-local open/accepted/ignored counts and accessible markers, stable decisions after target line shifts,
   deletion-only reviews, mixed-block undo, successful/conflicting saves, and swapping in both merge directions
 - matching keys and placeholders across all locale dictionaries
@@ -218,6 +221,8 @@ For changes to the view or save logic, check at least these cases:
 - green incoming source content and red outgoing target content, including color reversal after changing direction
 - the active frame's position badge with button/keyboard navigation, wraparound, resolution, undo, automatic
   advance, both merge directions, and no clipping at the top of a small grouped block
+- Keep both in block headers, target-first order with blank separators, ignored/accepted fragments preserved,
+  one-step undo, explicit saving, and no identical-file cleanup for different retained contents
 - review counts, open action groups and check/minus markers, mixed accepted/ignored blocks, row/block undo,
   shifted line indexes, and saved versus completed review state in both directions
 - accepted target changes with green text and red struck-through deletions on neutral backgrounds until save,

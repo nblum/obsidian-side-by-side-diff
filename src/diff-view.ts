@@ -13,6 +13,7 @@ import { getDroppedFilePath, getDroppedFileHandle, getVaultRelativePath, readExt
 import { hasEditableLineStructureChanged } from "./edit-sync";
 import { shouldOfferProposalCleanup } from "./proposal-cleanup";
 import { DiffSession, hasUnsavedComparisonChanges } from "./diff-session";
+import { canKeepBoth, createKeepBothPlan } from "./keep-both";
 import { countGroupChangedRows, getActionableRowIndexes, groupChangeRows, GROUP_HEADER_THRESHOLD, type ChangeRowGroup } from "./diff-grouping";
 import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./diff-view-state";
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
@@ -1311,7 +1312,7 @@ export class SideBySideDiffView extends ItemView {
     }
   }
   /** Stages every changed row inside a bridged block at once, in the same direction. */
-  async applyGroupChange(startIndex: number, endIndex: number, direction: DiffDirection): Promise<void> {
+  async applyGroupChange(startIndex: number, endIndex: number, direction: DiffDirection, action: "accept" | "keep-both" = "accept"): Promise<void> {
     if (this.state.mode !== "compare" && direction !== "left-to-right") return;
     const scrollPosition = this.getScrollPosition();
     const targetPosition = this.getChangeTargetPosition(startIndex);
@@ -1340,25 +1341,25 @@ export class SideBySideDiffView extends ItemView {
       if (actionableIndexes.length === 0) {
         return;
       }
-      // Apply from the last row to the first so earlier, not-yet-processed row indexes stay valid
-      // while splices from later rows shift everything after them.
-      let leftLines = splitLines(leftContent);
-      let rightLines = splitLines(rightContent);
-      for (let position = actionableIndexes.length - 1; position >= 0; position -= 1) {
-        const rowIndex = actionableIndexes[position];
-        const row = rowIndex === undefined ? undefined : rows[rowIndex];
-        if (!row) {
-          continue;
-        }
-        ({ leftLines, rightLines } = applyAlignedRowChange(leftLines, rightLines, row, direction));
-      }
       const leftToRight = direction === "left-to-right";
       const targetFile = leftToRight ? rightFile : leftFile;
       if (!(targetFile instanceof TFile) && targetFile.handle === null) return;
       const targetContent = leftToRight ? rightContent : leftContent;
-      const targetLines = leftToRight ? rightLines : leftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
-      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline, actionableIndexes);
+      if (action === "keep-both") {
+        if (!this.session.stageKeepBoth(targetFile.path, targetContent, targetBaseline, actionableIndexes)) return;
+      } else {
+        // Apply in reverse order so later splices do not move earlier target indexes.
+        let leftLines = splitLines(leftContent);
+        let rightLines = splitLines(rightContent);
+        for (let position = actionableIndexes.length - 1; position >= 0; position -= 1) {
+          const rowIndex = actionableIndexes[position];
+          const row = rowIndex === undefined ? undefined : rows[rowIndex];
+          if (!row) continue;
+          ({ leftLines, rightLines } = applyAlignedRowChange(leftLines, rightLines, row, direction));
+        }
+        this.session.stageChange(targetFile.path, joinLines(leftToRight ? rightLines : leftLines, targetContent), targetBaseline, actionableIndexes);
+      }
       await this.renderDiff(scrollPosition);
       this.showReviewFeedback("notice.staged");
       if (this.state.mode === "accept" && direction === "left-to-right") {
@@ -1554,7 +1555,7 @@ export class SideBySideDiffView extends ItemView {
     if (this.state.editRight) {
       root.createDiv({ cls: "file-diff-sbs-hint", text: this.translate("view.hint.edit") });
     }
-    const allChangesResolved = !this.state.editRight && visibleChangedCount === 0 && (counts.accepted + counts.ignored > 0 || this.hasPendingChanges());
+    const allChangesResolved = !this.state.editRight && visibleChangedCount === 0 && (counts.accepted + counts.ignored > 0 || this.hasPendingChanges() || !this.session.hasEqualContents());
     if (allChangesResolved) {
       this.buildResolvedMessage(root);
     } else if (changedRows.length === 0) {
@@ -1681,6 +1682,15 @@ export class SideBySideDiffView extends ItemView {
     acceptButton.disabled = !this.canApplyChange();
     acceptButton.title = this.translate("actions.acceptGroupTarget", { name: this.getApplyTargetName() });
     acceptButton.addEventListener("click", () => { void this.applyGroupChange(group.startIndex, group.endIndex, this.applyDirection); });
+    const openIndexes = getActionableRowIndexes(rows, group.startIndex, group.endIndex, row => this.session.hasDismissedRow(getDiffRowKey(row)));
+    if (canKeepBoth(createKeepBothPlan(rows, openIndexes, this.applyDirection))) {
+      const keepBothButton = actions.createEl("button", { text: this.translate("actions.keepBothGroup"), cls: "file-diff-sbs-group-button file-diff-sbs-keep-both" });
+      const label = this.translate("actions.keepBothGroupTarget", { name: this.getApplyTargetName() });
+      keepBothButton.disabled = !this.canApplyChange();
+      keepBothButton.title = label;
+      keepBothButton.setAttribute("aria-label", label);
+      keepBothButton.addEventListener("click", () => { void this.applyGroupChange(group.startIndex, group.endIndex, this.applyDirection, "keep-both"); });
+    }
     const dismissButton = actions.createEl("button", { text: this.translate("actions.dismissGroup"), cls: "file-diff-sbs-group-button" });
     dismissButton.title = this.translate("actions.dismissGroupTarget", { name: this.getApplyTargetName() });
     const groupRows = rows.slice(group.startIndex, group.endIndex + 1);
@@ -1834,7 +1844,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Opens the proposal-copy cleanup prompt after all accepted changes are saved. */
   maybePromptDeleteChangeCopy(): void {
-    if (this.session.hasShownProposalCleanupPrompt() || !shouldOfferProposalCleanup(this.state.mode, this.session.hasAcceptedProposalChanges(), this.session.getDismissedRowCount(), this.hasPendingChanges())) {
+    if (!this.session.hasEqualContents() || this.session.hasShownProposalCleanupPrompt() || !shouldOfferProposalCleanup(this.state.mode, this.session.hasAcceptedProposalChanges(), this.session.getDismissedRowCount(), this.hasPendingChanges())) {
       return;
     }
     const leftPath = this.state.leftPath;

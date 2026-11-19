@@ -330,6 +330,58 @@ describe("comparison in Obsidian", () => {
     });
   }
 
+  for (const reverse of [false, true]) {
+    it(`keeps both versions of open block fragments and preserves ignored rows (${reverse ? "right to left" : "left to right"})`, async () => {
+      const source = "A\ns1\ns2\ns3\ns4\ns5\nZ\n";
+      const target = "A\r\nt1\r\nt2\r\nt3\r\nt4\r\nt5\r\nZ\r\n";
+      const expected = "A\r\nt1\r\n\r\ns1\r\nt2\r\nt3\r\nt4\r\nt5\r\n\r\ns3\r\ns4\r\ns5\r\nZ\r\n";
+      await obsidianPage.write("Original.md", reverse ? target : source);
+      await obsidianPage.write("Comparison.md", reverse ? source : target);
+      await expect($(progress)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+      if (reverse) await $(`${view} .file-diff-sbs-direction-button`).click();
+      const ignored = $$(ignore)[1];
+      assert.ok(ignored);
+      await ignored.click();
+      const keep = `${view} .file-diff-sbs-keep-both`;
+      await expect($(keep)).toHaveText("Keep both");
+      await expect($(keep)).toBeEnabled();
+      await $(keep).click();
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 4 · Ignored: 1");
+      const targetPath = reverse ? "Original.md" : "Comparison.md";
+      const sourcePath = reverse ? "Comparison.md" : "Original.md";
+      assert.equal(await readSaved(targetPath), target);
+      assert.equal(await readSaved(sourcePath), source);
+      assert.equal(await browser.execute((selector, side) => Array.from(document.querySelectorAll<HTMLElement>(`${selector} .file-diff-sbs-code[data-diff-side='${side}'][data-diff-present='true']`), node => node.innerText).join("\n"), view, reverse ? "left" : "right"), expected.replace(/\r/g, "").replace(/\n$/, ""));
+      await $(undo).click();
+      await expect($(progress)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 1");
+      await expect($(save)).toBeDisabled();
+      await $(keep).click();
+      await saveFromToolbar();
+      await browser.waitUntil(async () => await readSaved(targetPath) === expected);
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 1");
+      assert.equal(await readSaved(sourcePath), source);
+      await expect($(`${view} .file-diff-sbs-identical-actions`)).not.toExist();
+      await browser.saveScreenshot(join(process.cwd(), `e2e-results/keep-both-${reverse ? "reverse" : "forward"}.png`));
+    });
+  }
+
+  it("keeps differing saved variants resolved without identical-file cleanup and omits Keep both for one-sided blocks", async () => {
+    await obsidianPage.write("Original.md", "A\ns1\ns2\ns3\ns4\nZ\n");
+    await obsidianPage.write("Comparison.md", "A\nt1\nt2\nt3\nt4\nZ\n");
+    await expect($(progress)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 0");
+    await $(`${view} .file-diff-sbs-keep-both`).click();
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 4 · Ignored: 0");
+    await saveFromToolbar();
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 0");
+    assert.equal(await readSaved("Comparison.md"), "A\nt1\nt2\nt3\nt4\n\ns1\ns2\ns3\ns4\nZ\n");
+    await expect($(`${view} .file-diff-sbs-identical-message strong`)).toHaveText("All change suggestions have been processed.");
+    await expect($(`${view} .file-diff-sbs-identical-actions`)).not.toExist();
+    await obsidianPage.write("Comparison.md", "A\nZ\n");
+    await expect($(progress)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 0");
+    await expect($(`${view} .file-diff-sbs-keep-both`)).not.toExist();
+    await expect($(save)).toBeDisabled();
+  });
+
   it("counts a mixed block by changed rows and undoes the entire acceptance at once", async () => {
     await obsidianPage.write("Original.md", "A\nnew1\nnew2\nnew3\nnew4\nnew5\nZ\n");
     await obsidianPage.write("Comparison.md", "A\nold1\nold2\nold3\nold4\nold5\nZ\n");
