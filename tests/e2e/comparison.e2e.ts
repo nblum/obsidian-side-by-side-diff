@@ -67,6 +67,35 @@ describe("comparison in Obsidian", () => {
     assert.equal(await readSaved("Comparison.md"), comparison);
   });
 
+  it("shows the Ko-fi support link in About settings", async () => {
+    await browser.executeObsidianCommand("app:open-settings");
+    await $(".vertical-tab-nav-item=Side-by-Side Diff").click();
+    const link = $(".vertical-tab-content a[href='https://ko-fi.com/blumnico']");
+    await expect(link).toBeDisplayed();
+    await expect(link).toHaveText("Buy me a coffee");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noopener");
+  });
+
+  it("offers coffee support on the introduction's thank-you step", async () => {
+    await browser.executeObsidianCommand("side-by-side-diff:show-introduction");
+    const modal = ".file-diff-sbs-introduction-modal";
+    const continueButton = $(`${modal} .file-diff-sbs-introduction-actions .mod-cta`);
+    const link = $(`${modal} a[href='https://ko-fi.com/blumnico']`);
+    await expect(link).not.toExist();
+    for (let step = 0; step < 4; step += 1) {
+      await continueButton.click();
+    }
+    await expect($(`${modal} h3`)).toHaveText("Thank you");
+    await expect(link).toBeDisplayed();
+    await expect(link).toHaveText("Buy me a coffee");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noopener");
+    await browser.saveScreenshot(join(process.cwd(), "e2e-results/introduction-thanks.png"));
+    await continueButton.click();
+    await expect($(modal)).not.toExist();
+  });
+
   it("stages, undoes and explicitly saves a row without writing to the source", async () => {
     await $(accept).click();
     await expect($(save)).toBeEnabled();

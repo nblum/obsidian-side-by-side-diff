@@ -2,7 +2,7 @@ import { PluginSettingTab, Setting } from "obsidian";
 import type { App, SettingDefinitionItem } from "obsidian";
 import type FileDiffSideBySidePlugin from "./main";
 import { DEFAULT_SETTINGS, isDiffDirection, isLanguagePreference, sanitizeCopySuffix } from "./settings-model";
-import { AUTHOR_WEBSITE_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL } from "./external-links";
+import { AUTHOR_WEBSITE_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL, KO_FI_URL } from "./external-links";
 
 export { DEFAULT_SETTINGS, isLanguagePreference, normalizePluginSettings, sanitizeCopySuffix } from "./settings-model";
 export type { PluginSettings } from "./settings-model";
@@ -196,6 +196,8 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       this.appendExternalLink(fragment, this.plugin.translate("settings.about.star"), GITHUB_REPOSITORY_URL);
       fragment.appendText(" · ");
       this.appendExternalLink(fragment, this.plugin.translate("settings.about.feedback"), GITHUB_FEEDBACK_URL);
+      fragment.appendText(" · ");
+      this.appendExternalLink(fragment, this.plugin.translate("settings.about.kofi"), KO_FI_URL);
     });
   }
 

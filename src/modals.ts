@@ -1,6 +1,6 @@
 import { Modal, SuggestModal } from "obsidian";
 import type { App, TFile } from "obsidian";
-import { AUTHOR_WEBSITE_URL, DOCUMENTATION_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL } from "./external-links";
+import { AUTHOR_WEBSITE_URL, DOCUMENTATION_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL, KO_FI_URL } from "./external-links";
 import type { Translator } from "./i18n";
 import { getIntroductionAssetUrl } from "./introduction-assets";
 import type { IntroductionAssetName } from "./introduction-assets";
@@ -176,7 +176,7 @@ export class IntroductionModal extends Modal {
     const groups = this.appendTip(parent, "modal.introduction.tips.groups.title", "modal.introduction.tips.groups.description");
     this.appendImage(groups, "grouped-changes.png", "modal.introduction.tips.groups.imageAlt");
   }
-  /** Adds the closing note and link to the developer's website. */
+  /** Adds the closing note and links for the developer, feedback, and support. */
   private renderThankYouContent(parent: HTMLElement): void {
     const note = parent.createEl("p", { text: this.translate("modal.introduction.thanks.websitePrefix") });
     note.appendText(" ");
@@ -186,6 +186,8 @@ export class IntroductionModal extends Modal {
     feedback.appendText(" ");
     this.appendExternalLink(feedback, "modal.introduction.thanks.feedbackLink", GITHUB_FEEDBACK_URL);
     feedback.appendText(".");
+    const support = parent.createEl("p");
+    this.appendExternalLink(support, "settings.about.kofi", KO_FI_URL);
   }
   /** Adds one illustrated comparison-start workflow. */
   private appendWorkflow(parent: HTMLElement, titleKey: string, descriptionKey: string, assetName: IntroductionAssetName, imageAltKey: string): void {

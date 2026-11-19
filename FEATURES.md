@@ -168,7 +168,8 @@ visible, can be reviewed and staged individually, and are written only through a
 
 - The plugin opens a short, five-step introduction once after an update when it has not been seen yet. It covers
   comparison entry points, file selection, navigation, change groups, feedback, documentation, and a closing
-  thank-you note. It can be reopened through the settings page or the command palette.
+  thank-you note with a "Buy me a coffee" Ko-fi support link. It can be reopened through the settings page or the
+  command palette.
 - Identical files show a dedicated message.
 - From that message, one of the files can be moved to the Obsidian trash after confirmation. The file is not
   permanently deleted and can be restored.
@@ -207,6 +208,7 @@ visible, can be reviewed and staged individually, and are written only through a
 
 Under **Settings → Side-by-Side Diff**, the following options are available:
 
+- **About me**: Links to the developer website, GitHub star, feedback, and Ko-fi support page.
 - **Language**: Show the plugin interface automatically, in German, or in English.
 - **Show in left ribbon**: Show or hide the icon in the left ribbon. The command palette and document menus are
   unaffected.

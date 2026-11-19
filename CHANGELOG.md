@@ -4,6 +4,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added a "Buy me a coffee" Ko-fi support link to the About section in plugin settings and the introduction's
+  thank-you step, plus the README's support links.
+
 ## [0.11.0] - 2026-11-18
 
 ### Added

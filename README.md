@@ -4,6 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/nblum/obsidian-side-by-side-diff?label=release)](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
 [![License: MIT](https://img.shields.io/github/license/nblum/obsidian-side-by-side-diff)](LICENSE)
 [![Star on GitHub](https://img.shields.io/github/stars/nblum/obsidian-side-by-side-diff?logo=github&label=star)](https://github.com/nblum/obsidian-side-by-side-diff)
+[![Buy me a coffee](https://img.shields.io/badge/Buy_me_a_coffee-Ko--fi-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/blumnico)
 
 A Markdown diff viewer for Obsidian: compare two notes or text files side by side, see exactly what changed,
 and choose which changes to keep. Use it to review a revised draft, compare versions of a note, or merge selected edits into an original.
@@ -218,6 +219,7 @@ Side-by-Side Diff runs locally in Obsidian.
 - [View the latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
 - [Read the changelog](CHANGELOG.md)
 - [Visit the developer website](https://blum-nico.de)
+- [Buy me a coffee](https://ko-fi.com/blumnico)
 
 If Side-by-Side Diff is useful to you, a [GitHub star](https://github.com/nblum/obsidian-side-by-side-diff) is much
 appreciated.
