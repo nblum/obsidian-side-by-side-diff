@@ -68,13 +68,24 @@ describe("comparison in Obsidian", () => {
   });
 
   it("shows the Ko-fi support link in About settings", async () => {
+    const mainWindow = await browser.getWindowHandle();
     await browser.executeObsidianCommand("app:open-settings");
-    await $(".vertical-tab-nav-item=Side-by-Side Diff").click();
-    const link = $(".vertical-tab-content a[href='https://ko-fi.com/blumnico']");
-    await expect(link).toBeDisplayed();
-    await expect(link).toHaveText("Buy me a coffee");
-    await expect(link).toHaveAttribute("target", "_blank");
-    await expect(link).toHaveAttribute("rel", "noopener");
+    // Recent Obsidian versions open Settings in a separate window.
+    const settingsWindow = (await browser.getWindowHandles()).find(handle => handle !== mainWindow);
+    if (settingsWindow !== undefined) await browser.switchToWindow(settingsWindow);
+    try {
+      await $(".vertical-tab-nav-item=Side-by-Side Diff").click();
+      const link = $(".vertical-tab-content a[href='https://ko-fi.com/blumnico']");
+      await expect(link).toBeDisplayed();
+      await expect(link).toHaveText("Buy me a coffee");
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", "noopener");
+    } finally {
+      if (settingsWindow !== undefined) {
+        await browser.closeWindow();
+        await browser.switchToWindow(mainWindow);
+      }
+    }
   });
 
   it("offers coffee support on the introduction's thank-you step", async () => {
@@ -120,7 +131,7 @@ describe("comparison in Obsidian", () => {
       const bounds = container.getBoundingClientRect();
       return target.top >= bounds.top - 2 && target.bottom <= bounds.bottom;
     }, modal), true, "section links scroll within the help dialog");
-    await $(`${modal} .modal-close-button`).click();
+    await browser.keys("Escape");
     await expect($(modal)).not.toExist();
     await expect($(save)).toBeEnabled();
     await expect($(`${view} [data-diff-pending='insert']`)).toHaveText(expect.stringContaining("Original wording."));
