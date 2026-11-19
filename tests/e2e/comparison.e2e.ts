@@ -96,6 +96,39 @@ describe("comparison in Obsidian", () => {
     await expect($(modal)).not.toExist();
   });
 
+  it("opens README help from the diff menu and preserves staged changes", async () => {
+    await $(accept).click();
+    await $(`${view} button[aria-label='File actions']`).click();
+    await $(".menu-item-title=Help").click();
+    const modal = ".file-diff-sbs-help-modal";
+    await expect($(`${modal} h1`)).toHaveText("Side-by-Side Diff");
+    const content = $(`${modal} .file-diff-sbs-help-content`);
+    await expect(content).toHaveText(expect.stringContaining("Changes are never written automatically"));
+    await browser.waitUntil(async () => browser.execute((selector) => {
+      const images = Array.from(document.querySelectorAll<HTMLImageElement>(`${selector} img`));
+      return images.length > 0 && images.every(image => image.complete && image.naturalWidth > 0 && image.src.startsWith("data:image/"));
+    }, modal));
+    await expect($(`${modal} a[href='https://github.com/nblum/obsidian-side-by-side-diff/blob/main/docs/visual-guide.md']`)).toExist();
+    await expect($(`${modal} a[href='https://ko-fi.com/blumnico']`)).toHaveText("Buy me a coffee");
+    await browser.saveScreenshot(join(process.cwd(), "e2e-results/help-readme.png"));
+    await $(`${modal} a[href='#keyboard-shortcuts']`).click();
+    assert.equal(await browser.execute((selector) => {
+      const heading = Array.from(document.querySelectorAll(`${selector} h2`)).find(element => element.textContent === "Keyboard shortcuts");
+      const container = document.querySelector(`${selector} .modal-content`);
+      if (!heading || !container) return false;
+      const target = heading.getBoundingClientRect();
+      const bounds = container.getBoundingClientRect();
+      return target.top >= bounds.top - 2 && target.bottom <= bounds.bottom;
+    }, modal), true, "section links scroll within the help dialog");
+    await $(`${modal} .modal-close-button`).click();
+    await expect($(modal)).not.toExist();
+    await expect($(save)).toBeEnabled();
+    await expect($(`${view} [data-diff-pending='insert']`)).toHaveText(expect.stringContaining("Original wording."));
+    assert.equal(await readSaved("Comparison.md"), comparison);
+    await $(undo).click();
+    await expect($(save)).toBeDisabled();
+  });
+
   it("stages, undoes and explicitly saves a row without writing to the source", async () => {
     await $(accept).click();
     await expect($(save)).toBeEnabled();

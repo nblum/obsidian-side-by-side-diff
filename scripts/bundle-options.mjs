@@ -7,6 +7,7 @@ export const PLUGIN_BUNDLE_OPTIONS = {
 	target: "es2020",
 	external: ["obsidian", "electron"],
 	loader: {
+		".md": "text",
 		".png": "dataurl",
 		".webp": "dataurl"
 	}

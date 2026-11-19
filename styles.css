@@ -257,6 +257,20 @@
 	width: min(48rem, calc(100vw - 2rem));
 }
 
+.file-diff-sbs-help-modal {
+	width: min(60rem, calc(100vw - 2rem));
+	max-height: 85vh;
+}
+
+.file-diff-sbs-help-modal .modal-content {
+	overflow-y: auto;
+}
+
+.file-diff-sbs-help-content img {
+	max-width: 100%;
+	height: auto;
+}
+
 .file-diff-sbs-introduction h3,
 .file-diff-sbs-introduction h4 {
 	margin-top: 0;

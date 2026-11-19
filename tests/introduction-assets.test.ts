@@ -23,5 +23,6 @@ test("embeds all introduction screenshots in the plugin bundle", async () => {
 	const bundle = outputFile.text;
 	assert.doesNotMatch(bundle, /getResourcePath\(/);
 	const embeddedImages = bundle.match(/data:image\/(?:png|webp);base64,/g) ?? [];
-	assert.equal(embeddedImages.length, INTRODUCTION_ASSET_NAMES.length);
+	// Help reuses all introduction assets and adds four README illustrations.
+	assert.equal(embeddedImages.length, INTRODUCTION_ASSET_NAMES.length + 4);
 });

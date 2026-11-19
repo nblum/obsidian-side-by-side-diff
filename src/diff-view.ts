@@ -18,6 +18,7 @@ import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./dif
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
 import { createPendingTargetPreview, type PendingTargetPreview } from "./pending-diff";
 import type { Language } from "./i18n";
+import { HelpModal } from "./help-modal";
 
 export type { PaneMode } from "./diff-view-state";
 type ComparisonFile = TFile | ExternalMarkdown;
@@ -1479,6 +1480,11 @@ export class SideBySideDiffView extends ItemView {
       menu.addItem((item) => {
         item.setTitle(this.translate("menu.refresh")).setIcon("refresh-cw").setDisabled(this.hasUnsavedChanges()).onClick(() => {
           if (!this.hasUnsavedChanges()) void this.renderDiff(this.getScrollPosition());
+        });
+      });
+      menu.addItem((item) => {
+        item.setTitle(this.translate("menu.help")).setIcon("circle-help").onClick(() => {
+          new HelpModal(this.app, (key, variables) => this.translate(key, variables)).open();
         });
       });
       menu.showAtMouseEvent(event);

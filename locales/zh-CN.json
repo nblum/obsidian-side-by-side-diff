@@ -13,6 +13,7 @@
 	"menu.compareSelectedFiles": "比较文件",
 	"menu.proposeChanges": "提出修改建议",
 	"menu.acceptChanges": "接受更改",
+	"menu.help": "帮助",
 	"menu.refresh": "刷新",
 	"picker.leftFile": "选择左侧文件",
 	"picker.rightFile": "选择右侧文件",

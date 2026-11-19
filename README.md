@@ -72,6 +72,9 @@ on the right, or use the **Drop files** card.
 For a walkthrough, open **Settings → Side-by-Side Diff → Introduction** or run `Show introduction` from the
 command palette. The introduction also opens once after an update if you have not seen it yet.
 
+In an open comparison, choose **Help** from the `…` file-actions menu to read this guide in a dialog.
+The guide and its screenshots are bundled with the plugin and work offline; links to other project documents open on GitHub.
+
 ## Compare, suggest, and accept changes
 
 ### Compare

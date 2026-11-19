@@ -6,6 +6,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Added **Help** to the open comparison's file-actions menu, showing the README and bundled screenshots in an
+  offline help dialog with section navigation.
 - Added a "Buy me a coffee" Ko-fi support link to the About section in plugin settings and the introduction's
   thank-you step, plus the README's support links.
 

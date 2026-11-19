@@ -166,6 +166,10 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Other actions
 
+- The open comparison's `…` file-actions menu offers **Help**, which renders the bundled English README in a
+  scrollable dialog using Obsidian's Markdown renderer. Screenshots work offline, section links navigate within
+  the dialog, and links to other repository files open on GitHub. Help stays available with unsaved changes and
+  preserves the comparison's staged edits and review state.
 - The plugin opens a short, five-step introduction once after an update when it has not been seen yet. It covers
   comparison entry points, file selection, navigation, change groups, feedback, documentation, and a closing
   thank-you note with a "Buy me a coffee" Ko-fi support link. It can be reopened through the settings page or the

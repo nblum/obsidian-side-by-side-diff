@@ -13,6 +13,7 @@
 	"menu.compareSelectedFiles": "Comparar arquivos",
 	"menu.proposeChanges": "Sugerir alterações",
 	"menu.acceptChanges": "Aceitar alterações",
+	"menu.help": "Ajuda",
 	"menu.refresh": "Atualizar",
 	"picker.leftFile": "Selecionar arquivo à esquerda",
 	"picker.rightFile": "Selecionar arquivo à direita",
