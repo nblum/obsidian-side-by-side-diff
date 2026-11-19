@@ -11,6 +11,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Show a position badge such as `5/12` on the top border of the active change frame only. It follows navigation
+  among open changes, updates during review, and has a localized accessible label without entering file content.
+
 - Show Open, Accepted, and Ignored changed-line counts beside the navigation arrows above the split, with
   accessible check/minus markers for resolved rows.
   Open changes retain compact accept/ignore controls without an extra status icon.

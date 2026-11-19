@@ -452,11 +452,34 @@
 	line-height: 1;
 }
 
+.file-diff-sbs-row.file-diff-sbs-active-change {
+	margin-top: 1.25rem;
+}
+
 .file-diff-sbs-active-change {
 	position: relative;
 	z-index: 1;
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
+}
+
+/* The active row's top margin keeps its badge clear of text and grouped-block clipping. */
+.file-diff-sbs-change-position {
+	position: absolute;
+	bottom: calc(100% - 2px);
+	left: 0.6rem;
+	z-index: 2;
+	padding: 0.05rem 0.4rem;
+	border-radius: var(--radius-s);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-family: var(--font-interface);
+	font-size: var(--font-small);
+	font-weight: 600;
+	line-height: 1.3;
+	white-space: nowrap;
+	pointer-events: none;
+	user-select: none;
 }
 
 .file-diff-sbs-cell {

@@ -74,6 +74,48 @@ describe("comparison in Obsidian", () => {
     assert.equal(await readSaved("Comparison.md"), comparison);
   });
 
+  for (const reverse of [false, true]) {
+    it(`shows one numbered badge on the active frame and updates it through review (${reverse ? "right to left" : "left to right"})`, async () => {
+      const badge = `${view} .file-diff-sbs-change-position`;
+      await obsidianPage.write("Original.md", "new1\nnew2\nanchor A\nnew3\nanchor B\nnew4\nanchor C\nnew5\n");
+      await obsidianPage.write("Comparison.md", "old1\nold2\nanchor A\nold3\nanchor B\nold4\nanchor C\nold5\n");
+      await expect($(progress)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+      if (reverse) await $(`${view} .file-diff-sbs-direction-button`).click();
+      await expect($(badge)).not.toExist();
+      await browser.executeObsidianCommand("side-by-side-diff:next-change");
+      await expect($(badge)).toHaveText("1/5");
+      await expect($(badge)).toHaveAttribute("aria-label", "Open change 1 of 5");
+      assert.equal(await browser.execute((selector) => {
+        const badge = document.querySelector(selector);
+        const row = badge?.closest(".file-diff-sbs-row");
+        const group = row?.closest(".file-diff-sbs-group");
+        if (!badge || !row || !group) return false;
+        const bounds = badge.getBoundingClientRect();
+        return bounds.top >= group.getBoundingClientRect().top && bounds.top < row.getBoundingClientRect().top;
+      }, badge), true, "the badge stays visible above the first row inside a clipped group");
+      await browser.executeObsidianCommand("side-by-side-diff:previous-change");
+      await expect($(badge)).toHaveText("5/5");
+      await expect($$(badge)).toBeElementsArrayOfSize(1);
+      await expect($(`${view} .file-diff-sbs-active-change .file-diff-sbs-change-position`)).toHaveText("5/5");
+      await browser.saveScreenshot(join(process.cwd(), `e2e-results/change-position-${reverse ? "reverse" : "forward"}.png`));
+      await browser.keys(["Alt", "ArrowLeft"]);
+      await expect($(badge)).not.toExist();
+      await browser.executeObsidianCommand("side-by-side-diff:next-change");
+      await expect($(badge)).toHaveText("1/4");
+      await $(undo).click();
+      await expect($(badge)).toHaveText("1/5");
+      await $(`${view} .file-diff-sbs-file-edit-button`).click();
+      await expect($(badge)).not.toExist();
+      await $(`${view} .file-diff-sbs-file-edit-button`).click();
+      await browser.executeObsidianCommand("side-by-side-diff:next-change");
+      await expect($$(badge)).toBeElementsArrayOfSize(1);
+      const ignores = await $$(ignore).getElements();
+      for (let index = 0; index < ignores.length; index += 1) await $(ignore).click();
+      await expect($(badge)).not.toExist();
+      await expect($(save)).toBeDisabled();
+    });
+  }
+
   it("shows the Ko-fi support link in About settings", async () => {
     const mainWindow = await browser.getWindowHandle();
     await browser.executeObsidianCommand("app:open-settings");

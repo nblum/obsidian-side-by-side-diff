@@ -148,6 +148,7 @@ requirements apply. Screenshot commands use the same default headless runner on 
 | Asset | Captured state |
 | --- | --- |
 | `compare-mode.webp` | Comparison, inline differences, and grouped actions |
+| `active-change.webp` | Active frame with its position among open changes |
 | `file-selection.png` | Original preview and right-file selection |
 | `file-menu.webp` | Single-file comparison context menu |
 | `compare-two-files-menu.png` | Native two-file selection and comparison menu |
@@ -215,6 +216,8 @@ For changes to the view or save logic, check at least these cases:
 - changed, inserted, and removed lines
 - inline differences within a line
 - green incoming source content and red outgoing target content, including color reversal after changing direction
+- the active frame's position badge with button/keyboard navigation, wraparound, resolution, undo, automatic
+  advance, both merge directions, and no clipping at the top of a small grouped block
 - review counts, open action groups and check/minus markers, mixed accepted/ignored blocks, row/block undo,
   shifted line indexes, and saved versus completed review state in both directions
 - accepted target changes with green text and red struck-through deletions on neutral backgrounds until save,

@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} ignoriert",
 	"view.review.summary": "Offen: {open} · Akzeptiert: {accepted} · Ignoriert: {ignored}",
 	"view.review.summaryLabel": "Review-Fortschritt (geänderte Zeilen)",
+	"view.changePosition": "Offene Änderung {current} von {total}",
 	"view.review.open": "Offen",
 	"view.review.accepted": "Akzeptiert",
 	"view.review.ignored": "Ignoriert",

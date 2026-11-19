@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} ignoradas",
 	"view.review.summary": "Pendientes: {open} · Aceptadas: {accepted} · Ignoradas: {ignored}",
 	"view.review.summaryLabel": "Progreso de la revisión (líneas modificadas)",
+	"view.changePosition": "Cambio pendiente {current} de {total}",
 	"view.review.open": "Pendiente",
 	"view.review.accepted": "Aceptada",
 	"view.review.ignored": "Ignorada",

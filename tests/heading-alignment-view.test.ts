@@ -1056,3 +1056,44 @@ test("pending target text stays distinct from open diff backgrounds when the sou
 	assert.equal(code?.querySelector(".file-diff-sbs-inline-right"), null);
 	assert.ok(allElements(root).some(el => el.dataset.diffChange === "true"), "the changed source still needs review");
 });
+
+
+test("only the active change receives a position badge, updated after navigation, resolution and editing", () => {
+	/** Captures the frame and badge lifecycle without substituting the view's position logic. */
+	function frame() {
+		const badges: { text: string; remove(): void; setAttribute(): void }[] = [];
+		return {
+			badges,
+			toggleClass: () => {}, setAttribute: () => {}, removeAttribute: () => {}, scrollIntoView: () => {},
+			createSpan: (options: { text: string }) => {
+				const badge = { text: options.text, setAttribute: () => {}, remove: () => { badges.splice(badges.indexOf(badge), 1); } };
+				badges.push(badge);
+				return badge;
+			}
+		};
+	}
+	const frames = [frame(), frame(), frame()];
+	const targets = new Map(frames.map((row, index) => [index * 3 + 1, [row as unknown as HTMLElement]]));
+	const { view } = createView(["new"], ["old"]);
+	Object.assign(view, {
+		getChangeTargets: () => targets,
+		contentEl: { querySelector: () => targets.size > 0 ? {} : null },
+		updateChangeNavigationState: module.exports.SideBySideDiffView.prototype.updateChangeNavigationState,
+		advanceAfterResolvedChange: module.exports.SideBySideDiffView.prototype.advanceAfterResolvedChange
+	});
+	assert.equal(view.focusChange(4), true);
+	assert.deepEqual(frames.map(row => row.badges.map(badge => badge.text)), [[], ["2/3"], []]);
+	assert.equal(view.focusChange(7), true);
+	assert.deepEqual(frames.map(row => row.badges.map(badge => badge.text)), [[], [], ["3/3"]]);
+	targets.delete(1);
+	view.updateChangeNavigationState();
+	assert.deepEqual(frames.map(row => row.badges.map(badge => badge.text)), [[], [], ["2/2"]]);
+	targets.delete(7);
+	view.updateChangeNavigationState();
+	assert.ok(frames.every(row => row.badges.length === 0));
+	view.advanceAfterResolvedChange(1);
+	assert.deepEqual(frames.map(row => row.badges.map(badge => badge.text)), [[], ["1/1"], []]);
+	Object.assign(view, { viewState: { ...view.state, editRight: true } });
+	view.updateChangeNavigationState();
+	assert.ok(frames.every(row => row.badges.length === 0));
+});

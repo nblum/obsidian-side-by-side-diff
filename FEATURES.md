@@ -33,6 +33,10 @@ visible, can be reviewed and staged individually, and are written only through a
   a successful save or refresh. Save confirmations, errors, and conflicts retain their global notices.
 - `Next change` and `Previous change` navigate through changes and scroll the selected row into view.
 - The same navigation is available with `Alt+ArrowDown` and `Alt+ArrowUp`.
+- Only the active change frame shows a compact badge attached to its top border, such as `5/12`, identifying its
+  position among currently open changed rows. It follows button/keyboard navigation and automatic advance,
+  updates when open changes are resolved or restored, and disappears when no open row is active or during editing.
+  The badge has a localized accessible name and tooltip and is excluded from copied and saved file text.
 - After accepting or ignoring a change, the view automatically advances to the next open change by default. This can be disabled in the settings.
 - Pane headers show the file name, vault-relative path, and `Original` / `Comparison` or `Proposal` identity.
   Original and Comparison labels follow their files when swapping. Separate Source and Target badges identify

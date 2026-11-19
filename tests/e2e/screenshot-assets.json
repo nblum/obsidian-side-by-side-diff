@@ -1,4 +1,5 @@
 [
+  { "filename": "active-change.webp", "description": "Active change frame with a position badge among open changes" },
   { "filename": "compare-mode.webp", "description": "Comparison with inline changes and grouped actions" },
   { "filename": "file-selection.png", "description": "Original preview and comparison-file selector" },
   { "filename": "file-menu.webp", "description": "Compare with another file in a note's context menu" },

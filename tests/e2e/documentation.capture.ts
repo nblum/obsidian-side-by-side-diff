@@ -110,6 +110,13 @@ describe("documentation screenshots (opt-in)", () => {
     await expect($(`${view} [data-review-status='open'] .file-diff-sbs-review-marker`)).not.toExist();
     await capture("compare-mode.webp");
     await capture("grouped-changes.png", `${view} .file-diff-sbs-group`);
+    await browser.executeObsidianCommand("side-by-side-diff:next-change");
+    await browser.executeObsidianCommand("side-by-side-diff:next-change");
+    await expect($(`${view} .file-diff-sbs-change-position`)).toHaveText("2/5");
+    await capture("active-change.webp");
+    await $(`${view} .file-diff-sbs-direction-button`).click();
+    await $(`${view} .file-diff-sbs-direction-button`).click();
+    await expect($(`${view} .file-diff-sbs-change-position`)).not.toExist();
 
     await $(`${view} .file-diff-sbs-file-edit-button`).click();
     await expect($(`${view} [contenteditable='true']`)).toExist();

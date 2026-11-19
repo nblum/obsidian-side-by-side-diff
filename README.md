@@ -107,7 +107,8 @@ strikethrough and the incoming text in green. The feedback beside `Undo` confirm
 
 The summary beside the previous/next arrows above the split counts **Open**, **Accepted**, and **Ignored** changed
 lines. Open changes keep their accept/ignore buttons; check and minus markers identify accepted and ignored changes. Navigation visits open changes only.
-Undo restores the previous decision.
+Undo restores the previous decision. The highlighted change frame has a badge such as **5/12** on its top border,
+showing its position among the currently open changes.
 Accepted means staged: save explicitly to write it. After saving, accepted counts reset while ignored differences
 stay ignored. Finishing a review can therefore leave the files different.
 

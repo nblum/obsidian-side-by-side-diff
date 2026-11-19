@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} genegeerd",
 	"view.review.summary": "Open: {open} · Geaccepteerd: {accepted} · Genegeerd: {ignored}",
 	"view.review.summaryLabel": "Voortgang van de controle (gewijzigde regels)",
+	"view.changePosition": "Open wijziging {current} van {total}",
 	"view.review.open": "Open",
 	"view.review.accepted": "Geaccepteerd",
 	"view.review.ignored": "Genegeerd",

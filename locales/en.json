@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} ignored",
 	"view.review.summary": "Open: {open} · Accepted: {accepted} · Ignored: {ignored}",
 	"view.review.summaryLabel": "Review progress (changed lines)",
+	"view.changePosition": "Open change {current} of {total}",
 	"view.review.open": "Open",
 	"view.review.accepted": "Accepted",
 	"view.review.ignored": "Ignored",

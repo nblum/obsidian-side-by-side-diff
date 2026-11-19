@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} ignorata/e",
 	"view.review.summary": "Da esaminare: {open} · Accettate: {accepted} · Ignorate: {ignored}",
 	"view.review.summaryLabel": "Avanzamento della revisione (righe modificate)",
+	"view.changePosition": "Modifica da esaminare {current} di {total}",
 	"view.review.open": "Da esaminare",
 	"view.review.accepted": "Accettata",
 	"view.review.ignored": "Ignorata",

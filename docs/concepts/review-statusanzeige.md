@@ -18,7 +18,10 @@ Each original change has one session-local status:
 
 Open entries have no extra status icon. Their action group carries the localized Open label. Accepted and
 ignored markers are placed between the panes, outside selectable file text. They have localized tooltips and accessible
-names. Colors supplement the symbols. The existing active-change focus remains separate from review status.
+names. Colors supplement the symbols. The existing active-change focus remains separate from review status. Only that frame receives a badge on its
+top border, for example `5/12`, with its one-based position among currently open changed rows. The badge updates
+with navigation, automatic advance, rerenders, and undo; it is absent when the active entry is resolved or during
+editing. Its localized accessible label and tooltip describe the position. It is outside selectable file text.
 The summary is a polite, atomic status region. Accepted target text and deleted-line previews retain their
 existing appearance until explicitly saved; an accepted deletion retains a status entry even if neither
 projected cell contains text.

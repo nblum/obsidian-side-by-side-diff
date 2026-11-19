@@ -100,6 +100,7 @@ export class SideBySideDiffView extends ItemView {
   private pendingEditSyncPreferredIndex: number | null = null;
   private saveRequestInProgress = false;
   private activeChangeRowIndex: number | null = null;
+  private changePositionBadge: HTMLElement | null = null;
   private previousChangeButton: HTMLButtonElement | null = null;
   private nextChangeButton: HTMLButtonElement | null = null;
   private directionButton: HTMLButtonElement | null = null;
@@ -628,6 +629,7 @@ export class SideBySideDiffView extends ItemView {
   async renderDiff(scrollPosition: ScrollPosition | null = null, loaded: LoadedComparison | null = null): Promise<void> {
     this.disposeRightEditorObserver();
     const token = ++this.renderToken;
+    this.changePositionBadge = null;
     this.previousChangeButton = null;
     this.nextChangeButton = null;
     this.directionButton = null;
@@ -750,12 +752,32 @@ export class SideBySideDiffView extends ItemView {
         }
       }
     }
+    this.updateChangePositionBadge(targets);
     const target = targets.get(rowIndex)?.[0];
     if (!target) {
       return false;
     }
     target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     return true;
+  }
+  /** Labels only the active frame with its position among currently open changes. */
+  private updateChangePositionBadge(targets = this.getChangeTargets()): void {
+    this.changePositionBadge?.remove();
+    this.changePositionBadge = null;
+    if (this.state.editRight || this.activeChangeRowIndex === null) return;
+    const position = [...targets.keys()].indexOf(this.activeChangeRowIndex);
+    const target = targets.get(this.activeChangeRowIndex)?.[0];
+    if (position < 0 || !target) return;
+    const current = position + 1;
+    const label = this.translate("view.changePosition", { current, total: targets.size });
+    const badge = target.createSpan({
+      cls: "file-diff-sbs-change-position",
+      text: `${String(current)}/${String(targets.size)}`
+    });
+    badge.setAttribute("role", "img");
+    badge.setAttribute("aria-label", label);
+    badge.title = label;
+    this.changePositionBadge = badge;
   }
   /** Collects rendered change targets once per aligned row. */
   getChangeTargets(): Map<number, HTMLElement[]> {
@@ -1774,6 +1796,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Enables navigation buttons only when the rendered comparison has a change. */
   updateChangeNavigationState(): void {
+    this.updateChangePositionBadge();
     const hasChanges = !this.state.editRight && this.contentEl.querySelector("[data-diff-change='true']") !== null;
     if (this.previousChangeButton) {
       this.previousChangeButton.disabled = !hasChanges;

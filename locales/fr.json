@@ -98,6 +98,7 @@
 	"view.summary.ignored": "{count} ignorée(s)",
 	"view.review.summary": "À traiter : {open} · Acceptées : {accepted} · Ignorées : {ignored}",
 	"view.review.summaryLabel": "Progression de la révision (lignes modifiées)",
+	"view.changePosition": "Modification à traiter {current} sur {total}",
 	"view.review.open": "À traiter",
 	"view.review.accepted": "Acceptée",
 	"view.review.ignored": "Ignorée",

@@ -34,6 +34,14 @@ open changes.
 
 ![Comparison showing inline differences and open review actions](../assets/compare-mode.webp)
 
+## Locate the current change
+
+Use the previous/next arrows or `Alt+ArrowUp` / `Alt+ArrowDown` to highlight a change. A badge on the active
+frame's top border shows its position among the open changed rows: `2/5` means the second of five open changes.
+Only the active frame has a badge. Accepting or ignoring a change updates the numbering, and Undo restores it.
+
+![Active change frame with a 2/5 position badge above its border](../assets/active-change.webp)
+
 ## Reverse the apply direction
 
 The arrow between the file headers reverses the direction while keeping the files in place. In this example,
