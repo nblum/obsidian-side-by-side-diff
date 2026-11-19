@@ -134,7 +134,7 @@ npm run screenshots:update
 ```
 
 The update command captures the complete set, validates every image, copies the files listed in
-`tests/e2e/screenshot-assets.json` to `assets/`, and rebuilds the plugin so the introduction embeds the refreshed
+`tests/e2e/screenshot-assets.json` to `assets/`, re-renders `keyboard-shortcuts.webp`, and rebuilds the plugin so the introduction embeds the refreshed
 images. A failed capture or missing image stops publication. Review `git diff --stat -- assets/` and visually
 inspect the images before committing.
 
@@ -164,7 +164,10 @@ requirements apply. Screenshot commands use the same default headless runner on 
 
 The walkthrough keeps its existing filename and animated WebP format so README links remain valid. Cropped
 views show the plugin or menu; walkthrough frames omit the footer with the random temporary-vault name.
-`keyboard-shortcuts.webp`, the teaser artwork, and SVG icons are illustrations and are maintained separately.
+`keyboard-shortcuts.webp` is derived from `active-change.webp`: `npm run screenshots:keyboard` (also part of
+`npm run screenshots:update`) overlays the shortcut callouts beside the matching buttons. Its callout coordinates in
+`scripts/render-keyboard-shortcuts.mjs` refer to the 936 × 643 capture; update them when the captured layout moves.
+The teaser artwork and SVG icons are illustrations and are maintained separately.
 To add a state, add its capture and assertions in `tests/e2e/documentation.capture.ts` and register its filename
 and description in `tests/e2e/screenshot-assets.json`. The suite fails if any registered capture is missing.
 

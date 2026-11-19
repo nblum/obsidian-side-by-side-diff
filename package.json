@@ -11,7 +11,8 @@
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "test:e2e": "npm run build && node scripts/run-obsidian-tests.mjs ./wdio.conf.mts",
     "screenshots": "npm run build && node scripts/run-obsidian-tests.mjs ./wdio.screenshots.conf.mts",
-    "screenshots:update": "npm run screenshots && node scripts/update-screenshots.mjs && npm run build",
+    "screenshots:update": "npm run screenshots && node scripts/update-screenshots.mjs && npm run screenshots:keyboard && npm run build",
+    "screenshots:keyboard": "node scripts/render-keyboard-shortcuts.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json",
     "validate:manifest": "node scripts/validate-manifest.mjs",
     "release": "node scripts/release.mjs"
