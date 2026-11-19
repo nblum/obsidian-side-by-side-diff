@@ -183,6 +183,8 @@ The unit tests cover the deterministic diff, synchronization, and translation ru
 - copying comparison text with document focus while excluding alignment gaps
 - pending target previews for accepted insertions, replacements and deletions, including empty targets, both
   directions, subsequent action indexes, undo, successful/conflicting saves, and copying without deleted previews
+- session-local open/accepted/ignored counts and accessible markers, stable decisions after target line shifts,
+  deletion-only reviews, mixed-block undo, successful/conflicting saves, and swapping in both merge directions
 - matching keys and placeholders across all locale dictionaries
 - selecting the next and previous change, including wraparound and resolved-row handling
 - honoring the configurable automatic advance after accepting or ignoring a change
@@ -213,6 +215,8 @@ For changes to the view or save logic, check at least these cases:
 - changed, inserted, and removed lines
 - inline differences within a line
 - green incoming source content and red outgoing target content, including color reversal after changing direction
+- review counts, open action groups and check/minus markers, mixed accepted/ignored blocks, row/block undo,
+  shifted line indexes, and saved versus completed review state in both directions
 - accepted target changes with green text and red struck-through deletions on neutral backgrounds until save,
   including copy, multiple accepts, undo, empty targets, and light/dark themes
 - `→`, `←`, `×`, `Swap`, `Refresh`, and reversing direction without moving the files

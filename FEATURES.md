@@ -21,7 +21,7 @@ visible, can be reviewed and staged individually, and are written only through a
   the other file, and visual alignment gaps.
 - When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
   the following lines stay in sync.
-- The first toolbar row contains the comparison title, change count, save action, and a file-actions menu with
+- The first toolbar row contains the comparison title, save action, and a file-actions menu with
   `Refresh`; there is no separate action row.
 - `Swap` is an icon with a tooltip above the direction icon between the file headers. The edit-mode icon sits
   at the right edge of the target's file header, vertically centered, and moves with the target when direction
@@ -115,6 +115,25 @@ visible, can be reviewed and staged individually, and are written only through a
 - The block header disappears once every row in the block has been resolved, whether through the block controls or
   through individual per-row actions.
 - `Accept all` never re-applies a row the user has already ignored individually within the same block.
+
+### Review status and progress
+
+- Comparison mode shows localized **Open**, **Accepted**, and **Ignored** counts beside the previous/next arrows
+  directly above the split content, for original changed aligned rows.
+  Block actions count the changed rows they resolve, excluding unchanged lines and alignment gaps.
+- Open rows use their existing accept/ignore buttons with an accessible Open group label and no extra status icon.
+  Accepted and ignored rows show check and minus markers between the panes, with localized accessible names and
+  tooltips. Markers are excluded from copied file text. The summary uses a polite, atomic status region.
+- Review identity survives staged insertions and deletions, including repeated lines and target-only deletions.
+  Accepted and ignored entries remain visible, but only open rows receive review actions or navigation targets.
+- Undo restores content and status together, for individual rows and whole blocks in either merge direction.
+- Review progress is separate from saved content. Failed or conflicting saves retain the statuses. Successful
+  saving resets accepted counts and undo history while keeping ignored differences resolved.
+- Swapping retains ignored decisions and their undo; reversing direction reopens them. Discarding or choosing
+  another comparison resets the review. State is not persisted across sessions.
+- Direct editing retains its changed-line summary. Refresh without pending content starts a new alignment,
+  preserving matching ignored differences and their undo. Ordinary rerenders retain progress; changed file
+  contents rebuild the alignment while preserving staged content and matching ignored keys.
 
 ### Accepting and ignoring changes
 

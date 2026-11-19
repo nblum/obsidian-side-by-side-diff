@@ -572,13 +572,14 @@ test("ignoring rows or blocks preserves both rendered files, clears highlights a
 					}
 					if (ignoredIndexes.includes(index)) {
 						assert.equal(rowElement.dataset.diffChange, undefined);
-						assert.equal(rowElement.children[1]?.children.length, 0);
+						assert.equal(rowElement.children[1]?.children.length, 1, "ignored rows retain a status marker");
+						assert.equal(rowElement.dataset.reviewStatus, "ignored");
 					}
 				}
 				assert.equal(session.hasPendingChanges(), false, "ignoring must not stage edits to either file");
 				await view.undoLastChange();
 				assert.equal(root.children[changedIndex]?.dataset.diffChange, "true");
-				assert.equal(root.children[changedIndex]?.children[1]?.children.length, 2);
+				assert.equal(root.children[changedIndex]?.children[1]?.children.length, 2, "open rows use only their two actions");
 				assert.equal(session.canUndo(), false, "ignoring a block must be one undo step");
 			}
 		}
@@ -627,7 +628,7 @@ test("row buttons and keyboard acceptance use the displayed direction and target
 	const { view, rendered } = createView(["old"], ["new"]);
 	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
 	const buttons: { text: string; title?: string; disabled?: boolean; click: (() => void) | undefined; setAttribute: () => void; addEventListener: (name: string, handler: () => void) => void }[] = [];
-	const cell = { createEl: (_tag: string, options: { text: string }) => {
+	const cell = { setAttribute: () => {}, createSpan: () => new EditorElement(), createEl: (_tag: string, options: { text: string }) => {
 		const button = { text: options.text, setAttribute: () => {}, addEventListener: (_name: string, handler: () => void) => { button.click = handler; }, click: undefined as (() => void) | undefined };
 		buttons.push(button);
 		return button;
@@ -761,6 +762,10 @@ test("compact header keeps save/menu on top, swap above direction, and edit excl
 	assert.equal(review.children[0].children[0].text, "");
 	assert.equal(renderedIcons.get(review.children[0].children[0]), "undo-2");
 	assert.equal(renderedTooltips.get(review.children[0].children[0]), "actions.undoTitle");
+	assert.equal(root.find("file-diff-sbs-comparison-toolbar")?.find("file-diff-sbs-summary"), undefined);
+	const reviewNavigation = root.find("file-diff-sbs-review-navigation");
+	assert.ok(reviewNavigation?.children[0]?.classes.has("file-diff-sbs-summary"));
+	assert.ok(reviewNavigation?.children[1]?.classes.has("file-diff-sbs-navigation"));
 	const navigation = root.find("file-diff-sbs-navigation");
 	assert.deepEqual(navigation?.children.map(button => button.attributes.get("aria-label")), ["actions.previousChange", "actions.nextChange"]);
 	assert.ok(navigation?.children.every(button => button.text === ""));
@@ -1015,7 +1020,7 @@ test("deleted preview rows do not shift the next merge button and undo retains e
 		const realApply = view.applyRowChange.bind(view);
 		let operation: Promise<void> | undefined;
 		view.applyRowChange = (index, selectedDirection) => { operation = realApply(index, selectedDirection); return operation; };
-		nextRow.children[1]?.children[0]?.handlers.get("click")?.();
+		nextRow.children[1]?.children.find(child => child.handlers.has("click"))?.handlers.get("click")?.();
 		assert.ok(operation);
 		await operation;
 		assert.equal(displayedText(targetSide), "A\nnew-a\nnew-b\nZ");
@@ -1027,13 +1032,15 @@ test("deleted preview rows do not shift the next merge button and undo retains e
 });
 
 test("a failed guarded save retains the pending target markers and deletion previews", async () => {
-	const { view, root, stored, targetPath } = await createPendingPreviewView("right-to-left", ["A", "new", "Z"], ["A", "old", "Z"]);
+	const { view, session, root, stored, targetPath } = await createPendingPreviewView("right-to-left", ["A", "new", "Z"], ["A", "old", "Z"]);
 	await view.applyRowChange(1, "right-to-left");
 	stored.set(targetPath, "changed outside the comparison");
 	assert.equal(await view.savePendingChanges(), false);
 	assert.equal(allElements(root).filter(el => el.dataset.diffPending === "insert").length, 1);
 	assert.equal(allElements(root).filter(el => el.dataset.diffPending === "delete").length, 1);
 	assert.equal(stored.get(targetPath), "changed outside the comparison");
+	assert.deepEqual(session.getReviewCounts(), { open: 0, accepted: 1, ignored: 0 });
+	assert.equal(allElements(root).filter(el => el.dataset.reviewStatus === "accepted").length, 1);
 });
 
 test("pending target text stays distinct from open diff backgrounds when the source changes again", async () => {

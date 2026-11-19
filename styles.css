@@ -34,10 +34,6 @@
 	background: var(--background-secondary);
 }
 
-.file-diff-sbs-comparison-toolbar {
-	grid-template-columns: minmax(0, 1fr) auto auto;
-}
-
 .file-diff-sbs-toolbar-actions {
 	display: flex;
 	align-items: center;
@@ -96,6 +92,25 @@
 	flex-wrap: wrap;
 	gap: 0.4rem;
 	margin-left: auto;
+}
+
+.file-diff-sbs-review-navigation {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	min-width: 0;
+	max-width: 100%;
+	margin-left: auto;
+}
+
+.file-diff-sbs-review-navigation .file-diff-sbs-navigation {
+	flex-wrap: nowrap;
+	flex-shrink: 0;
+	margin-left: 0;
+}
+
+.file-diff-sbs-review-feedback:empty {
+	display: none;
 }
 
 .file-diff-sbs-review-feedback {
@@ -203,11 +218,6 @@
 
 	.file-diff-sbs-comparison-toolbar {
 		grid-template-columns: minmax(0, 1fr) auto;
-	}
-
-	.file-diff-sbs-comparison-toolbar > .file-diff-sbs-summary {
-		grid-column: 1 / -1;
-		grid-row: 2;
 	}
 
 	.file-diff-sbs-toolbar-actions {
@@ -470,9 +480,31 @@
 	align-items: center;
 	justify-content: center;
 	gap: 0.05rem;
+	box-sizing: border-box;
+	width: 2.5rem;
 	min-width: 2.5rem;
 	border-bottom: 1px solid var(--background-modifier-border);
 	background: var(--background-primary-alt);
+}
+
+/* Review markers are outside selectable file text and remain distinct without color. */
+.file-diff-sbs-review-marker {
+	display: inline-block;
+	flex: 0 0 1rem;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--font-small);
+	line-height: 1;
+}
+
+.file-diff-sbs-row[data-review-status="accepted"] .file-diff-sbs-review-marker {
+	color: var(--color-green);
+}
+
+.file-diff-sbs-summary[role="status"] {
+	max-width: 28rem;
+	font-size: var(--font-small);
+	overflow-wrap: anywhere;
 }
 
 .file-diff-sbs-action-cell + .file-diff-sbs-cell {

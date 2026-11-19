@@ -11,6 +11,12 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Show Open, Accepted, and Ignored changed-line counts beside the navigation arrows above the split, with
+  accessible check/minus markers for resolved rows.
+  Open changes retain compact accept/ignore controls without an extra status icon.
+  Keep decisions attached to their original changes after insertions and deletions, support row/block undo in both
+  merge directions, and retain progress after failed saves. Successful saving clears accepted counts while ignored
+  differences remain resolved.
 - Added **Help** to the open comparison's file-actions menu, showing the README and bundled screenshots in an
   offline help dialog with section navigation.
 - Added a "Buy me a coffee" Ko-fi support link to the About section in plugin settings and the introduction's

@@ -59,7 +59,7 @@ function createSafetyView(vaultBase?: string) {
   let rendered = { left: "", right: "", message: "" };
   const view = Object.create(module.exports.SideBySideDiffView.prototype) as SideBySideDiffView;
   Object.assign(view, {
-    session, externalMarkdown: null, retainedExternalMarkdown: null, renderToken: 0, dropToken: 0,
+    session, externalMarkdown: null, retainedExternalMarkdown: null, renderToken: 0, dropToken: 0, comparisonOptions: {},
     changeActions: new Map(), viewState: { leftPath: "left.md", rightPath: "right.md", editRight: false, mode: "compare" },
     plugin: { language: "en", settings: DEFAULT_SETTINGS, translate: (key: string) => key, rememberRecentRightFile: () => Promise.resolve() },
     app: { vault: {

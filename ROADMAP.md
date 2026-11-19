@@ -15,7 +15,15 @@ for implementation. Once shipped, update the feature reference and changelog and
 
 ## Next
 
-No features are currently selected for implementation.
+### Review status and progress
+
+- **Status:** Implemented; pending release.
+- **Benefit:** Show open, accepted, and ignored changed-line counts and accessible row markers in both merge
+  directions, with consistent undo and guarded saving.
+- **Scope:** Session-local review state. Successful saving resets accepted counts and retains ignored decisions;
+  review completion remains distinct from file equality and saved content.
+- **Reference:** [Implemented behavior](FEATURES.md#review-status-and-progress) and
+  [review status design](docs/concepts/review-statusanzeige.md).
 
 ## Later
 
@@ -42,17 +50,6 @@ not a delivery sequence.
 - **Initial scope:** Add a distinct **Keep both** block action that stages both variants into the right file and
   participates in undo. Keep the existing **Accept all** meaning: accept every applicable change in the block.
 - **Decisions:** Define the order and separator between variants and how previously resolved rows are handled.
-
-### Review status and progress
-
-- **Benefit:** Make open, accepted, and ignored changes visible throughout a review.
-- **Initial scope:** Add review counts and accessible status markers, keeping review progress distinct from
-  whether changes have been saved.
-- **Current implementation:** Pending accepted target content has text-color markers and deletion previews;
-  accepting changes and undoing also show accessible feedback beside the review controls. Broader review counts
-  and status markers remain under consideration.
-- **Design:** [Review status concept](docs/concepts/review-statusanzeige.md). Reconcile the draft with existing
-  undo behavior and current translation requirements before implementation.
 
 ### Optional single-column diff layout
 

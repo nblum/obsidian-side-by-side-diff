@@ -106,6 +106,8 @@ describe("documentation screenshots (opt-in)", () => {
     await $(`${view} .file-diff-sbs-picker-card button`).click();
     await chooseFile(right);
     await expect($$(accept)).toBeElementsArrayOfSize(5);
+    await expect($(`${view} .file-diff-sbs-summary`)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+    await expect($(`${view} [data-review-status='open'] .file-diff-sbs-review-marker`)).not.toExist();
     await capture("compare-mode.webp");
     await capture("grouped-changes.png", `${view} .file-diff-sbs-group`);
 
@@ -123,12 +125,16 @@ describe("documentation screenshots (opt-in)", () => {
 
     await $(`${view} button[aria-keyshortcuts='Alt+ArrowLeft']`).click();
     await expect($$(accept)).toBeElementsArrayOfSize(4);
+    await expect($(`${view} .file-diff-sbs-summary`)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 1");
+    await expect($(`${view} [data-review-status='ignored'] .file-diff-sbs-review-marker`)).toHaveAttribute("aria-label", "Ignored");
     await capture("ignored-changes.webp");
     await $(undo).click();
     await expect($$(accept)).toBeElementsArrayOfSize(5);
     await $(accept).click();
     await expect($(`${view} [data-diff-pending='insert']`)).toExist();
     await expect($(`${view} .file-diff-sbs-review-feedback`)).toHaveText("Change staged. Save to write it.");
+    await expect($(`${view} .file-diff-sbs-summary`)).toHaveText("Open: 4 · Accepted: 1 · Ignored: 0");
+    await expect($(`${view} [data-review-status='accepted'] .file-diff-sbs-review-marker`)).toHaveAttribute("aria-label", "Accepted");
     await capture("pending-changes.webp");
     await $(`${view} .file-diff-sbs-swap-button`).click();
     await expect($(".modal-title")).toHaveText("Unsaved changes");

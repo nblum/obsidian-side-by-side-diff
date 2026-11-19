@@ -105,6 +105,12 @@ strikethrough and the incoming text in green. The feedback beside `Undo` confirm
 
 ![Accepted target text and deletion preview before saving](assets/pending-changes.webp)
 
+The summary beside the previous/next arrows above the split counts **Open**, **Accepted**, and **Ignored** changed
+lines. Open changes keep their accept/ignore buttons; check and minus markers identify accepted and ignored changes. Navigation visits open changes only.
+Undo restores the previous decision.
+Accepted means staged: save explicitly to write it. After saving, accepted counts reset while ignored differences
+stay ignored. Finishing a review can therefore leave the files different.
+
 Ignoring preserves both versions; see the [ignored-change example](docs/visual-guide.md#ignore-a-change).
 
 ### Suggest changes
@@ -234,7 +240,7 @@ appreciated.
 - [Roadmap](ROADMAP.md) – candidate and planned features, with links to detailed concepts
 - [Contributing](CONTRIBUTING.md) – development setup, build commands, tests, and validation
 - [Changelog](CHANGELOG.md) – changes by release
-- [Review status concept](docs/concepts/review-statusanzeige.md) – proposed improvements to review states
+- [Review status concept](docs/concepts/review-statusanzeige.md) – review states, counts, and session lifecycle
 
 The plugin source is TypeScript. Build and test instructions, project structure, and contribution guidance live in
 [CONTRIBUTING.md](CONTRIBUTING.md).

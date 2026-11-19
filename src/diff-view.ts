@@ -2,7 +2,7 @@ import { FileSystemAdapter, ItemView, Menu, Notice, TFile, setIcon, setTooltip }
 import { join, relative } from "node:path";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
-import { createComparisonModelFromLines, createIndexedDiffRowsFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model";
+import { createComparisonModelFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model";
 import { clearChangeTargetMetadata, getAutoAdvanceTargetPosition, getChangeKeyboardAction, getNextChangeIndex, isUndoShortcut, type ChangeNavigationDirection } from "./diff-navigation";
 import { DeleteChangeCopyModal, DeleteIdenticalFileModal, FilePickerModal, UnsavedChangesModal } from "./modals";
 import { createGuardedSaveTransform, SaveConflictError } from "./save-guard";
@@ -1223,6 +1223,7 @@ export class SideBySideDiffView extends ItemView {
         return false;
       }
       this.session.clearUndoStack();
+      this.session.commitReview();
       new Notice(this.translate("notice.saved"));
       await this.renderDiff(scrollPosition);
       if (promptForProposalCleanup) {
@@ -1258,9 +1259,9 @@ export class SideBySideDiffView extends ItemView {
       const { leftContent: storedLeftContent, rightContent: storedRightContent } = loaded;
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
-      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
+      const rows = this.session.getReviewRows(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions, this.applyDirection);
       const row = rows[rowIndex];
-      if (row === undefined || row.equal) {
+      if (row === undefined || row.equal || this.session.hasDismissedRow(getDiffRowKey(row))) {
         return;
       }
       const leftToRight = direction === "left-to-right";
@@ -1275,7 +1276,7 @@ export class SideBySideDiffView extends ItemView {
       const targetContent = leftToRight ? rightContent : leftContent;
       const targetLines = leftToRight ? nextRightLines : nextLeftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
-      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
+      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline, [rowIndex]);
       await this.renderDiff(scrollPosition);
       this.showReviewFeedback("notice.staged");
       if (this.state.mode === "accept" && direction === "left-to-right") {
@@ -1310,7 +1311,7 @@ export class SideBySideDiffView extends ItemView {
       const { leftContent: storedLeftContent, rightContent: storedRightContent } = loaded;
       const leftContent = this.getDisplayedContent(leftFile.path, storedLeftContent);
       const rightContent = this.getDisplayedContent(rightFile.path, storedRightContent);
-      const rows = createIndexedDiffRowsFromLines(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions);
+      const rows = this.session.getReviewRows(splitLines(leftContent), splitLines(rightContent), this.comparisonOptions, this.applyDirection);
       // Skip rows the user already resolved individually - "Accept all" must not silently
       // reverse a change they explicitly dismissed.
       const actionableIndexes = getActionableRowIndexes(rows, startIndex, endIndex, (row) => this.session.hasDismissedRow(getDiffRowKey(row)));
@@ -1335,7 +1336,7 @@ export class SideBySideDiffView extends ItemView {
       const targetContent = leftToRight ? rightContent : leftContent;
       const targetLines = leftToRight ? rightLines : leftLines;
       const targetBaseline = leftToRight ? storedRightContent : storedLeftContent;
-      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline);
+      this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline, actionableIndexes);
       await this.renderDiff(scrollPosition);
       this.showReviewFeedback("notice.staged");
       if (this.state.mode === "accept" && direction === "left-to-right") {
@@ -1443,22 +1444,18 @@ export class SideBySideDiffView extends ItemView {
     this.comparisonOptions = {
       alignMarkdownByHeadings: this.plugin.settings.alignMarkdownByHeadings && leftFile.extension.toLowerCase() === "md" && rightFile.extension.toLowerCase() === "md"
     };
-    const rows = createComparisonModelFromLines(leftLines, rightLines, this.comparisonOptions).rows;
+    const rows = this.state.editRight
+      ? createComparisonModelFromLines(leftLines, rightLines, this.comparisonOptions).rows
+      : this.session.getReviewRows(leftLines, rightLines, this.comparisonOptions, this.applyDirection);
     const changedRows = rows.filter((row) => !row.equal);
-    const dismissedCount = changedRows.filter((row) => this.session.hasDismissedRow(getDiffRowKey(row))).length;
-    const visibleChangedCount = changedRows.length - dismissedCount;
-    const summaryParts = [this.translate(
-      visibleChangedCount === 1 ? "view.summary.changedOne" : "view.summary.changedMany",
-      { count: visibleChangedCount }
-    )];
-    if (dismissedCount > 0) {
-      summaryParts.push(this.translate("view.summary.ignored", { count: dismissedCount }));
-    }
-    const summary = summaryParts.join(" \xB7 ");
+    const counts = this.session.getReviewCounts();
+    const visibleChangedCount = counts.open;
+    const summary = this.state.editRight
+      ? this.translate(changedRows.length === 1 ? "view.summary.changedOne" : "view.summary.changedMany", { count: changedRows.length })
+      : this.translate("view.review.summary", { ...counts });
     const toolbar = root.createDiv({ cls: "file-diff-sbs-toolbar" });
     const title = toolbar.createDiv({ cls: "file-diff-sbs-title" });
     title.createSpan({ text: this.translate("commands.compareTwoFiles"), cls: "file-diff-sbs-title-main" });
-    toolbar.createDiv({ cls: "file-diff-sbs-summary", text: summary });
     toolbar.addClass("file-diff-sbs-comparison-toolbar");
     const actions = toolbar.createDiv({ cls: "file-diff-sbs-toolbar-actions" });
     const saveButton = actions.createEl("button", {
@@ -1479,7 +1476,10 @@ export class SideBySideDiffView extends ItemView {
       const menu = new Menu();
       menu.addItem((item) => {
         item.setTitle(this.translate("menu.refresh")).setIcon("refresh-cw").setDisabled(this.hasUnsavedChanges()).onClick(() => {
-          if (!this.hasUnsavedChanges()) void this.renderDiff(this.getScrollPosition());
+          if (!this.hasUnsavedChanges()) {
+            this.session.resetReview();
+            void this.renderDiff(this.getScrollPosition());
+          }
         });
       });
       menu.addItem((item) => {
@@ -1532,7 +1532,7 @@ export class SideBySideDiffView extends ItemView {
     if (this.state.editRight) {
       root.createDiv({ cls: "file-diff-sbs-hint", text: this.translate("view.hint.edit") });
     }
-    const allChangesResolved = !this.state.editRight && visibleChangedCount === 0 && (changedRows.length > 0 || this.hasPendingChanges());
+    const allChangesResolved = !this.state.editRight && visibleChangedCount === 0 && (counts.accepted + counts.ignored > 0 || this.hasPendingChanges());
     if (allChangesResolved) {
       this.buildResolvedMessage(root);
     } else if (changedRows.length === 0) {
@@ -1553,7 +1553,15 @@ export class SideBySideDiffView extends ItemView {
       cls: "file-diff-sbs-review-feedback",
       attr: { role: "status", "aria-live": "polite", "aria-atomic": "true" }
     });
-    const navigation = reviewActions.createDiv({ cls: "file-diff-sbs-navigation" });
+    const reviewNavigation = reviewActions.createDiv({ cls: "file-diff-sbs-review-navigation" });
+    const summaryEl = reviewNavigation.createDiv({ cls: "file-diff-sbs-summary", text: summary });
+    if (!this.state.editRight) {
+      summaryEl.setAttribute("role", "status");
+      summaryEl.setAttribute("aria-live", "polite");
+      summaryEl.setAttribute("aria-atomic", "true");
+      summaryEl.setAttribute("aria-label", this.translate("view.review.summaryLabel"));
+    }
+    const navigation = reviewNavigation.createDiv({ cls: "file-diff-sbs-navigation" });
     const previousChangeButton = navigation.createEl("button", { cls: "clickable-icon" });
     previousChangeButton.setAttribute("aria-label", this.translate("actions.previousChange"));
     setTooltip(previousChangeButton, this.translate("actions.previousChangeTitle"));
@@ -1875,6 +1883,8 @@ export class SideBySideDiffView extends ItemView {
   buildRow(parent: HTMLElement, row: IndexedDiffRow, rowIndex: number, isChange = !row.equal): void {
     const rowElement = parent.createDiv({ cls: "file-diff-sbs-row" });
     rowElement.dataset.diffRowIndex = String(rowIndex);
+    const reviewStatus = this.session.getReviewStatus(rowIndex);
+    if (reviewStatus !== null) rowElement.dataset.reviewStatus = reviewStatus;
     if (isChange) {
       rowElement.dataset.diffChange = "true";
     }
@@ -1913,9 +1923,19 @@ export class SideBySideDiffView extends ItemView {
   /** Adds centered buttons for copying or ignoring a changed row in read-only mode. */
   buildActionCell(parent: HTMLElement, row: IndexedDiffRow, rowIndex: number): void {
     const cell = parent.createDiv({ cls: "file-diff-sbs-action-cell" });
-    if (row.equal || this.state.editRight) {
-      return;
+    if (this.state.editRight) return;
+    const status = this.session.getReviewStatus(rowIndex);
+    if (status === "open") {
+      cell.setAttribute("role", "group");
+      cell.setAttribute("aria-label", this.translate("view.review.open"));
+    } else if (status !== null) {
+      const label = this.translate(`view.review.${status}`);
+      const marker = cell.createSpan({ cls: "file-diff-sbs-review-marker", text: status === "accepted" ? "✓" : "−" });
+      marker.setAttribute("role", "img");
+      marker.setAttribute("aria-label", label);
+      marker.title = label;
     }
+    if (row.equal) return;
     const acceptButton = cell.createEl("button", { text: this.applyDirection === "left-to-right" ? "→" : "←", cls: "file-diff-sbs-merge-button" });
     acceptButton.disabled = !this.canApplyChange();
     acceptButton.title = this.translate("actions.acceptTarget", { name: this.getApplyTargetName() });

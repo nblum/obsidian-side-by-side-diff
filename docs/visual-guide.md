@@ -28,7 +28,9 @@ file picker. The **Drop files** card accepts a vault file or an external Markdow
 The headers identify the **Original** and **Comparison**, along with the current **Source** and **Target**.
 Green source content will be inserted; red target content will be removed or replaced if you accept it. Inline
 highlights identify the changed words within a line. Arrow buttons between the panes accept individual changes;
-`×` ignores them. Previous/next controls navigate between open changes.
+`×` ignores them. The summary beside the navigation arrows counts open, accepted, and ignored changed lines.
+Open rows keep their action buttons; check and minus markers identify accepted and ignored rows. Previous/next controls navigate between
+open changes.
 
 ![Comparison showing inline differences and open review actions](../assets/compare-mode.webp)
 
@@ -53,7 +55,8 @@ block in one step; a single **Undo** reverses that step. Accept all skips change
 
 Accepting a change updates the target preview. New target text is green; the previous target line remains visible
 in red with strikethrough. Deleted previews are excluded from copied and saved target content. Feedback beside
-the review controls confirms that the change is staged. The files on disk remain unchanged.
+the review controls confirms that the change is staged; its row gains a check marker and the Accepted count increases.
+The files on disk remain unchanged.
 
 Use **Undo** or `Ctrl/Cmd+Z` to reverse an accept or ignore action before saving.
 
@@ -62,8 +65,8 @@ Use **Undo** or `Ctrl/Cmd+Z` to reverse an accept or ignore action before saving
 ## Ignore a change
 
 Ignoring removes the row's review highlights and actions while preserving both files' displayed text and line
-numbers. The summary counts the ignored change. Ignoring every difference completes the review, but does not
-make the files identical. Undo restores the review action.
+numbers. A minus marker identifies the ignored row, and the summary counts the decision. Ignoring every difference
+completes the review, but does not make the files identical. Undo restores the review action.
 
 ![Ignored first difference with both versions of the text still visible](../assets/ignored-changes.webp)
 
@@ -88,7 +91,8 @@ Dismissing the dialog keeps the current comparison and its pending work.
 **Save changes** writes the staged target content after checking for external changes. If another edit changed
 the file since you opened the comparison, saving is canceled and your staged changes remain available for review.
 
-After accepting and saving all differences in these sample notes, both files are identical and Save is disabled.
+After a successful save, accepted counts reset while ignored differences remain resolved. After accepting and
+saving all differences in these sample notes, both files are identical and Save is disabled.
 The identical-file message offers a separate, confirmed trash action; review completion alone does not offer that
 proof of equality.
 

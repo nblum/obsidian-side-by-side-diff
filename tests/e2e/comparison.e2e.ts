@@ -9,6 +9,7 @@ const save = `${view} .file-diff-sbs-save-action`;
 const accept = `${view} [data-diff-change='true'] button[aria-keyshortcuts='Alt+ArrowRight']`;
 const ignore = `${view} [data-diff-change='true'] button[aria-keyshortcuts='Alt+ArrowLeft']`;
 const undo = `${view} button[aria-keyshortcuts='Ctrl+Z']`;
+const progress = `${view} .file-diff-sbs-review-navigation .file-diff-sbs-summary[role="status"]`;
 const feedback = `${view} .file-diff-sbs-review-feedback`;
 const original = await readFile(new URL("./vault/Original.md", import.meta.url), "utf8");
 const comparison = await readFile(new URL("./vault/Comparison.md", import.meta.url), "utf8");
@@ -61,6 +62,12 @@ describe("comparison in Obsidian", () => {
 
   it("opens through both pickers and renders inline changes without saving", async () => {
     await expect($(save)).toBeDisabled();
+    await expect($(progress)).toHaveText("Open: 1 · Accepted: 0 · Ignored: 0");
+    await expect($(`${view} .file-diff-sbs-comparison-toolbar .file-diff-sbs-summary`)).not.toExist();
+    await expect($(progress)).toHaveAttribute("aria-label", "Review progress (changed lines)");
+    await expect($(`${view} [data-review-status='open'] .file-diff-sbs-review-marker`)).not.toExist();
+    await expect($(`${view} [data-review-status='open'] .file-diff-sbs-action-cell`)).toHaveAttribute("role", "group");
+    await expect($(`${view} [data-review-status='open'] .file-diff-sbs-action-cell`)).toHaveAttribute("aria-label", "Open");
     await expect($(`${view} [data-diff-side='left'] .file-diff-sbs-inline-left`)).toHaveText("Original");
     await expect($(`${view} [data-diff-side='right'] .file-diff-sbs-inline-right`)).toHaveText("Comparison");
     assert.equal(await readSaved("Original.md"), original);
@@ -144,6 +151,8 @@ describe("comparison in Obsidian", () => {
     await $(accept).click();
     await expect($(save)).toBeEnabled();
     await expect($(feedback)).toHaveText("Change staged. Save to write it.");
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 1 · Ignored: 0");
+    await expect($(`${view} [data-review-status='accepted'] .file-diff-sbs-review-marker`)).toHaveAttribute("aria-label", "Accepted");
     await expect($(feedback)).toHaveAttribute("role", "status");
     await expect($(feedback)).toHaveAttribute("aria-live", "polite");
     await expect($$(".notice")).toBeElementsArrayOfSize(0);
@@ -155,6 +164,7 @@ describe("comparison in Obsidian", () => {
 
     await $(undo).click();
     await expect($(feedback)).toHaveText("Undone.");
+    await expect($(progress)).toHaveText("Open: 1 · Accepted: 0 · Ignored: 0");
     await expect($$(".notice")).toBeElementsArrayOfSize(0);
     await expect($(save)).toBeDisabled();
     await expect($$(accept)).toBeElementsArrayOfSize(1);
@@ -169,6 +179,8 @@ describe("comparison in Obsidian", () => {
     await browser.waitUntil(async () => await readSaved("Comparison.md") === original);
     await expect($(save)).toBeDisabled();
     await expect($(feedback)).toHaveText("");
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 0");
+    await expect($(`${view} [data-review-status]`)).not.toExist();
     await expect($(".notice-container")).toHaveText(expect.stringContaining("Changes saved."));
     await expect($(`${view} [data-diff-pending]`)).not.toExist();
     assert.equal(await readSaved("Original.md"), original);
@@ -176,6 +188,8 @@ describe("comparison in Obsidian", () => {
 
   it("ignores a row while preserving both displayed files and supports undo", async () => {
     await $(ignore).click();
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 1");
+    await expect($(`${view} [data-review-status='ignored'] .file-diff-sbs-review-marker`)).toHaveAttribute("aria-label", "Ignored");
     await expect($$(accept)).toBeElementsArrayOfSize(0);
     await expect($(save)).toBeDisabled();
     await expect($(`${view} .file-diff-sbs-grid`)).toHaveText(expect.stringContaining("Original wording."));
@@ -209,8 +223,88 @@ describe("comparison in Obsidian", () => {
     await expect($(".notice-container")).toHaveText(expect.stringContaining("Saving was canceled to prevent overwriting it."));
     await expect($(save)).toBeEnabled();
     await expect($(`${view} [data-diff-pending='insert']`)).toExist();
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 1 · Ignored: 0");
+    await expect($(`${view} [data-review-status='accepted']`)).toExist();
     assert.equal(await readSaved("Comparison.md"), external);
     assert.equal(await readSaved("Original.md"), original);
+  });
+
+  for (const reverse of [false, true]) {
+    it(`keeps review identities after insertion, ignore, undo and save (${reverse ? "right to left" : "left to right"})`, async () => {
+      const source = "A\ninsert\nB\nnew\nC\nnew\nZ\n";
+      const target = "A\nB\nold\nC\nold\nZ\n";
+      await obsidianPage.write("Original.md", reverse ? target : source);
+      await obsidianPage.write("Comparison.md", reverse ? source : target);
+      await expect($(progress)).toHaveText("Open: 3 · Accepted: 0 · Ignored: 0");
+      if (reverse) await $(`${view} .file-diff-sbs-direction-button`).click();
+      const ignoredRow = $$(ignore)[2];
+      assert.ok(ignoredRow);
+      await ignoredRow.click();
+      await expect($(progress)).toHaveText("Open: 2 · Accepted: 0 · Ignored: 1");
+      await $(accept).click();
+      await expect($(progress)).toHaveText("Open: 1 · Accepted: 1 · Ignored: 1");
+      await expect($$(`${view} [data-review-status='ignored']`)).toBeElementsArrayOfSize(1);
+      await expect($$(`${view} [data-diff-change='true']`)).toBeElementsArrayOfSize(1);
+      await browser.executeObsidianCommand("side-by-side-diff:next-change");
+      await expect($(`${view} .file-diff-sbs-active-change`)).toHaveAttribute("data-review-status", "open");
+      assert.equal(await browser.execute((selector) => {
+        const widths = Array.from(document.querySelectorAll(`${selector} .file-diff-sbs-action-cell`), element => element.getBoundingClientRect().width);
+        return widths.length > 0 && Math.max(...widths) - Math.min(...widths) < 1;
+      }, view), true, "open, accepted and ignored rows keep the same action-column width");
+      await $(undo).click();
+      await expect($(progress)).toHaveText("Open: 2 · Accepted: 0 · Ignored: 1");
+      await $(accept).click();
+      await $(accept).click();
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 2 · Ignored: 1");
+      const targetPath = reverse ? "Original.md" : "Comparison.md";
+      assert.equal(await readSaved(targetPath), target, "review decisions remain staged");
+      await saveFromToolbar();
+      await browser.waitUntil(async () => await readSaved(targetPath) === "A\ninsert\nB\nnew\nC\nold\nZ\n");
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 1");
+      await expect($(save)).toBeDisabled();
+      await browser.saveScreenshot(join(process.cwd(), `e2e-results/review-progress-${reverse ? "reverse" : "forward"}.png`));
+    });
+  }
+
+  for (const reverse of [false, true]) {
+    it(`retains ignored duplicate lines after saving (${reverse ? "right to left" : "left to right"})`, async () => {
+      await obsidianPage.write("Original.md", "2\n2\n2\n0\n");
+      await obsidianPage.write("Comparison.md", "0\n0\n0\n");
+      await expect($(progress)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+      if (reverse) await $(`${view} .file-diff-sbs-direction-button`).click();
+      for (const index of [1, 2, 4]) {
+        await $(`${view} [data-diff-row-index='${String(index)}'] button[aria-keyshortcuts='Alt+ArrowLeft']`).click();
+      }
+      for (const index of [0, 5]) {
+        await $(`${view} [data-diff-row-index='${String(index)}'] button[aria-keyshortcuts='Alt+ArrowRight']`).click();
+      }
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 2 · Ignored: 3");
+      await saveFromToolbar();
+      await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 3");
+      await expect($$(`${view} [data-review-status='ignored']`)).toBeElementsArrayOfSize(3);
+      await expect($$(accept)).toBeElementsArrayOfSize(0);
+      assert.equal(await readSaved(reverse ? "Original.md" : "Comparison.md"), reverse ? "2\n2\n0\n0\n" : "2\n0\n0\n");
+      await expect($(save)).toBeDisabled();
+    });
+  }
+
+  it("counts a mixed block by changed rows and undoes the entire acceptance at once", async () => {
+    await obsidianPage.write("Original.md", "A\nnew1\nnew2\nnew3\nnew4\nnew5\nZ\n");
+    await obsidianPage.write("Comparison.md", "A\nold1\nold2\nold3\nold4\nold5\nZ\n");
+    await expect($(progress)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+    const ignoredRow = $$(ignore)[1];
+    assert.ok(ignoredRow);
+    await ignoredRow.click();
+    await expect($(progress)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 1");
+    await $(`${view} .file-diff-sbs-group-actions button`).click();
+    await expect($(progress)).toHaveText("Open: 0 · Accepted: 4 · Ignored: 1");
+    await expect($$(`${view} [data-review-status='accepted']`)).toBeElementsArrayOfSize(4);
+    await expect($(`${view} [data-review-status='ignored']`)).toHaveText(expect.stringContaining("old2"));
+    await $(undo).click();
+    await expect($(progress)).toHaveText("Open: 4 · Accepted: 0 · Ignored: 1");
+    await $(undo).click();
+    await expect($(progress)).toHaveText("Open: 5 · Accepted: 0 · Ignored: 0");
+    await expect($(save)).toBeDisabled();
   });
 
   it("prompts before swapping with staged changes and discards only on request", async () => {

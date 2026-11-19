@@ -1,184 +1,66 @@
-# Konzept: Statusanzeige für Änderungen
+# Review status and progress
 
-Status: Entwurf
+Status: Implemented, pending release
 
-## Ziel
+## Behavior
 
-Die Vergleichsansicht soll jederzeit eindeutig zeigen, welche Änderungen noch
-offen sind, welche bereits akzeptiert und welche ignoriert wurden. Die Anzeige
-spiegelt den Review-Fortschritt wider, ohne den Speicherstatus der Datei damit
-zu verwechseln.
+Comparison mode shows `Open: 2 · Accepted: 3 · Ignored: 1` beside the previous/next arrows directly above the split.
+Counts refer to originally changed aligned rows, including additions and deletions. A block action resolves several rows but counts each changed row
+once. Unchanged rows and visual alignment gaps do not count.
 
-## Ausgangslage
+Each original change has one session-local status:
 
-Aktuell verschwinden bearbeitete Änderungen nach dem Akzeptieren oder
-Ignorieren aus der offenen Navigation. Dadurch ist aus der Ansicht nicht
-ersichtlich, ob eine Änderung erledigt wurde oder nie Teil des Reviews war.
-Außerdem werden „ignoriert“ und „nicht mehr vorhanden“ visuell nicht klar
-unterschieden.
-
-## Geltungsbereich
-
-Das Konzept umfasst:
-
-- einen expliziten Status pro ursprünglicher Änderung,
-- eine Zusammenfassung der offenen, akzeptierten und ignorierten Änderungen,
-- eine dauerhafte Markierung erledigter Zeilen während der Review-Sitzung,
-- die Anpassung von Navigation, Tastaturaktionen und automatischem Weiterspringen,
-- zugängliche, übersetzbare Statusbezeichnungen.
-
-Nicht Teil der ersten Umsetzung sind ein dauerhaftes Speichern des Review-
-Status über mehrere Sitzungen und eine eigene Undo-Historie. Beides kann später
-auf dem Statusmodell aufbauen.
-
-## Statusmodell
-
-Jede Änderung erhält genau einen Review-Status:
-
-| Status | Bedeutung | Sichtbarkeit in der Ansicht | Navigation |
+| Status | Meaning | Marker | Navigation |
 | --- | --- | --- | --- |
-| `open` | Noch keine Entscheidung getroffen | normal hervorgehoben | Ziel von „Nächste/Vorherige Änderung“ |
-| `accepted` | Änderung für die rechte Datei übernommen | sichtbar, mit positiver Markierung | wird übersprungen |
-| `ignored` | Änderung bewusst verworfen bzw. zurückgestellt | sichtbar, dezent mit eigener Markierung | wird übersprungen |
+| `open` | No decision yet | Accept/ignore buttons with a localized group label | Included |
+| `accepted` | Source content staged into the current target | Check mark with a localized label | Skipped |
+| `ignored` | Both versions retained without a file change | Minus with a localized label | Skipped |
 
-Das Statusmodell bezieht sich auf die beim Laden erkannten Änderungen. Es ist
-damit unabhängig davon, ob die resultierende Datei bereits gespeichert wurde.
-Eine Statusänderung darf erst nach einer erfolgreichen Aktion erfolgen.
+Open entries have no extra status icon. Their action group carries the localized Open label. Accepted and
+ignored markers are placed between the panes, outside selectable file text. They have localized tooltips and accessible
+names. Colors supplement the symbols. The existing active-change focus remains separate from review status.
+The summary is a polite, atomic status region. Accepted target text and deleted-line previews retain their
+existing appearance until explicitly saved; an accepted deletion retains a status entry even if neither
+projected cell contains text.
 
-Für jede Änderung wird eine stabile Kennung benötigt. Die Kennung darf nicht
-allein aus dem aktuellen Zeileninhalt bestehen, da sich dieser nach dem
-Akzeptieren verändern kann. Geeignet ist eine Kombination aus Vergleichs-
-Sitzung, Datei und ursprünglicher Diff-Position beziehungsweise einem stabilen
-Diff-Entry aus dem Diff-Modell.
+## Identity and content
 
-Beispiel für die fachliche Struktur:
+`ReviewState` captures the original deterministic alignment. Original row positions identify entries within
+that review, including repeated identical lines. Accepting a row projects the source value into the target and
+updates target indexes without re-aligning the remaining rows. This keeps earlier ignored decisions and later
+merge actions attached to their original entries after insertions and deletions.
 
-```ts
-type ReviewStatus = "open" | "accepted" | "ignored";
+Rendering and row/block actions use the same projected rows and alignment options. No file is written by a
+review decision. Literal content, line endings, guarded saving, and external target permissions retain their
+existing behavior. Both merge directions use the same model. Proposal acceptance retains its fixed direction.
 
-interface ReviewEntry {
-  id: string;
-  status: ReviewStatus;
-  rowIndex: number;
-}
-```
+## Lifecycle
 
-`rowIndex` ist nur eine aktuelle Darstellungsposition und darf nicht als
-dauerhafte Identität verwendet werden.
+- Accept and ignore update only open entries. Block acceptance skips previously ignored entries.
+- Existing Undo restores content and review statuses together. A block action is one undo step.
+- Next/previous and automatic advance visit only open changes. Automatic advance still follows its setting.
+- Failed or conflicting saves preserve pending content and review status.
+- Successful saving clears accepted counts and undo history and rebases the projected rows on saved content.
+  Open and ignored entries retain their identities, including duplicate-heavy alignments. Saved target-only
+  deletion placeholders are removed. Saving does not make ignored differences equal or reopen them.
+- Swapping panes preserves ignored decisions and their remapped undo actions. Pending content follows the
+  existing save/discard confirmation. Reversing direction reopens ignored entries and starts a fresh review.
+- Discarding or selecting another comparison resets transient decisions. Review state is not persisted.
+- Direct editing uses its existing changed-line summary rather than review counters and retains its existing
+  save/discard confirmation. Returning to comparison retains the review when contents still match; changed
+  contents start a new alignment.
+- Explicit Refresh, available without pending changes, starts a new alignment, retaining matching ignored
+  differences and their undo. Ordinary rerenders, including language changes, retain the review.
+- If displayed file contents change outside the projected model, a new alignment is built. Only ignored entries
+  whose current keys still match are carried over. Staged target content remains protected by the save guard.
 
-## Zustandsübergänge
+Review completion means that every original difference has a decision. It does not establish file equality or
+that staged content has been saved. The existing completion message retains that distinction.
 
-| Aktion | Vorher | Nachher | Nebenwirkung |
-| --- | --- | --- | --- |
-| Akzeptieren | `open` | `accepted` | Inhalt der rechten Datei wird im Arbeitsspeicher aktualisiert |
-| Ignorieren | `open` | `ignored` | Keine Dateiänderung; Änderung bleibt als erledigt sichtbar |
-| Speichern | `accepted`/`ignored` | Status bleibt bis zum erfolgreichen Speichern sichtbar | Danach wird der Vergleich neu aufgebaut und die Statusliste zurückgesetzt |
-| Verwerfen | beliebig | neue Review-Sitzung | ausstehende Änderungen und Status werden verworfen |
-| Tauschen oder Editiermodus | beliebig | neue Review-Sitzung | bestehende Bestätigungsabfrage bleibt verpflichtend |
-| Externe Änderung erkannt | beliebig | unverändert | Speichern wird abgebrochen; Status und lokale Änderungen werden nicht still überschrieben |
-| Neu laden | beliebig | neue Review-Sitzung | Status werden aus dem neuen Diff abgeleitet |
+## Validation
 
-Fehler bei einer Aktion dürfen keinen Statusübergang auslösen. So bleibt eine
-Änderung bei einem fehlgeschlagenen Speichern weiterhin nachvollziehbar.
-
-## Darstellung
-
-### Zusammenfassung
-
-Am Kopf der Vergleichsansicht wird eine kompakte Zusammenfassung angezeigt,
-zum Beispiel:
-
-`Offen: 2 · Akzeptiert: 3 · Ignoriert: 1`
-
-Die Zähler werden aus dem Statusmodell berechnet und nicht aus sichtbaren DOM-
-Elementen. Gibt es keine offenen Änderungen, wird das als abgeschlossener
-Review-Zustand erkennbar angezeigt.
-
-### Einzelne Änderung
-
-Jede Diff-Zeile beziehungsweise jeder Änderungsblock erhält:
-
-- eine Statusklasse, zum Beispiel `status-open`, `status-accepted` oder
-  `status-ignored`,
-- ein sichtbares Textlabel oder ein Symbol mit Tooltip,
-- eine klare optische Trennung zwischen aktivem Fokus und Review-Status,
-- weiterhin zugängliche Informationen über `aria-label` oder vergleichbare
-  semantische Attribute.
-
-Empfohlene visuelle Sprache:
-
-- `open`: Akzentfarbe und Label „Offen“,
-- `accepted`: grünes Häkchen und Label „Akzeptiert“,
-- `ignored`: neutrales oder gedämpftes Symbol und Label „Ignoriert“.
-
-Farbe allein ist kein Statussignal. Die Markierungen müssen auch bei hoher
-Kontraststufe, ohne Farbwahrnehmung und in der Tastaturbedienung verständlich
-bleiben. Die aktive Änderung erhält zusätzlich eine eigene Fokusmarkierung.
-
-Die Aktionen „Akzeptieren“ und „Ignorieren“ sind für erledigte Änderungen
-deaktiviert oder werden durch eine spätere Undo-Aktion ersetzt. In der ersten
-Version genügt Deaktivieren; eine Undo-Funktion bleibt bewusst außerhalb des
-Scopes.
-
-## Navigation und Tastatur
-
-„Nächste Änderung“ und „Vorherige Änderung“ navigieren ausschließlich zu
-`open`-Einträgen und scrollen den Zielblock automatisch in den sichtbaren
-Bereich. Die bestehende Markierung der aktiven Änderung bleibt unabhängig vom
-Status erhalten.
-
-Die vorhandenen Aktionen gelten weiterhin für die hervorgehobene Änderung:
-
-- `Alt + Pfeil links`: ignorieren,
-- `Alt + Pfeil rechts`: akzeptieren.
-
-Nach einer erfolgreichen Aktion springt die Ansicht abhängig von der Option
-„Nach Änderung automatisch weiterspringen“ zur nächsten offenen Änderung. Ist
-die Option deaktiviert, bleibt der Fokus auf dem erledigten Block und dessen
-neuer Status wird sichtbar.
-
-## Lebenszyklus und Architektur
-
-Die Statusverwaltung sollte als kleine, testbare Schicht zwischen Diff-Modell
-und Darstellung umgesetzt werden:
-
-1. Diff-Modell und Review-Einträge beim Aufbau einer Vergleichsansicht
-   erzeugen.
-2. Statusänderungen ausschließlich über typisierte Aktionen durchführen.
-3. Zähler, Navigation und Zeilenmarkierungen aus demselben Statusmodell
-   ableiten.
-4. Bei Speichern, Verwerfen, Tauschen, Editiermodus und Neuladen den
-   Sitzungslebenszyklus zentral zurücksetzen beziehungsweise neu aufbauen.
-5. Speicherfehler und externe Änderungen als fehlgeschlagene Aktion behandeln,
-   ohne lokale Statusinformationen zu verlieren.
-
-Damit werden widersprüchliche Zustände vermieden, etwa ein Zähler „akzeptiert“,
-obwohl die Zeile noch als offen navigierbar ist.
-
-## Tests und Abnahmekriterien
-
-Die Umsetzung gilt als vollständig, wenn:
-
-- neue Änderungen den Status `open` erhalten,
-- Akzeptieren und Ignorieren genau den erwarteten Status setzen,
-- die drei Zähler immer die Statusliste widerspiegeln,
-- Navigation erledigte Änderungen überspringt und bei Bedarf umschlägt,
-- automatisches Weiterspringen mit aktivierter und deaktivierter Option korrekt
-  funktioniert,
-- die Statusanzeige auch nach fehlgeschlagenem Speichern konsistent bleibt,
-- ein extern verändertes Ziel nicht überschrieben wird,
-- Tauschen, Editiermodus, Verwerfen und Neuladen eine neue Review-Sitzung
-  korrekt behandeln,
-- Tastatur- und Screenreader-Nutzer den Status ohne Farbwahrnehmung erkennen,
-- deutsche und englische Labels vorhanden sind.
-
-Für die Logik sind Unit-Tests des Statusmodells und der Navigation zu
-bevorzugen. Ergänzend sollten wenige View-Tests die Statusklassen, Zähler,
-Scrollziel und Tastaturaktionen prüfen.
-
-## Offene Produktentscheidung
-
-Empfehlung für die erste Umsetzung: Akzeptierte und ignorierte Änderungen
-bleiben bis zum expliziten Speichern oder Verwerfen sichtbar. So kann der
-Nutzer den vollständigen Review-Fortschritt prüfen und erkennt jederzeit, was
-bereits entschieden wurde.
+Focused tests cover repeated lines, insertions before ignored changes, deletion-only reviews, both directions,
+row/block undo, ignored decisions after save and swap, resets, guarded save failures, and rendered status
+markers. The isolated Obsidian E2E suite covers accessible labels, review counts, explicit saving, failed saving,
+both merge directions, shifting target indexes, and mixed block acceptance/undo. All nine locales have the same
+keys and placeholders. Documentation captures include open, accepted, ignored, and reverse-direction states.

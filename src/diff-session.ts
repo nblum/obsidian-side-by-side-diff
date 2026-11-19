@@ -1,3 +1,6 @@
+import { ReviewState, type ReviewCounts, type ReviewStatus } from "./review-state.ts";
+import type { DiffDirection } from "./diff-core.ts";
+import type { ComparisonOptions, ComparisonRowModel } from "./diff-model.ts";
 import { captureSaveBaseline, migrateSaveEntry, refreshSaveBaseline } from "./save-guard.ts";
 
 /** Describes one staged file content snapshot without exposing session storage. */
@@ -6,10 +9,16 @@ export interface PendingChange {
 	readonly content: string;
 }
 
+/** Captures review decisions with the alignment to which they belong. */
+interface ReviewSnapshot {
+	readonly review: ReviewState;
+	readonly statuses: readonly (ReviewStatus | null)[];
+}
+
 /** Records how to reverse one accept or ignore action, however many rows it touched. */
-type UndoEntry =
+type UndoEntry = (
 	| { readonly type: "stage"; readonly path: string; readonly previousContent: string | undefined }
-	| { readonly type: "dismiss"; readonly rowKeys: readonly string[] };
+	| { readonly type: "dismiss"; readonly rowKeys: readonly string[] }) & { readonly reviewSnapshot: ReviewSnapshot | null };
 
 /**
  * Returns whether leaving the comparison would discard real, unwritten data.
@@ -22,6 +31,7 @@ export function hasUnsavedComparisonChanges(rightEditorChanged: boolean, hasPend
 
 /** Encapsulates transient comparison state independently from the Obsidian view. */
 export class DiffSession {
+	private review: ReviewState | null = null;
 	private readonly dismissedRowKeys = new Set<string>();
 	private readonly pendingContents = new Map<string, string>();
 	private readonly saveBaselines = new Map<string, string>();
@@ -29,19 +39,51 @@ export class DiffSession {
 	private proposalChangesAccepted = false;
 	private proposalCleanupPromptShown = false;
 
+	/** Reuses stable review rows until actual comparison content or direction changes. */
+	public getReviewRows(left: string[], right: string[], options: ComparisonOptions, direction: DiffDirection): ComparisonRowModel[] {
+		if (this.review === null || !this.review.matches(left, right, options, direction)) {
+			const ignored = this.getDismissedRowKeys();
+			this.review = new ReviewState(left, right, options, direction);
+			this.review.ignore(ignored);
+		}
+		return this.review.getRows();
+	}
+
+	/** Exposes row-based progress independently of pending file writes. */
+	public getReviewCounts(): ReviewCounts { return this.review?.getCounts() ?? { open: 0, accepted: 0, ignored: 0 }; }
+
+	/** Supplies accessible status markers for original changed rows. */
+	public getReviewStatus(index: number): ReviewStatus | null { return this.review?.getStatus(index) ?? null; }
+
+	/** Clears saved acceptance markers while keeping the remaining review identities intact. */
+	public commitReview(): void { this.review?.commit(); }
+
+	/** Starts a fresh alignment on explicit refresh while retaining matching ignored decisions. */
+	public resetReview(): void {
+		const keys = this.getDismissedRowKeys();
+		this.review = null;
+		this.dismissedRowKeys.clear();
+		for (const key of keys) this.dismissedRowKeys.add(key);
+	}
+
+	/** Captures statuses alongside the existing atomic undo action. */
+	private snapshotReview(): ReviewSnapshot | null {
+		return this.review === null ? null : { review: this.review, statuses: this.review.snapshot() };
+	}
+
 	/** Returns whether a diff row has been dismissed in the current session. */
 	public hasDismissedRow(rowKey: string): boolean {
-		return this.dismissedRowKeys.has(rowKey);
+		return this.review !== null ? this.review.hasIgnoredKey(rowKey) : this.dismissedRowKeys.has(rowKey);
 	}
 
 	/** Returns all dismissed row keys as a defensive copy. */
 	public getDismissedRowKeys(): string[] {
-		return [...this.dismissedRowKeys];
+		return this.review?.getIgnoredKeys() ?? [...this.dismissedRowKeys];
 	}
 
 	/** Returns the number of dismissed rows without exposing the backing set. */
 	public getDismissedRowCount(): number {
-		return this.dismissedRowKeys.size;
+		return this.review?.getCounts().ignored ?? this.dismissedRowKeys.size;
 	}
 
 	/** Marks one diff row as dismissed until the comparison is reset. */
@@ -51,17 +93,20 @@ export class DiffSession {
 
 	/** Marks several diff rows as dismissed in one undoable step, e.g. for a whole block. */
 	public dismissRows(rowKeys: readonly string[]): void {
-		const newKeys = rowKeys.filter((rowKey) => !this.dismissedRowKeys.has(rowKey));
+		const reviewSnapshot = this.snapshotReview();
+		const newKeys = [...new Set(rowKeys)].filter((rowKey) => !this.hasDismissedRow(rowKey));
 		for (const rowKey of newKeys) {
 			this.dismissedRowKeys.add(rowKey);
 		}
 		if (newKeys.length > 0) {
-			this.undoStack.push({ type: "dismiss", rowKeys: newKeys });
+			this.review?.ignore(newKeys);
+			this.undoStack.push({ type: "dismiss", rowKeys: newKeys, reviewSnapshot });
 		}
 	}
 
 	/** Replaces dismissed rows after the comparison panes have been exchanged. */
 	public replaceDismissedRows(rowKeys: readonly string[]): void {
+		this.review = null;
 		this.dismissedRowKeys.clear();
 		for (const rowKey of rowKeys) {
 			this.dismissedRowKeys.add(rowKey);
@@ -84,9 +129,10 @@ export class DiffSession {
 	}
 
 	/** Stages content and records the first observed target baseline. */
-	public stageChange(path: string, content: string, baseline: string): void {
+	public stageChange(path: string, content: string, baseline: string, acceptedIndexes: readonly number[] = []): void {
 		captureSaveBaseline(this.saveBaselines, path, baseline);
-		this.undoStack.push({ type: "stage", path, previousContent: this.pendingContents.get(path) });
+		this.undoStack.push({ type: "stage", path, previousContent: this.pendingContents.get(path), reviewSnapshot: this.snapshotReview() });
+		this.review?.accept(acceptedIndexes);
 		this.pendingContents.set(path, content);
 	}
 
@@ -113,6 +159,11 @@ export class DiffSession {
 				this.dismissedRowKeys.delete(rowKey);
 			}
 		}
+		if (entry.reviewSnapshot !== null && entry.reviewSnapshot.review === this.review) {
+			this.review.restore(entry.reviewSnapshot.statuses);
+		} else if (entry.type === "dismiss") {
+			this.review?.reopen(entry.rowKeys);
+		}
 		return true;
 	}
 
@@ -126,7 +177,7 @@ export class DiffSession {
 		for (let index = 0; index < this.undoStack.length; index += 1) {
 			const entry = this.undoStack[index];
 			if (entry?.type === "dismiss") {
-				this.undoStack[index] = { ...entry, rowKeys: entry.rowKeys.map(swapRowKey) };
+				this.undoStack[index] = { ...entry, rowKeys: entry.rowKeys.map(swapRowKey), reviewSnapshot: null };
 			}
 		}
 	}
@@ -175,6 +226,7 @@ export class DiffSession {
 
 	/** Clears staged changes, baselines, dismissed rows, and undo history after a discard. */
 	public clearTransientChanges(): void {
+		this.review = null;
 		this.pendingContents.clear();
 		this.saveBaselines.clear();
 		this.dismissedRowKeys.clear();
