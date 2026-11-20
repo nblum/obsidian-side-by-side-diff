@@ -501,9 +501,10 @@ export class SideBySideDiffView extends ItemView {
     this.disposeRightEditorObserver();
     this.contentEl.empty();
   }
-  /** Rerenders only when a compared path changed. */
+  /** Refreshes compared files without replacing unsaved editor text or its conflict baseline. */
   refreshForPath(path: string): void {
     if (path === this.state.leftPath || path === this.state.rightPath) {
+      if (this.hasRightEditorChanges()) return;
       void this.renderDiff(this.getScrollPosition());
     }
   }
@@ -978,15 +979,17 @@ export class SideBySideDiffView extends ItemView {
     }
     await this.setState({ ...this.state, editRight: true }, { history: false });
   }
-  /** Leaves editing without discarding unsaved target changes. */
+  /** Offers save/discard/cancel before leaving a dirty editor, preserving it when saving fails. */
   async disableRightEditMode(): Promise<void> {
     if (!this.state.editRight) {
       return;
     }
     const hasUnsavedChanges = this.rightEditorState !== null && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue;
     if (hasUnsavedChanges) {
-      new Notice(this.translate("notice.saveFirst"));
-      return;
+      const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this), this.translate("modal.unsaved.leaveEditQuestion"), {
+        allowCancel: true, discardLabel: this.translate("modal.unsaved.discardEdits")
+      }).waitForChoice();
+      if (choice === "cancel" || (choice === "save" && !await this.saveRightEdits())) return;
     }
     if (this.targetPath !== null) {
       this.session.removeSaveBaseline(this.targetPath);
@@ -1686,12 +1689,17 @@ export class SideBySideDiffView extends ItemView {
     const rightHeader = header.createDiv({ cls: "file-diff-sbs-header-file file-diff-sbs-right-file" });
     this.buildFileHeader(rightHeader, rightFile, paneLabels.right, this.state.editRight ? leftToRight ? "edit" : "reference" : leftToRight ? "target" : "source");
     const targetHeader = leftToRight ? rightHeader : leftHeader;
-    const editButton = targetHeader.createEl("button", { cls: "clickable-icon file-diff-sbs-file-edit-button" });
-    if (this.state.editRight) editButton.addClass("file-diff-sbs-compare-mode-button");
+    const editButton = targetHeader.createEl("button", { cls: "file-diff-sbs-file-edit-button" });
+    if (this.state.editRight) {
+      editButton.addClass("file-diff-sbs-compare-mode-button");
+      editButton.textContent = this.translate("actions.compareMode");
+    } else {
+      editButton.addClass("clickable-icon");
+      setIcon(editButton, "pencil");
+    }
     editButton.setAttribute("aria-label", this.translate(this.state.editRight ? "actions.compareMode" : "actions.edit"));
     setTooltip(editButton, this.translate(this.state.editRight ? "actions.compareModeTitle" : "actions.editTitle"));
-    setIcon(editButton, this.state.editRight ? "columns-2" : "pencil");
-    editButton.disabled = !this.canApplyChange();
+    editButton.disabled = !this.state.editRight && !this.canApplyChange();
     editButton.addEventListener("click", () => {
       if (this.state.editRight) void this.disableRightEditMode();
       else void this.enableRightEditMode();
@@ -2286,6 +2294,7 @@ export class SideBySideDiffView extends ItemView {
       return validate === undefined || await validate();
     }
     const choice = await new UnsavedChangesModal(this.app, this.translate.bind(this), question).waitForChoice();
+    if (choice === "cancel") return false;
     // An asynchronous drop may have failed or been superseded while the dialog was open.
     // Validate before a discard can erase the current session or a save can write it.
     if (validate !== undefined && !await validate()) return false;

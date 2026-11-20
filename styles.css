@@ -162,6 +162,19 @@ body.is-mobile .file-diff-sbs-root {
 	flex-shrink: 0;
 }
 
+.file-diff-sbs-compare-mode-button {
+	max-width: 100%;
+	min-height: var(--file-diff-sbs-toolbar-size);
+	height: auto;
+	padding: 0.3rem 0.65rem;
+	line-height: 1.25;
+	white-space: normal;
+}
+
+.file-diff-sbs-header-file:has(.file-diff-sbs-compare-mode-button) {
+	flex-wrap: wrap;
+}
+
 .file-diff-sbs-root[data-layout="single-column"] .file-diff-sbs-file-edit-button:not(.file-diff-sbs-compare-mode-button) {
 	display: none;
 }

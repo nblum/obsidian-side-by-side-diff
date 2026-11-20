@@ -174,7 +174,8 @@ selection, deletion, Backspace, and `Enter` for new lines are supported.
 
 Changes are never written automatically while typing or clicking a diff action. The file is updated only after using
 `Save changes` or `Ctrl/Cmd + S`. Before saving, the plugin checks for external file changes and cancels instead of
-overwriting newer content.
+overwriting newer content. Use **Leave edit mode** to return to comparison. Unsaved edits offer **Save**,
+**Discard changes**, or **Cancel**; Escape also keeps editing. A failed save preserves the editor and its text.
 Closing a view with unsaved changes opens a confirmation dialog.
 The [save-or-discard example](docs/visual-guide.md#handle-unsaved-changes) shows the same protection before swapping files.
 

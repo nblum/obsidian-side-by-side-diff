@@ -113,11 +113,14 @@ completes the review, but does not make the files identical. Undo restores the r
 
 In a wide side-by-side view, the pencil opens **Edit mode** for the target on either side; the source stays
 read-only. Narrow and single-column views hide the entry while keeping an existing editor usable. Typing remains
-unsaved until **Save changes** or `Ctrl/Cmd+S`. The comparison-mode icon returns to reviewing differences.
+unsaved until **Save changes** or `Ctrl/Cmd+S`. **Leave edit mode** returns to reviewing differences.
 
 ![Target editor beside the read-only source](../assets/inline-edit.png)
 
 ## Handle unsaved changes
+
+**Leave edit mode** is a text button. If the editor contains unsaved changes, choose **Save**, **Discard changes**,
+or **Cancel**. Escape keeps editing as well. Save errors or external-change conflicts leave the editor open.
 
 Actions that would replace pending work prompt you to save or discard it. This example appears before swapping
 the files. **Save** writes the staged changes before continuing; **Don't save** discards the pending changes.

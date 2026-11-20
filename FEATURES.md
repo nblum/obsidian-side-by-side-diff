@@ -25,7 +25,7 @@ visible, can be reviewed and staged individually, and are written only through a
   `Refresh`; there is no separate action row.
 - `Swap` is an icon with a tooltip above the direction icon between the file headers. The edit-mode icon sits
   at the right edge of the target's file header, vertically centered, and moves with the target when direction
-  changes. It changes to `Comparison mode` while editing. The source is never editable.
+  changes. It becomes a `Leave edit mode` text button while editing. The source is never editable.
 - `Undo`, `Previous change`, and `Next change` use accessible icon buttons with tooltips and retain their shortcuts.
 - `Undo` and change navigation sit below the file headers, directly above the split content.
 - Accepting a row or block and undoing a review action show localized feedback beside the review controls in a
@@ -234,7 +234,11 @@ visible, can be reviewed and staged individually, and are written only through a
 - Multi-line selection, deletion, Backspace, and `Enter` for new blank lines work as expected.
 - Side-by-side editing keeps both files aligned line by line; single-column editing uses a full-width target
   and a collapsible source reference.
-- `Comparison mode` ends direct editing.
+- The localized `Leave edit mode` text button ends direct editing. A dirty editor offers Save, Discard changes
+  and Cancel; Escape or closing the dialog also cancels. Save writes only the actual target before leaving;
+  discard reloads its saved content. A clean editor returns directly to comparison.
+- Failed or conflicting saves keep the live editor open. External modify events do not rebuild a dirty editor
+  or replace its unsaved text; explicit saving still checks the captured baseline.
 - Saving happens via `Save changes` or `Ctrl/Cmd + S`.
 - Closing with unsaved changes prompts the plugin to ask whether to save.
 - The edited file's existing line-ending style is preserved when saving.

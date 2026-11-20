@@ -6,10 +6,14 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Fixed
 
+- Preserve unsaved editor text when a compared file changes externally. A conflicting save keeps the live editor
+  open without overwriting the external change.
 - Let toolbar buttons handle Enter during direct editing instead of inserting a line into the target.
 
 ### Changed
 
+- Use a Leave edit mode text button with Save, Discard changes and Cancel for unsaved edits. Escape keeps editing;
+  failed saves preserve the editor and its text.
 - Unify row/block review buttons with rounded outlines, theme-aware tints and keyboard-focus states. Button heights
   follow the device rather than the comparison layout, with small vertical margins around row actions.
 - Run Linux Obsidian E2E tests and documentation captures on a private virtual display by default. Set

@@ -127,6 +127,8 @@ Compact-header checks cover direction reversal and saving, restoring desktop con
 focus fallback, live-editor retention, same-name folder labels and long filenames.
 Regression checks hide the edit entry in every single-column view and compare Save/navigation/review heights
 across all preferences at narrow and wide widths, separately for desktop and mobile styling.
+Edit-exit checks exercise Save/Discard in both directions, Cancel/Escape preserving the same editor, and an
+external modification during confirmation refusing to save while retaining the edited text.
 CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian, uploading failure
 artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
 selection/clipboard interaction, or external file drop.

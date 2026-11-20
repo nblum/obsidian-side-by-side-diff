@@ -6,7 +6,7 @@ import { getIntroductionAssetUrl } from "./introduction-assets";
 import type { IntroductionAssetName } from "./introduction-assets";
 import { orderRecentFiles } from "./recent-files";
 
-export type UnsavedChoice = "save" | "discard";
+export type UnsavedChoice = "save" | "discard" | "cancel";
 
 interface IntroductionStep {
   id: "welcome" | "start" | "selection" | "tips" | "thanks";
@@ -412,14 +412,18 @@ export class UnsavedChangesModal extends Modal {
   private finished: boolean;
   private readonly translate: Translator;
   private readonly question: string;
+  private readonly allowCancel: boolean;
+  private readonly discardLabel: string;
 
   /** Creates a save-or-discard prompt for pending comparison changes. */
-  constructor(app: App, translate: Translator, question = translate("modal.unsaved.question")) {
+  constructor(app: App, translate: Translator, question = translate("modal.unsaved.question"), options: { allowCancel?: boolean; discardLabel?: string } = {}) {
     super(app);
     this.resolveChoice = null;
     this.finished = false;
     this.translate = translate;
     this.question = question;
+    this.allowCancel = options.allowCancel ?? false;
+    this.discardLabel = options.discardLabel ?? translate("modal.unsaved.discard");
   }
   /** Opens the prompt and resolves with the selected close action. */
   waitForChoice(): Promise<UnsavedChoice> {
@@ -428,14 +432,18 @@ export class UnsavedChangesModal extends Modal {
       this.open();
     });
   }
-  /** Renders the save and discard actions. */
+  /** Renders save/discard actions and an optional way to keep editing. */
   override onOpen(): void {
     this.titleEl.setText(this.translate("modal.unsaved.title"));
     this.contentEl.createEl("p", { text: this.question });
     const actions = this.contentEl.createDiv({ cls: "file-diff-sbs-unsaved-actions" });
+    if (this.allowCancel) {
+      const cancelButton = actions.createEl("button", { text: this.translate("modal.cancel") });
+      cancelButton.addEventListener("click", () => { this.choose("cancel"); });
+    }
     const saveButton = actions.createEl("button", { text: this.translate("modal.unsaved.save"), cls: "mod-cta" });
     saveButton.addEventListener("click", () => { this.choose("save"); });
-    const discardButton = actions.createEl("button", { text: this.translate("modal.unsaved.discard") });
+    const discardButton = actions.createEl("button", { text: this.discardLabel });
     discardButton.addEventListener("click", () => { this.choose("discard"); });
   }
   /** Resolves the prompt and closes it after a button choice. */
@@ -448,11 +456,11 @@ export class UnsavedChangesModal extends Modal {
     this.resolveChoice = null;
     this.close();
   }
-  /** Defaults to discarding when the prompt is closed with Escape. */
+  /** Cancellable prompts preserve the editor when dismissed; existing close prompts keep their default. */
   override onClose(): void {
     if (!this.finished) {
       this.finished = true;
-      this.resolveChoice?.("discard");
+      this.resolveChoice?.(this.allowCancel ? "cancel" : "discard");
       this.resolveChoice = null;
     }
     this.contentEl.empty();

@@ -60,6 +60,23 @@ async function saved(name: string): Promise<string> {
   return readFile(join(obsidianPage.getVaultPath(), name), "utf8");
 }
 
+/** Replaces the first literal editor line through the real keyboard and native selection. */
+async function replaceEditorHeading(): Promise<void> {
+  await browser.execute((selector) => {
+    const editor = document.querySelector<HTMLElement>(`${selector} .file-diff-sbs-document-editor`);
+    const line = editor?.querySelector(".file-diff-sbs-edit-code");
+    const selection = document.getSelection();
+    if (!editor || !line || !selection) throw new Error("Target editor missing");
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(line);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, view);
+  await browser.keys("# Edited target");
+  await expect($(save)).toBeEnabled();
+}
+
 /** Copies a real DOM selection through the document's registered clipboard handler. */
 async function copyWholeComparison(): Promise<string> {
   return browser.execute((selector) => {
@@ -315,6 +332,73 @@ describe("single-column layout in Obsidian", () => {
     }, header);
     assert.equal(fits, true);
     await browser.saveScreenshot(join(process.cwd(), "e2e-results/compact-ambiguous-file-header.png"));
+  });
+
+  for (const reverse of [false, true]) {
+    for (const choice of ["Save", "Discard changes"]) {
+      it(`offers ${choice} before leaving a dirty editor (${reverse ? "reverse" : "forward"})`, async () => {
+        if (reverse) await $(`${view} .file-diff-sbs-direction-button`).click();
+        const target = reverse ? "Original.md" : "Comparison.md";
+        const source = reverse ? "Comparison.md" : "Original.md";
+        const original = await saved(target);
+        const sourceText = await saved(source);
+        await $(`${view} .file-diff-sbs-file-edit-button`).click();
+        await replaceEditorHeading();
+        await chooseLayout("single-column");
+        await setWidth(390);
+        const exit = `${view} .file-diff-sbs-compare-mode-button`;
+        await expect($(exit)).toHaveText("Leave edit mode");
+        await expect($(`${exit} svg`)).not.toExist();
+        await $(exit).click();
+        await expect($(".modal-title")).toHaveText("Unsaved changes");
+        await expect($(".modal-content")).toHaveText(expect.stringContaining("Save changes before leaving edit mode?"));
+        assert.equal(await saved(target), original);
+        await $(".file-diff-sbs-unsaved-actions").$(`button=${choice}`).click();
+        await expect($(".modal-title")).not.toExist();
+        await expect($(`${view} .file-diff-sbs-document-editor`)).not.toExist();
+        await expect($(root)).toHaveAttribute("data-layout", "single-column");
+        assert.equal(await saved(target), choice === "Save" ? original.replace("# Review", "# Edited target") : original);
+        assert.equal(await saved(source), sourceText);
+        await expect($(save)).toBeDisabled();
+      });
+    }
+  }
+
+  it("keeps the live editor and its text when edit-exit confirmation is cancelled or dismissed", async () => {
+    const original = await saved("Comparison.md");
+    await $(`${view} .file-diff-sbs-file-edit-button`).click();
+    await replaceEditorHeading();
+    await chooseLayout("single-column");
+    const editor = `${view} .file-diff-sbs-document-editor`;
+    await browser.execute((selector) => { Reflect.set(window, "cancelExitEditor", document.querySelector(selector)); }, editor);
+    await setWidth(390);
+    for (const cancel of ["button", "escape"]) {
+      await $(`${view} .file-diff-sbs-compare-mode-button`).click();
+      await expect($(".modal-title")).toHaveText("Unsaved changes");
+      await browser.saveScreenshot(join(process.cwd(), "e2e-results/leave-edit-confirmation.png"));
+      if (cancel === "button") await $(".file-diff-sbs-unsaved-actions").$("button=Cancel").click();
+      else await browser.keys("Escape");
+      await expect($(".modal-title")).not.toExist();
+      await expect($(editor)).toHaveText(expect.stringContaining("# Edited target"));
+      assert.equal(await browser.execute((selector) => document.querySelector(selector) === Reflect.get(window, "cancelExitEditor"), editor), true);
+      assert.equal(await saved("Comparison.md"), original);
+      await expect($(save)).toBeEnabled();
+    }
+  });
+
+  it("keeps editing when saving from the exit dialog encounters an external-change conflict", async () => {
+    const source = await saved("Original.md");
+    await $(`${view} .file-diff-sbs-file-edit-button`).click();
+    await replaceEditorHeading();
+    await $(`${view} .file-diff-sbs-compare-mode-button`).click();
+    await expect($(".modal-title")).toHaveText("Unsaved changes");
+    await obsidianPage.write("Comparison.md", "External changes must survive\n");
+    await $(".file-diff-sbs-unsaved-actions").$("button=Save").click();
+    await expect($(".modal-title")).not.toExist();
+    await expect($(`${view} .file-diff-sbs-document-editor`)).toHaveText(expect.stringContaining("# Edited target"));
+    await expect($(save)).toBeEnabled();
+    assert.equal(await saved("Comparison.md"), "External changes must survive\n");
+    assert.equal(await saved("Original.md"), source);
   });
 
   it("shares review-button styling in light and dark themes and exposes hover and keyboard focus", async () => {

@@ -85,6 +85,89 @@ function nativeDrop(path: string, content: string): File {
   return { name: "outside.md", path, text: () => Promise.resolve(content) } as unknown as File;
 }
 
+test("leaving a dirty editor saves, discards or cancels without losing its baseline prematurely", async () => {
+  const modal = module.exports.UnsavedChangesModal.prototype;
+  const originalChoice = modal.waitForChoice;
+  try {
+    for (const reverse of [false, true]) {
+      for (const choice of ["save", "discard", "cancel"] as const) {
+        const { view, session } = createSafetyView();
+        const target = reverse ? "left.md" : "right.md";
+        const editorState = { editor: {}, initialValue: "original" };
+        let saves = 0;
+        Object.assign(view, { viewState: { ...view.state, editRight: true, direction: reverse ? "right-to-left" : "left-to-right" },
+          rightEditorState: editorState, serializeRightEditor: () => "edited",
+          saveRightEdits: async () => { saves += 1; return true; },
+          setState: async (state: unknown) => { Object.assign(view, { viewState: state }); } });
+        session.captureSaveBaseline(target, "original");
+        modal.waitForChoice = () => Promise.resolve(choice);
+        await view.disableRightEditMode();
+        assert.equal(saves, choice === "save" ? 1 : 0);
+        assert.equal(view.state.editRight, choice === "cancel");
+        assert.equal(session.getSaveBaseline(target), choice === "cancel" ? "original" : undefined);
+        if (choice === "cancel") assert.equal(Reflect.get(view, "rightEditorState"), editorState);
+      }
+    }
+  } finally { modal.waitForChoice = originalChoice; }
+});
+
+test("a failed save while leaving editing keeps the editor and its save-conflict baseline", async () => {
+  const { view, session } = createSafetyView();
+  const modal = module.exports.UnsavedChangesModal.prototype;
+  const originalChoice = modal.waitForChoice;
+  const editorState = { editor: {}, initialValue: "original" };
+  let transitioned = false;
+  Object.assign(view, { viewState: { ...view.state, editRight: true }, rightEditorState: editorState,
+    serializeRightEditor: () => "edited", saveRightEdits: () => Promise.resolve(false),
+    setState: () => { transitioned = true; return Promise.resolve(); } });
+  session.captureSaveBaseline("right.md", "original");
+  try {
+    modal.waitForChoice = () => Promise.resolve("save");
+    await view.disableRightEditMode();
+    assert.equal(transitioned, false);
+    assert.equal(view.state.editRight, true);
+    assert.equal(Reflect.get(view, "rightEditorState"), editorState);
+    assert.equal(session.getSaveBaseline("right.md"), "original");
+  } finally { modal.waitForChoice = originalChoice; }
+});
+
+test("leaving an unchanged editor returns to comparison without prompting or saving", async () => {
+  const { view, session } = createSafetyView();
+  Object.assign(view, { viewState: { ...view.state, editRight: true },
+    rightEditorState: { editor: {}, initialValue: "unchanged" }, serializeRightEditor: () => "unchanged",
+    saveRightEdits: () => { throw new Error("Clean editor must not save"); },
+    setState: async (state: unknown) => { Object.assign(view, { viewState: state }); } });
+  session.captureSaveBaseline("right.md", "unchanged");
+  await view.disableRightEditMode();
+  assert.equal(view.state.editRight, false);
+  assert.equal(session.getSaveBaseline("right.md"), undefined);
+});
+
+test("dismissing an edit-exit prompt cancels while existing close prompts retain their default", async () => {
+  for (const allowCancel of [true, false]) {
+    const modal = new module.exports.UnsavedChangesModal({} as never, key => key, "question", { allowCancel });
+    Object.assign(modal, { open: () => {}, contentEl: { empty: () => {} } });
+    const choice = modal.waitForChoice();
+    modal.onClose();
+    assert.equal(await choice, allowCancel ? "cancel" : "discard");
+  }
+});
+
+test("file refreshes preserve a dirty editor and its conflict baseline, but update a clean editor", () => {
+  const { view, session } = createSafetyView();
+  let refreshes = 0;
+  Object.assign(view, { viewState: { ...view.state, editRight: true },
+    rightEditorState: { editor: {}, initialValue: "original" }, serializeRightEditor: () => "edited",
+    renderDiff: () => { refreshes += 1; return Promise.resolve(); } });
+  session.captureSaveBaseline("right.md", "original");
+  for (const path of ["left.md", "right.md", "unrelated.md"]) view.refreshForPath(path);
+  assert.equal(refreshes, 0);
+  assert.equal(session.getSaveBaseline("right.md"), "original");
+  Object.assign(view, { serializeRightEditor: () => "original" });
+  for (const path of ["left.md", "right.md", "unrelated.md"]) view.refreshForPath(path);
+  assert.equal(refreshes, 2);
+});
+
 test("single-row and grouped accepts refuse external content that changed after display", async () => {
   const dir = await mkdtemp(join(tmpdir(), "sbs-stale-display-"));
   try {

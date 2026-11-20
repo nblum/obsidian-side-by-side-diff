@@ -72,6 +72,13 @@ return at 720 pixels, except that the edit entry remains hidden in any single-co
 and its return action survive narrowing or switching layout; hidden focused actions fall back to
 the layout control. Header changes preserve the visible logical row, including when the chosen layout stays fixed.
 
+## Leaving editing
+
+The existing editor remains usable after switching to single column. Its localized Leave edit mode text button
+offers Save, Discard changes or Cancel for unsaved edits; Escape also cancels. Save/discard affect only the actual
+target, and a failed save retains the live editor. Compared-file modify events preserve a dirty editor so an
+external change during the exit confirmation is detected by the normal save-baseline guard.
+
 ## Selection and copying
 
 Single-column comparison copies selected text in reading order, including both changed variants and shared
@@ -135,11 +142,11 @@ mobile runtime, native clipboard, software-keyboard, or lifecycle compatibility.
 ## Recorded validation (2026-11-19–20)
 
 - `npm run lint`, `npm run typecheck`, `npm run validate:manifest`, `npm run build`, and `git diff --check` passed.
-- `npm test`: 264 tests passed, including production-bundle loading with desktop modules unavailable.
-- The full isolated desktop E2E suite passed on Obsidian 1.6.7: 57 cases, comprising 21 comparison cases and
-  36 layout cases, including compact controls, file headers, copying both variants,
+- `npm test`: 269 tests passed, including production-bundle loading with desktop modules unavailable.
+- The full isolated desktop E2E suite passed on Obsidian 1.6.7: 63 cases, comprising 21 comparison cases and
+  42 layout cases, including compact controls, file headers, copying both variants, edit-exit confirmation,
   block footers and the scroll-anchor regression.
-- Four affected layout/editor E2E workflows passed on Obsidian 1.15.1 after the final changes.
+- Ten affected layout/editor E2E workflows passed on Obsidian 1.15.1 after the final changes.
 - The documentation capture suite passed on Obsidian 1.15.1; all 15 captures and the derived keyboard
   illustration were refreshed and the plugin was rebuilt with the updated assets. Wide and narrow comparisons, editing, pending/ignored/retained variants, save prompts,
   and the keyboard callouts were visually inspected in the default light theme.
@@ -153,12 +160,12 @@ Row Accept/Ignore buttons have 3-pixel vertical margins in both layouts, retaini
 In single column, the action strip joins the last visible variant without a divider and leaves a 4-pixel gap
 afterwards. This makes the controls read as the footer of the change above. The geometry case checks both
 360- and 390-pixel views, exact margins, opposite-edge alignment, and the greater distance to the following change.
-The full 57-case suite on Obsidian 1.6.7 and all 264 unit tests pass. No visible strings, review logic, persistence,
+The full 63-case suite on Obsidian 1.6.7 and all 269 unit tests pass. No visible strings, review logic, persistence,
 or roadmap status changed; translations and device release gates remain unchanged.
 
 ### Layout and editor workflows
 
-The layout suite now has 36 cases. Nine follow-up cases exercise the initial narrow preview/picker, layout-default
+The layout suite now has 42 cases. Nine follow-up cases exercise the initial narrow preview/picker, layout-default
 persistence through the actual settings UI, visible-row and keyboard-focus continuity, backward multi-line editor
 selection and literal CRLF/blank-line/hard-break preservation in both directions, staged-deletion clipboard
 exclusion and copying both visible variants in both directions, and Save/Don't save before entering the stacked editor.
@@ -177,7 +184,9 @@ narrow/wide views, with desktop and mobile styling checked separately. Before th
 from 30 to 44 pixels, navigation from 26 to 44 pixels, and review actions also changed height with the layout.
 Review controls now use a shared 32-pixel desktop height and a 44-pixel mobile minimum. No layout selector applies
 device sizing; existing desktop editor sessions and their return action remain available in single-column mode.
-
+Six exit-editor cases exercise Save and Discard in both directions, Cancel/Escape retaining the same editor,
+and an external-change conflict while the exit dialog is open. The conflict test reproduced a dirty-editor
+replacement before the file-refresh guard was added; a focused unit regression failed for the same cause.
 
 The scroll-anchor E2E case reproduced a jump when stacked headers moved the scroll viewport. A focused unit
 regression also failed before the fix (an unchanged document scroll position moved from 500 to 700 pixels).
