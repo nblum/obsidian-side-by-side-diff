@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, moment, requireApiVersion } from "obsidian";
+import { Notice, Platform, Plugin, TFile, addIcon, moment, requireApiVersion } from "obsidian";
 import type { Command, Menu, TAbstractFile } from "obsidian";
 import { FilePickerModal, IntroductionModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
@@ -10,6 +10,7 @@ import type { ChangeNavigationDirection } from "./diff-navigation";
 import { rememberRecentFilePath } from "./recent-files";
 import { validateComparisonProtocolRequest } from "./protocol";
 import { extendTabMenus } from "./tab-context-menu";
+import { registerDiffLayoutIcons } from "./layout-icons";
 const ICON_ID = "square-split-horizontal";
 
 /** Formats a timestamp for deterministic change-copy names. */
@@ -28,6 +29,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
   /** Loads settings and registers the view, commands and ribbon action. */
   override async onload(): Promise<void> {
     await this.loadSettings();
+    registerDiffLayoutIcons(addIcon);
     this.registerView(VIEW_TYPE, (leaf) => new SideBySideDiffView(leaf, this));
     this.registerObsidianProtocolHandler("side-by-side-diff", (params) => {
       void this.openProtocolComparison(params);
@@ -39,7 +41,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
     );
     this.updateRibbonVisibility();
     this.addSettingTab(new FileDiffSettingsTab(this.app, this));
-    const restoreTabMenus = extendTabMenus((menu, view) => {
+    const restoreTabMenus = typeof Platform !== "undefined" && Platform.isMobileApp ? null : extendTabMenus((menu, view) => {
       // getState also identifies files in deferred views of tabs not opened this session.
       const path: unknown = view.getState().file;
       const file = typeof path === "string" ? this.app.vault.getAbstractFileByPath(path) : null;

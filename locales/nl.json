@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "Bestanden slepen",
 	"notice.comparisonChanged": "“{name}” is gewijzigd sinds deze vergelijking werd weergegeven. Controleer de vernieuwde vergelijking voordat je wijzigingen accepteert.",
 	"view.externalReadOnly": "Dit neergezette bestand is alleen-lezen omdat schrijftoegang tot het bestand niet beschikbaar is.",
+	"view.roles.targetCompact": "Doel",
+	"view.file.external": "Extern bestand",
 	"view.roles.source": "Bron",
 	"view.roles.target": "Doel · wordt gewijzigd",
 	"view.roles.reference": "Alleen-lezen referentie",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "Rechts → links",
 	"view.targetUnavailable": "Het doelbestand is niet meer beschikbaar.",
 	"view.pending.change": "Overgenomen wijziging — nog niet opgeslagen",
-	"view.pending.deletion": "Verwijdering in afwachting — nog niet opgeslagen"
+	"view.pending.deletion": "Verwijdering in afwachting — nog niet opgeslagen",
+	"view.layout.auto": "Automatisch",
+	"view.layout.side-by-side": "Naast elkaar",
+	"view.layout.single-column": "Eén kolom",
+	"view.referenceToggle": "Bronreferentie tonen/verbergen",
+	"settings.layout.name": "Standaardindeling",
+	"settings.layout.description": "Kies de indeling voor nieuwe vergelijkingen. Automatisch plaatst varianten onder elkaar bij een weergave smaller dan 720 pixels.",
+	"actions.acceptRow": "Overnemen",
+	"actions.ignoreRow": "Negeren",
+	"view.layout.switch": "Indeling: {current}. Schakel naar {next}."
 }

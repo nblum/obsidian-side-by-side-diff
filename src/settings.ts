@@ -3,6 +3,7 @@ import type { App, SettingDefinitionItem } from "obsidian";
 import type FileDiffSideBySidePlugin from "./main";
 import { DEFAULT_SETTINGS, isDiffDirection, isLanguagePreference, sanitizeCopySuffix } from "./settings-model";
 import { AUTHOR_WEBSITE_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL, KO_FI_URL } from "./external-links";
+import { isDiffLayout } from "./diff-layout";
 
 export { DEFAULT_SETTINGS, isLanguagePreference, normalizePluginSettings, sanitizeCopySuffix } from "./settings-model";
 export type { PluginSettings } from "./settings-model";
@@ -74,6 +75,20 @@ export class FileDiffSettingsTab extends PluginSettingTab {
         }
       },
       {
+        name: this.plugin.translate("settings.layout.name"),
+        desc: this.plugin.translate("settings.layout.description"),
+        control: {
+          type: "dropdown",
+          key: "defaultLayout",
+          defaultValue: DEFAULT_SETTINGS.defaultLayout,
+          options: {
+            auto: this.plugin.translate("view.layout.auto"),
+            "side-by-side": this.plugin.translate("view.layout.side-by-side"),
+            "single-column": this.plugin.translate("view.layout.single-column")
+          }
+        }
+      },
+      {
         name: this.plugin.translate("settings.autoAdvance.name"),
         desc: this.plugin.translate("settings.autoAdvance.description"),
         control: {
@@ -120,6 +135,8 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       this.plugin.settings.autoAdvanceAfterChange = value;
     } else if (key === "defaultApplyDirection" && isDiffDirection(value)) {
       this.plugin.settings.defaultApplyDirection = value;
+    } else if (key === "defaultLayout" && isDiffLayout(value)) {
+      this.plugin.settings.defaultLayout = value;
     } else if (key === "alignMarkdownByHeadings" && typeof value === "boolean") {
       this.plugin.settings.alignMarkdownByHeadings = value;
     } else if (key === "changeCopySuffix" && typeof value === "string") {
@@ -161,6 +178,14 @@ export class FileDiffSettingsTab extends PluginSettingTab {
         .addOption("right-to-left", this.plugin.translate("settings.applyDirection.rightToLeft"))
         .setValue(this.plugin.settings.defaultApplyDirection).onChange(async (value) => {
           await this.setControlValue("defaultApplyDirection", value);
+        });
+    });
+    new Setting(containerEl).setName(this.plugin.translate("settings.layout.name")).setDesc(this.plugin.translate("settings.layout.description")).addDropdown((dropdown) => {
+      dropdown.addOption("auto", this.plugin.translate("view.layout.auto"))
+        .addOption("side-by-side", this.plugin.translate("view.layout.side-by-side"))
+        .addOption("single-column", this.plugin.translate("view.layout.single-column"))
+        .setValue(this.plugin.settings.defaultLayout).onChange(async (value) => {
+          await this.setControlValue("defaultLayout", value);
         });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.autoAdvance.name")).setDesc(this.plugin.translate("settings.autoAdvance.description")).addToggle((toggle) => {

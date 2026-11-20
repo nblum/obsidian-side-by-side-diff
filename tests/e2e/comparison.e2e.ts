@@ -54,9 +54,15 @@ describe("comparison in Obsidian", () => {
       language: "en",
       introductionSeen: true,
       defaultApplyDirection: "left-to-right",
+      defaultLayout: "side-by-side",
       autoAdvanceAfterChange: false,
     }));
     await obsidianPage.enablePlugin("side-by-side-diff");
+    // Desktop workflows need a wide comparison area; narrow headers intentionally hide the edit entry.
+    await browser.executeObsidian(({ require }) => {
+      const remote = require("@electron/remote") as { getCurrentWindow(): { setSize(width: number, height: number): void } };
+      remote.getCurrentWindow().setSize(1440, 1000);
+    });
     await openComparison();
   });
 

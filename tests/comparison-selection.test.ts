@@ -166,6 +166,43 @@ test("copying a partial single line uses both selection boundaries", () => {
   assert.equal(fixture.clipboard.get("text/plain"), "changed");
 });
 
+test("stacked copying includes both selected variants once and preserves partial lines and whitespace", () => {
+  for (const reverse of [false, true]) {
+    const fixture = createCopyFixture("right", ["first shared", "first shared", "target  ", "source", "", "", "last line", "last line"], 6, 4);
+    const targetSide = reverse ? "left" : "right";
+    fixture.codes.forEach((code, index) => {
+      code.dataset.diffSide = index % 2 === 0 ? targetSide : reverse ? "right" : "left";
+      Object.assign(code.dataset, { diffShared: String(index !== 2 && index !== 3) });
+      code.closest = ((selector: string) => selector === ".file-diff-sbs-root"
+        ? { dataset: { layout: "single-column" } } : code) as typeof code.closest;
+    });
+    // The selection ends in the visible target cell; the hidden shared source duplicate follows it.
+    fixture.range.endContainer.parentElement = fixture.codes[6];
+    Object.assign(fixture.range, { intersectsNode: () => true });
+    Object.assign(fixture.view, { contentEl: {
+      ownerDocument: { getSelection: () => fixture.selection },
+      contains: () => true,
+      querySelector: () => null,
+      querySelectorAll: () => fixture.codes
+    } });
+    Object.assign(fixture.state, { mode: "compare", direction: reverse ? "right-to-left" : "left-to-right" });
+    fixture.view.handleCopy(fixture.event);
+    assert.equal(fixture.clipboard.get("text/plain"), "shared\ntarget  \nsource\n\nlast");
+    assert.equal(fixture.prevented(), true);
+  }
+});
+
+test("stacked pointer selection keeps both variants selectable", () => {
+  const fixture = createSelectionFixture();
+  const root = new SelectionElement();
+  root.dataset.layout = "single-column";
+  fixture.code.ancestors.set(".file-diff-sbs-root", root);
+  Object.assign(fixture.view.contentEl, { querySelector: () => null });
+  fixture.view.handleSelectionStart(fixture.event);
+  assert.equal(fixture.grid.dataset.diffSelectionSide, undefined);
+  assert.equal(fixture.cleared(), 0);
+});
+
 test("comparison copying leaves editing, collapsed, cross-side and unrelated selections to the browser", () => {
   for (const kind of ["editing", "collapsed", "cross-side", "outside", "no-clipboard", "no-range"] as const) {
     const fixture = createCopyFixture("left", ["left", "last"], 0, 4);

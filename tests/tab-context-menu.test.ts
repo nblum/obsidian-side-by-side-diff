@@ -53,7 +53,7 @@ async function loadPlugin(active: TestFile | null, files: TestFile[], tabHook = 
       if (name === "electron") return {};
       assert.equal(name, "obsidian");
       return {
-        Plugin: class {}, ItemView: class {}, PluginSettingTab: class {}, Modal: class {},
+        addIcon: () => {}, Plugin: class {}, ItemView: class {}, PluginSettingTab: class {}, Modal: class {},
         SuggestModal: class {}, View: TestView, TFile: TestFile,
         Notice: class { constructor(message: string) { assert.fail(message); } },
         moment: { locale: () => "en" }, requireApiVersion: () => true

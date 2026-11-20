@@ -3,6 +3,7 @@ import compareMode from "../assets/compare-mode.webp";
 import walkthrough from "../assets/comparsion-record1.webp";
 import pendingChanges from "../assets/pending-changes.webp";
 import inlineEdit from "../assets/inline-edit.png";
+import singleColumn from "../assets/single-column.webp";
 import { INTRODUCTION_ASSETS } from "./introduction-assets";
 import { GITHUB_REPOSITORY_URL } from "./external-links";
 
@@ -11,7 +12,8 @@ const images: Record<string, string> = {
   "compare-mode.webp": compareMode,
   "comparsion-record1.webp": walkthrough,
   "pending-changes.webp": pendingChanges,
-  "inline-edit.png": inlineEdit
+  "inline-edit.png": inlineEdit,
+  "single-column.webp": singleColumn
 };
 
 /** Prepares the bundled README for offline rendering and repository-relative navigation. */

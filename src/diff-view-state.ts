@@ -1,4 +1,5 @@
 import type { DiffDirection } from "./diff-core.ts";
+import { isDiffLayout, type DiffLayout } from "./diff-layout.ts";
 
 /** Identifies the user-facing workflow represented by a comparison view. */
 export type PaneMode = "compare" | "proposal" | "accept";
@@ -12,10 +13,11 @@ export interface DiffViewState {
 	mode: PaneMode;
 	direction?: DiffDirection;
 	originalSide?: "left" | "right";
+	layout?: DiffLayout;
 }
 
 /** Converts unknown workspace state into a safe comparison state. */
-export function parseDiffViewState(state: unknown, defaultDirection: DiffDirection = "left-to-right"): DiffViewState {
+export function parseDiffViewState(state: unknown, defaultDirection: DiffDirection = "left-to-right", defaultLayout: DiffLayout = "auto"): DiffViewState {
 	const storedState = typeof state === "object" && state !== null ? state as Record<string, unknown> : {};
 	const mode = storedState.mode;
 	return {
@@ -25,7 +27,8 @@ export function parseDiffViewState(state: unknown, defaultDirection: DiffDirecti
 		mode: mode === "proposal" || mode === "accept" ? mode : "compare",
 		direction: mode === "proposal" || mode === "accept" ? "left-to-right"
 			: storedState.direction === "left-to-right" || storedState.direction === "right-to-left" ? storedState.direction : defaultDirection,
-		originalSide: storedState.originalSide === "right" ? "right" : "left"
+		originalSide: storedState.originalSide === "right" ? "right" : "left",
+		layout: isDiffLayout(storedState.layout) ? storedState.layout : defaultLayout
 	};
 }
 
@@ -38,6 +41,7 @@ export function swapDiffViewState(state: DiffViewState): DiffViewState {
 		editRight: false,
 		mode,
 		direction: mode === "compare" && state.direction === "right-to-left" ? "right-to-left" : "left-to-right",
-		originalSide: state.originalSide === "right" ? "left" : "right"
+		originalSide: state.originalSide === "right" ? "left" : "right",
+		layout: state.layout ?? "auto"
 	};
 }

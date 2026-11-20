@@ -1,5 +1,6 @@
 import type { LanguagePreference } from "./i18n.ts";
 import type { DiffDirection } from "./diff-core.ts";
+import { isDiffLayout, type DiffLayout } from "./diff-layout.ts";
 import { normalizeRecentFilePaths } from "./recent-files.ts";
 
 /** Describes persisted options that influence plugin behavior and presentation. */
@@ -7,6 +8,7 @@ export interface PluginSettings {
 	showRibbonIcon: boolean;
 	autoAdvanceAfterChange: boolean;
 	defaultApplyDirection: DiffDirection;
+	defaultLayout: DiffLayout;
 	alignMarkdownByHeadings: boolean;
 	changeCopySuffix: string;
 	language: LanguagePreference;
@@ -19,6 +21,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	showRibbonIcon: true,
 	autoAdvanceAfterChange: true,
 	defaultApplyDirection: "left-to-right",
+	defaultLayout: "auto",
 	alignMarkdownByHeadings: false,
 	changeCopySuffix: "_changes_",
 	language: "auto",
@@ -49,6 +52,7 @@ export function normalizePluginSettings(value: unknown): PluginSettings {
 		showRibbonIcon: typeof storedSettings.showRibbonIcon === "boolean" ? storedSettings.showRibbonIcon : DEFAULT_SETTINGS.showRibbonIcon,
 		autoAdvanceAfterChange: typeof storedSettings.autoAdvanceAfterChange === "boolean" ? storedSettings.autoAdvanceAfterChange : DEFAULT_SETTINGS.autoAdvanceAfterChange,
 		defaultApplyDirection: isDiffDirection(storedSettings.defaultApplyDirection) ? storedSettings.defaultApplyDirection : DEFAULT_SETTINGS.defaultApplyDirection,
+		defaultLayout: isDiffLayout(storedSettings.defaultLayout) ? storedSettings.defaultLayout : DEFAULT_SETTINGS.defaultLayout,
 		alignMarkdownByHeadings: typeof storedSettings.alignMarkdownByHeadings === "boolean" ? storedSettings.alignMarkdownByHeadings : DEFAULT_SETTINGS.alignMarkdownByHeadings,
 		changeCopySuffix: typeof storedSettings.changeCopySuffix === "string" ? sanitizeCopySuffix(storedSettings.changeCopySuffix) : DEFAULT_SETTINGS.changeCopySuffix,
 		language: isLanguagePreference(storedSettings.language) ? storedSettings.language : DEFAULT_SETTINGS.language,

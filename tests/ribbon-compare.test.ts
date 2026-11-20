@@ -105,7 +105,7 @@ runInNewContext(bundle.outputFiles[0].text, {
     if (name.startsWith("node:")) return createRequire(import.meta.url)(name);
     assert.equal(name, "obsidian");
     return {
-      Plugin: class {}, ItemView: TestItemView, PluginSettingTab: class {}, Modal: class {},
+      addIcon: () => {}, setIcon: () => {}, setTooltip: () => {}, Plugin: class {}, ItemView: TestItemView, PluginSettingTab: class {}, Modal: class {},
       SuggestModal: TestSuggestModal, TFile: TestFile,
       Notice: class { constructor(message: string) { notices.push(message); } },
       moment: { locale: () => "en" }, requireApiVersion: () => true

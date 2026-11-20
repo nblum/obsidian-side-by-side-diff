@@ -4,6 +4,25 @@ These screenshots use two sample notes, `Release notes.md` and `Revised release 
 They show the English interface with Obsidian's default light theme. Your notes keep their literal Markdown;
 review actions stage changes until you explicitly save.
 
+## Choose a layout
+
+The icon button beside Save cycles Automatic → Side by side → Single column → Automatic. Its A, columns and rows
+icons identify the preference, and its tooltip names the next choice. Automatic stacks variants when
+this comparison is narrower than 720 pixels. Layout switches preserve unsaved changes, review decisions and Undo.
+
+In single column, equal text appears once. Each changed row shows the target first and the incoming source below
+it, with file labels and compact Accept / Ignore controls aligned left and right. Block actions appear below the
+content once at least two changed rows remain open. Copying includes both selected variants in reading order,
+with shared text once and without labels or controls. Editing opens a full-width target below a collapsible
+source reference, and resizing keeps the same editor.
+
+Below 720 pixels, compact file rows show Source/Target and filenames, with folders only for identical names.
+One vertical arrow reverses the direction; Swap and the edit entry are hidden. An existing editor remains usable.
+Single-column comparisons also hide the edit entry in wide views. Button heights follow the device rather than
+the layout: switching between columns and stacked rows does not resize Save, navigation or review controls.
+
+![Single-column comparison](../assets/single-column.webp)
+
 ## Start from the file explorer
 
 Select two text files, right-click, and choose **Compare files**. Use `Alt`-click on Windows/Linux or `Option`-click
@@ -54,14 +73,15 @@ with its role. Save or undo pending changes before reversing direction.
 
 ## Resolve a whole block
 
-A block with more than three changed lines offers **Accept all** and **Ignore all**. These actions resolve the
-block in one step; a single **Undo** reverses that step. Accept all skips changes you already ignored individually.
+In side-by-side mode, a block with more than three open changed lines offers **Accept all** and **Ignore all**
+in its header. Single-column mode shows these actions below the content from two open changed rows onward. They
+resolve the block in one step; a single **Undo** reverses that step. Accept all skips changes you already ignored individually.
 
 ![Grouped changes with Accept all and Ignore all controls](../assets/grouped-changes.png)
 
 ## Keep both versions
 
-Choose **Keep both** in a block header when you need text from both versions. For each open fragment, the target
+Choose **Keep both** in the block actions when you need text from both versions. For each open fragment, the target
 keeps its current text, followed by one blank line and the source text. Ignored or already accepted rows stay as
 chosen; unchanged blank lines separate fragments and are not copied twice. The action follows the current merge
 direction and remains staged until you save. One **Undo** restores the whole block.
@@ -91,9 +111,9 @@ completes the review, but does not make the files identical. Undo restores the r
 
 ## Edit the target directly
 
-The pencil icon opens **Edit mode** for the current target. The source remains read-only beside it. This works
-on either target side, and typing remains staged until **Save changes** or `Ctrl/Cmd+S`. The comparison-mode icon
-returns to reviewing differences.
+In a wide side-by-side view, the pencil opens **Edit mode** for the target on either side; the source stays
+read-only. Narrow and single-column views hide the entry while keeping an existing editor usable. Typing remains
+unsaved until **Save changes** or `Ctrl/Cmd+S`. The comparison-mode icon returns to reviewing differences.
 
 ![Target editor beside the read-only source](../assets/inline-edit.png)
 
@@ -101,7 +121,6 @@ returns to reviewing differences.
 
 Actions that would replace pending work prompt you to save or discard it. This example appears before swapping
 the files. **Save** writes the staged changes before continuing; **Don't save** discards the pending changes.
-Dismissing the dialog keeps the current comparison and its pending work.
 
 ![Save-or-discard prompt before swapping files](../assets/unsaved-changes.webp)
 

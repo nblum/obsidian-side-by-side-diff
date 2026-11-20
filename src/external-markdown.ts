@@ -1,5 +1,4 @@
-import { isAbsolute, relative, sep } from "node:path";
-import { webUtils } from "electron";
+import { getDesktopPaths, getNativeDropPath } from "./desktop-capabilities";
 import { SaveConflictError } from "./save-guard";
 
 /** A file-scoped browser capability obtained from an explicit file drop. */
@@ -24,21 +23,16 @@ let saveQueue = Promise.resolve();
 
 /** Resolves a native drop path within the vault without reading the filesystem. */
 export function getVaultRelativePath(path: string, vaultBase: string): string | null {
-  const pathInVault = relative(vaultBase, path);
-  if (!pathInVault || pathInVault === ".." || pathInVault.startsWith(`..${sep}`) || isAbsolute(pathInVault)) return null;
-  return pathInVault.split(sep).join("/");
+  const paths = getDesktopPaths();
+  if (!paths) return null;
+  const pathInVault = paths.relative(vaultBase, path);
+  if (!pathInVault || pathInVault === ".." || pathInVault.startsWith(`..${paths.sep}`) || paths.isAbsolute(pathInVault)) return null;
+  return pathInVault.split(paths.sep).join("/");
 }
 
 /** Resolves only the desktop path attached to an explicitly dropped browser file. */
 export function getDroppedFilePath(file: File): string | null {
-  try {
-    const path = webUtils?.getPathForFile(file);
-    if (typeof path === "string" && path.length > 0) return path;
-  } catch {
-    // Older Electron versions expose File.path instead of webUtils.
-  }
-  const legacyPath = (file as File & { path?: string }).path;
-  return typeof legacyPath === "string" && legacyPath.length > 0 ? legacyPath : null;
+  return getNativeDropPath(file);
 }
 
 /** Captures the capability during the drop event, before its data store expires. */

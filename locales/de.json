@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "Dateien ablegen",
 	"notice.comparisonChanged": "„{name}“ wurde seit der Anzeige dieses Vergleichs geändert. Prüfe den aktualisierten Vergleich, bevor du Änderungen übernimmst.",
 	"view.externalReadOnly": "Diese abgelegte Datei ist schreibgeschützt, da kein schreibender Dateizugriff verfügbar ist.",
+	"view.roles.targetCompact": "Ziel",
+	"view.file.external": "Externe Datei",
 	"view.roles.source": "Quelle",
 	"view.roles.target": "Ziel · wird geändert",
 	"view.roles.reference": "Nur lesbare Referenz",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "Rechts → links",
 	"view.targetUnavailable": "Die Zieldatei ist nicht mehr verfügbar.",
 	"view.pending.change": "Übernommene Änderung – noch nicht gespeichert",
-	"view.pending.deletion": "Vorgemerkte Löschung – noch nicht gespeichert"
+	"view.pending.deletion": "Vorgemerkte Löschung – noch nicht gespeichert",
+	"view.layout.auto": "Automatisch",
+	"view.layout.side-by-side": "Nebeneinander",
+	"view.layout.single-column": "Einspaltig",
+	"view.referenceToggle": "Quellreferenz ein-/ausblenden",
+	"settings.layout.name": "Standardansicht für Vergleiche",
+	"settings.layout.description": "Ansicht für neue Vergleiche wählen. Automatisch zeigt Varianten bei weniger als 720 Pixeln Ansichtsbreite untereinander.",
+	"actions.acceptRow": "Übernehmen",
+	"actions.ignoreRow": "Ignorieren",
+	"view.layout.switch": "Ansicht: {current}. Wechseln zu {next}."
 }

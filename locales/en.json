@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "Drop files",
 	"notice.comparisonChanged": "“{name}” changed since this comparison was displayed. Review the refreshed comparison before accepting changes.",
 	"view.externalReadOnly": "This dropped file is read-only because writable file access is unavailable.",
+	"view.roles.targetCompact": "Target",
+	"view.file.external": "External file",
 	"view.roles.source": "Source",
 	"view.roles.target": "Target · will be changed",
 	"view.roles.reference": "Read-only reference",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "Right → left",
 	"view.targetUnavailable": "The target file is no longer available.",
 	"view.pending.change": "Accepted change — not saved yet",
-	"view.pending.deletion": "Pending deletion — not saved yet"
+	"view.pending.deletion": "Pending deletion — not saved yet",
+	"view.layout.auto": "Automatic",
+	"view.layout.side-by-side": "Side by side",
+	"view.layout.single-column": "Single column",
+	"view.referenceToggle": "Show/hide source reference",
+	"settings.layout.name": "Default comparison layout",
+	"settings.layout.description": "Choose the layout for new comparisons. Automatic stacks variants in views narrower than 720 pixels.",
+	"actions.acceptRow": "Accept",
+	"actions.ignoreRow": "Ignore",
+	"view.layout.switch": "Layout: {current}. Switch to {next}."
 }

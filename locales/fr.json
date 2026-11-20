@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "Déposer des fichiers",
 	"notice.comparisonChanged": "« {name} » a changé depuis l’affichage de cette comparaison. Vérifiez la comparaison actualisée avant d’accepter des modifications.",
 	"view.externalReadOnly": "Ce fichier déposé est en lecture seule, car l’accès en écriture au fichier n’est pas disponible.",
+	"view.roles.targetCompact": "Cible",
+	"view.file.external": "Fichier externe",
 	"view.roles.source": "Source",
 	"view.roles.target": "Cible · sera modifiée",
 	"view.roles.reference": "Référence en lecture seule",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "Droite → gauche",
 	"view.targetUnavailable": "Le fichier cible n’est plus disponible.",
 	"view.pending.change": "Modification acceptée — pas encore enregistrée",
-	"view.pending.deletion": "Suppression en attente — pas encore enregistrée"
+	"view.pending.deletion": "Suppression en attente — pas encore enregistrée",
+	"view.layout.auto": "Automatique",
+	"view.layout.side-by-side": "Côte à côte",
+	"view.layout.single-column": "Une colonne",
+	"view.referenceToggle": "Afficher/masquer la référence source",
+	"settings.layout.name": "Disposition par défaut",
+	"settings.layout.description": "Choisissez la disposition des nouvelles comparaisons. Le mode automatique empile les variantes dans les vues de moins de 720 pixels.",
+	"actions.acceptRow": "Accepter",
+	"actions.ignoreRow": "Ignorer",
+	"view.layout.switch": "Disposition : {current}. Passer à {next}."
 }

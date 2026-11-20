@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "拖放文件",
 	"notice.comparisonChanged": "“{name}”在此比较显示后已发生更改。请先查看刷新后的比较，再接受更改。",
 	"view.externalReadOnly": "无法获取写入权限，拖入的文件仅供读取。",
+	"view.roles.targetCompact": "目标",
+	"view.file.external": "外部文件",
 	"view.roles.source": "来源",
 	"view.roles.target": "目标 · 将被修改",
 	"view.roles.reference": "只读参考",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "右 → 左",
 	"view.targetUnavailable": "目标文件已不可用。",
 	"view.pending.change": "已接受的更改，尚未保存",
-	"view.pending.deletion": "待删除的内容，尚未保存"
+	"view.pending.deletion": "待删除的内容，尚未保存",
+	"view.layout.auto": "自动",
+	"view.layout.side-by-side": "并排",
+	"view.layout.single-column": "单列",
+	"view.referenceToggle": "显示/隐藏源文件参考",
+	"settings.layout.name": "默认比较布局",
+	"settings.layout.description": "选择新比较的布局。自动模式会在视图宽度小于 720 像素时将两个版本上下排列。",
+	"actions.acceptRow": "接受",
+	"actions.ignoreRow": "忽略",
+	"view.layout.switch": "布局：{current}。切换为{next}。"
 }

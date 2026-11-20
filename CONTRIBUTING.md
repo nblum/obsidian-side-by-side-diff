@@ -111,6 +111,22 @@ The suite exercises both file pickers, inline differences, staging, undo, ignore
 explicit saving, external-change conflicts, the unsaved-change prompt when swapping, and direct editing and
 keyboard saving into either target pane. Saved content is checked directly on disk. Failed tests save an
 application screenshot alongside runner logs in `e2e-results/`.
+
+The layout suite also exercises the narrow initial picker, the actual layout-default setting and its persisted
+value, logical scroll anchors and keyboard focus across Auto transitions, and Save/Don't save when entering the
+stacked editor with staged changes. In both merge directions it checks backward multi-line selections across
+manual and responsive layout changes, CRLF/blank-line/Markdown-hard-break preservation on save, and clipboard
+output that includes both stacked variants once and excludes staged deletion previews and hidden shared duplicates. Geometry
+checks cover compact row-button heights and left/right alignment, block-action footers, two-row block actions,
+small vertical button margins and action strips visually attached to the preceding stacked change,
+restored desktop headers, both directions and one-step undo. The three-state icon control is exercised with mouse,
+Space and Enter, including during editing. Geometry checks assert a square layout button matching Save in every
+preference, container width and device style, with a scaled inset icon and a mobile minimum of 44 pixels;
+review-button appearance is checked in light/dark themes and disabled states.
+Compact-header checks cover direction reversal and saving, restoring desktop controls at 720 pixels, hidden-action
+focus fallback, live-editor retention, same-name folder labels and long filenames.
+Regression checks hide the edit entry in every single-column view and compare Save/navigation/review heights
+across all preferences at narrow and wide widths, separately for desktop and mobile styling.
 CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian, uploading failure
 artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
 selection/clipboard interaction, or external file drop.
@@ -147,6 +163,7 @@ requirements apply. Screenshot commands use the same default headless runner on 
 
 | Asset | Captured state |
 | --- | --- |
+| `single-column.webp` | A 390-pixel comparison with compact row controls and a two-change block footer |
 | `compare-mode.webp` | Comparison, inline differences, and grouped actions |
 | `active-change.webp` | Active frame with its position among open changes |
 | `file-selection.png` | Original preview and right-file selection |
@@ -166,8 +183,9 @@ The walkthrough keeps its existing filename and animated WebP format so README l
 views show the plugin or menu; walkthrough frames omit the footer with the random temporary-vault name.
 `keyboard-shortcuts.webp` is derived from `active-change.webp`: `npm run screenshots:keyboard` (also part of
 `npm run screenshots:update`) overlays the shortcut callouts beside the matching buttons. Its callout coordinates in
-`scripts/render-keyboard-shortcuts.mjs` refer to the 936 × 643 capture; update them when the captured layout moves.
-The teaser artwork and SVG icons are illustrations and are maintained separately.
+`scripts/render-keyboard-shortcuts.mjs` refer to the 936 × 722 capture; update them when the captured layout moves.
+The capture also writes `e2e-results/screenshots/keyboard-targets.json` with the real button bounds for updating
+these coordinates. The teaser artwork and SVG icons are illustrations and are maintained separately.
 To add a state, add its capture and assertions in `tests/e2e/documentation.capture.ts` and register its filename
 and description in `tests/e2e/screenshot-assets.json`. The suite fails if any registered capture is missing.
 

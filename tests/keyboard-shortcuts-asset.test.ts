@@ -18,12 +18,12 @@ test("the keyboard-shortcut illustration is derived from a capture of the expect
   try {
     const source = join(dir, "active-change.webp");
     const destination = join(dir, "keyboard-shortcuts.webp");
-    await sharp({ create: { width: 936, height: 643, channels: 3, background: "white" } }).webp().toFile(source);
+    await sharp({ create: { width: 936, height: 722, channels: 3, background: "white" } }).webp().toFile(source);
     await renderKeyboardShortcuts(source, destination);
     const metadata = await sharp(destination).metadata();
     assert.equal(metadata.format, "webp");
     assert.equal(metadata.width, 936);
-    assert.equal(metadata.height, 643);
+    assert.equal(metadata.height, 722);
     const { channels } = await sharp(destination).stats();
     assert.ok(channels[0]!.min < 100, "the overlay must draw callouts onto the capture");
 

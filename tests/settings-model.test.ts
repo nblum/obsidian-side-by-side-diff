@@ -17,7 +17,8 @@ test("normalizes incomplete persisted settings using safe defaults", () => {
 		language: "auto",
 		recentRightFilePaths: ["first.md", "second.md"],
 		introductionSeen: false,
-		defaultApplyDirection: "left-to-right"
+		defaultApplyDirection: "left-to-right",
+		defaultLayout: "auto"
 	});
 });
 
@@ -40,7 +41,8 @@ test("preserves valid settings while sanitizing every path separator", () => {
 		language: "de",
 		recentRightFilePaths: ["one.md"],
 		introductionSeen: false,
-		defaultApplyDirection: "left-to-right"
+		defaultApplyDirection: "left-to-right",
+		defaultLayout: "auto"
 	});
 });
 

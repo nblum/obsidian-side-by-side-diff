@@ -16,6 +16,7 @@ function loadApi(electron: object = {}): typeof import("../src/external-markdown
   runInNewContext(output!.text, {
     module, exports: module.exports, TextDecoder,
     require: (name: string) => {
+      if (name === "obsidian") return { Platform: { isMobileApp: false } };
       if (name === "electron") return electron;
       assert.equal(name, "node:path");
       return path;

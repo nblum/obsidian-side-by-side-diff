@@ -200,6 +200,8 @@
 	"view.selection.dropFiles": "Arrastrar archivos",
 	"notice.comparisonChanged": "«{name}» ha cambiado desde que se mostró esta comparación. Revisa la comparación actualizada antes de aceptar cambios.",
 	"view.externalReadOnly": "Este archivo soltado es de solo lectura porque el acceso de escritura al archivo no está disponible.",
+	"view.roles.targetCompact": "Destino",
+	"view.file.external": "Archivo externo",
 	"view.roles.source": "Origen",
 	"view.roles.target": "Destino · se modificará",
 	"view.roles.reference": "Referencia de solo lectura",
@@ -217,5 +219,14 @@
 	"settings.applyDirection.rightToLeft": "Derecha → izquierda",
 	"view.targetUnavailable": "El archivo de destino ya no está disponible.",
 	"view.pending.change": "Cambio aceptado — aún sin guardar",
-	"view.pending.deletion": "Eliminación pendiente — aún sin guardar"
+	"view.pending.deletion": "Eliminación pendiente — aún sin guardar",
+	"view.layout.auto": "Automática",
+	"view.layout.side-by-side": "En paralelo",
+	"view.layout.single-column": "Una columna",
+	"view.referenceToggle": "Mostrar/ocultar la referencia de origen",
+	"settings.layout.name": "Disposición predeterminada",
+	"settings.layout.description": "Elige la disposición para las nuevas comparaciones. El modo automático apila las variantes en vistas de menos de 720 píxeles.",
+	"actions.acceptRow": "Aceptar",
+	"actions.ignoreRow": "Ignorar",
+	"view.layout.switch": "Disposición: {current}. Cambiar a {next}."
 }

@@ -276,7 +276,7 @@ test("external drops replace only the right file and memory-only targets cannot 
 		await view.swapFiles();
 		assert.equal(view.state.rightPath, source.path);
 		assert.equal(view.state.leftPath, "left.md");
-		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare" });
+		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare", layout: "auto" });
 	}
 });
 
@@ -406,7 +406,7 @@ test("browser handles without native paths can be swapped and save staged blocks
 		await view.swapFiles();
 		assert.equal(view.state.rightPath, externalPath);
 		assert.equal(view.state.leftPath, "left.md");
-		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare" });
+		assert.deepEqual({ ...view.getState() }, { leftPath: "left.md", rightPath: null, editRight: false, mode: "compare", layout: "auto" });
 		await view.applyGroupChange(0, 10, "left-to-right");
 		assert.equal(await readFile(diskPath, "utf8"), original);
 		assert.equal(session.getPendingChanges()[0]?.content, "new\r\n");
@@ -487,7 +487,7 @@ test("dropping another external file after a manual swap preserves the external 
 		await view.applyRowChange(0, "left-to-right");
 		assert.equal(await view.writePendingChanges(), "saved");
 		assert.equal(await readFile(secondPath, "utf8"), "first");
-		assert.deepEqual({ ...view.getState() }, { leftPath: null, rightPath: null, editRight: false, mode: "compare" });
+		assert.deepEqual({ ...view.getState() }, { leftPath: null, rightPath: null, editRight: false, mode: "compare", layout: "auto" });
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
@@ -730,9 +730,10 @@ test("compact header keeps save/menu on top, swap above direction, and edit excl
 	assert.equal(root.find("file-diff-sbs-action-toolbar"), undefined);
 	const top = root.find("file-diff-sbs-toolbar-actions");
 	assert.ok(top);
-	assert.equal(top.children.length, 2);
-	assert.ok(top.children[0]?.classes.has("file-diff-sbs-save-action"));
-	assert.equal(top.children[1]?.attributes.get("aria-label"), "actions.fileMenu");
+	assert.equal(top.children.length, 3);
+	assert.ok(top.children[0]?.classes.has("file-diff-sbs-layout-button"));
+	assert.ok(top.children[1]?.classes.has("file-diff-sbs-save-action"));
+	assert.equal(top.children[2]?.attributes.get("aria-label"), "actions.fileMenu");
 	const center = root.find("file-diff-sbs-direction");
 	assert.ok(center);
 	assert.equal(center.children[0]?.attributes.get("aria-label"), "actions.swap");
@@ -747,7 +748,7 @@ test("compact header keeps save/menu on top, swap above direction, and edit excl
 	center.children[0]?.handlers.get("click")?.();
 	center.children[1]?.handlers.get("click")?.();
 	right.find("file-diff-sbs-file-edit-button")?.handlers.get("click")?.();
-	top.children[0]?.handlers.get("click")?.();
+	top.children[1]?.handlers.get("click")?.();
 	assert.deepEqual(clicked, ["swap", "reverse", "edit", "save"]);
 	root.children = [];
 	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });
@@ -795,6 +796,9 @@ test("the editor normalizes its rows around the target while preserving physical
 	/** Supplies only the DOM operations needed before observer initialization. */
 	class EditElement {
 		children: EditElement[] = [];
+		dataset: Record<string, string> = {};
+		createEl(_tag: string, options: { cls: string }): EditElement { return this.createDiv(options); }
+		addEventListener(): void {}
 		classes = new Set<string>();
 		ownerDocument = { defaultView: null };
 		createDiv(options: { cls: string }): EditElement {
@@ -1143,4 +1147,82 @@ test("retained variants never offer proposal-copy cleanup until a later explicit
 	assert.equal(await view.savePendingChanges(), true);
 	assert.equal(session.hasEqualContents(), true);
 	assert.equal(cleanup, 1);
+});
+
+test("editor alignment retains pending work during composition and resumes after composition", () => {
+	const { view } = createView(["left"], ["right"]);
+	const frames: (() => void)[] = [];
+	const synchronized: (number | null)[] = [];
+	const editor = { isConnected: true } as HTMLElement;
+	Object.assign(view, {
+		viewState: { ...view.state, editRight: true }, composing: true, editSyncFrame: null,
+		pendingEditSyncPreferredIndex: null, editInputSnapshot: null,
+		contentEl: { ownerDocument: { defaultView: { requestAnimationFrame(callback: () => void) { frames.push(callback); return frames.length; } } } },
+		synchronizeEditablePanes: (_editor: HTMLElement, index: number | null) => { synchronized.push(index); }
+	});
+	view.scheduleEditablePaneSync(editor, 4);
+	assert.equal(frames.length, 0);
+	Object.assign(view, { composing: false });
+	view.scheduleEditablePaneSync(editor);
+	assert.equal(frames.length, 1);
+	Object.assign(view, { composing: true });
+	frames[0]!();
+	assert.deepEqual(synchronized, []);
+	Object.assign(view, { composing: false });
+	view.scheduleEditablePaneSync(editor);
+	frames[1]!();
+	assert.deepEqual(synchronized, [4]);
+});
+
+test("layout scroll anchoring follows the viewport when responsive headers change height", () => {
+	const { view } = createView(["left"], ["right"]);
+	const root = {
+		dataset: { layout: "side-by-side" },
+		querySelector(selector: string): unknown {
+			if (selector === ".file-diff-sbs-layout-button") return { setAttribute: () => {} };
+			if (selector === ".file-diff-sbs-grid") return { dataset: {} };
+			return scroll;
+		},
+		querySelectorAll(selector: string): unknown[] { return selector === ".file-diff-sbs-row" ? [anchor] : []; }
+	};
+	const viewportTop = () => root.dataset.layout === "single-column" ? 300 : 100;
+	const scroll = { scrollTop: 500, getBoundingClientRect: () => ({ top: viewportTop() }) };
+	const anchor = {
+		getBoundingClientRect: () => ({ top: viewportTop() + 490 - scroll.scrollTop, bottom: viewportTop() + 514 - scroll.scrollTop }),
+		querySelector: () => null
+	};
+	Object.assign(view, {
+		layoutObserver: {},
+		app: { workspace: { requestSaveLayout: () => {} } },
+		contentEl: { clientWidth: 390, querySelector: () => root, ownerDocument: { activeElement: null, getSelection: () => null } }
+	});
+	for (const layout of ["single-column", "side-by-side"] as const) {
+		view.setLayout(layout);
+		assert.equal(root.dataset.layout, layout);
+		assert.equal(scroll.scrollTop, 500, "header movement must not scroll the document");
+		assert.equal(anchor.getBoundingClientRect().top - viewportTop(), -10);
+	}
+});
+
+test("Enter on a toolbar button leaves editing to native button activation", () => {
+	const { view } = createView(["left"], ["right"]);
+	const editor = {};
+	const button = {};
+	let inserted = 0;
+	let prevented = 0;
+	Object.assign(view, {
+		viewState: { ...view.state, editRight: true },
+		getEditableEditor: (target: unknown) => target === editor ? editor : null,
+		insertEditableLineBreak: () => { inserted += 1; return true; }
+	});
+	const event = {
+		key: "Enter", altKey: false, ctrlKey: false, metaKey: false, shiftKey: false,
+		preventDefault: () => { prevented += 1; }, stopImmediatePropagation: () => {}
+	};
+	view.handleKeydown({ ...event, target: button } as unknown as KeyboardEvent);
+	assert.equal(inserted, 0);
+	assert.equal(prevented, 0);
+	view.handleKeydown({ ...event, target: editor } as unknown as KeyboardEvent);
+	assert.equal(inserted, 1);
+	assert.equal(prevented, 1);
 });

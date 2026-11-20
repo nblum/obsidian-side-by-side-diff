@@ -34,9 +34,31 @@ for implementation. Once shipped, update the feature reference and changelog and
   split fragments and remain untouched. Staging, one-step undo, write permissions and guarded saving are reused.
 - **Reference:** [Grouped change blocks](FEATURES.md#grouped-change-blocks).
 
+### Optional single-column diff layout
+
+- **Status:** Implemented; pending release (phase 1 of the mobile workstream).
+- **Benefit:** Improve prose review and comparison in narrow desktop windows and establish the layout needed
+  for phones and tablets.
+- **Scope:** Auto, side-by-side, and single-column layout choices. Show equal text once and stack changed
+  target/source variants with explicit file identity. Preserve row/block review actions, Keep both, navigation,
+  copying, direct target editing, pending changes, and explicit saving across layout changes.
+- **Dependency:** Mobile availability requires the separate runtime and device validation in phase 2; this
+  layout alone does not establish mobile support.
+- **Reference:** [Single-column layout and mobile support plan](docs/concepts/single-column-and-mobile.md).
+
 ## Later
 
-No features are currently assigned to this group.
+### Mobile support
+
+- **Status:** Runtime and narrow-layout preparation implemented; Android/iOS device validation pending (phase 2).
+- **Benefit:** Compare and merge vault text files on Android and iOS, with touch-accessible controls and direct
+  target editing.
+- **Scope:** Remove startup dependencies on desktop-only modules, adapt comparison entry points and dialogs,
+  and validate selection, editing, guarded saving, lifecycle behavior, and touch interaction on both platforms.
+  External file-manager integration is outside the initial mobile scope; desktop external Markdown stays supported.
+- **Release gate:** Retain the desktop-only declaration until the runtime audit and Android/iOS acceptance checks
+  pass. Narrow desktop tests are additional evidence, not mobile verification.
+- **Reference:** [Single-column layout and mobile support plan](docs/concepts/single-column-and-mobile.md).
 
 ## Under consideration
 
@@ -52,13 +74,6 @@ not a delivery sequence.
 - **Decisions:** Handle missing originals and multiple conflict copies; revalidate files before actions; decide
   when to offer moving a conflict copy to the trash. Finishing a review, especially after ignoring changes, does
   not establish that the files are identical. This remains a manual two-way merge without a shared ancestor.
-
-### Optional single-column diff layout
-
-- **Benefit:** Improve prose review and comparison in narrow windows.
-- **Initial scope:** Show unchanged text once and stack changed variants vertically, retaining file identity,
-  navigation, and staged merge actions. Keep side-by-side comparison available.
-- **Decisions:** Define layout switching with pending changes and how direct editing works in this layout.
 
 ### Reading view for Markdown comparisons
 
@@ -84,13 +99,6 @@ not a delivery sequence.
 - **Initial scope:** Evaluate punctuation-aware tokenization or character-level refinement within changed tokens.
 - **Decisions:** Compare readability across supported languages and retain deterministic, bounded calculations.
   Preserve literal content, including trailing spaces that can represent Markdown hard breaks.
-
-### Mobile support
-
-- **Benefit:** Compare vault notes on phones and tablets.
-- **Initial scope:** Audit desktop API dependencies and validate comparison, saving, navigation, and touch
-  interaction on mobile before changing the desktop-only declaration.
-- **Decisions:** Determine a suitable narrow-screen layout and which external-file capabilities are available.
 
 ## Design constraints
 

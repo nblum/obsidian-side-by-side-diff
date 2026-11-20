@@ -140,3 +140,35 @@ test("the legacy ribbon toggle restores its value, updates visibility and persis
     assert.equal(legacySettings.find(setting => setting.name === "settings.ribbon.name")?.control?.value, initial);
   }
 });
+
+
+test("both settings renderers offer layout defaults and persist only valid selections", async () => {
+  for (const initial of ["auto", "side-by-side", "single-column"] as const) {
+    const settings = { ...DEFAULT_SETTINGS, defaultLayout: initial };
+    const persisted: string[] = [];
+    const tab = Object.create(module.exports.FileDiffSettingsTab.prototype) as FileDiffSettingsTab;
+    Object.assign(tab, {
+      containerEl: { empty: () => { legacySettings.length = 0; } },
+      plugin: {
+        settings, translate: (key: string) => key,
+        saveSettings: () => { persisted.push(settings.defaultLayout); return Promise.resolve(); }
+      }
+    });
+    const definition = tab.getSettingDefinitions().find(item => "name" in item && item.name === "settings.layout.name");
+    assert.ok(definition && "control" in definition);
+    assert.ok("options" in definition.control);
+    assert.deepEqual({ ...definition.control.options }, {
+      auto: "view.layout.auto", "side-by-side": "view.layout.side-by-side", "single-column": "view.layout.single-column"
+    });
+    tab.display();
+    const control = legacySettings.find(setting => setting.name === "settings.layout.name")?.control;
+    assert.ok(control?.change);
+    assert.equal(control.value, initial);
+    await control.change("single-column");
+    await tab.setControlValue("defaultLayout", "side-by-side");
+    await control.change("invalid");
+    await tab.setControlValue("defaultLayout", null);
+    assert.deepEqual(persisted, ["single-column", "side-by-side"]);
+    assert.equal(settings.defaultLayout, "side-by-side");
+  }
+});

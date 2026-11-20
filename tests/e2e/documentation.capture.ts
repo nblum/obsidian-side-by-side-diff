@@ -119,6 +119,22 @@ describe("documentation screenshots (opt-in)", () => {
     await browser.executeObsidianCommand("side-by-side-diff:next-change");
     await expect($(`${view} .file-diff-sbs-change-position`)).toHaveText("2/5");
     await capture("active-change.webp");
+    // Record real hit boxes to keep the derived shortcut illustration aligned after toolbar changes.
+    await writeFile(join(output, "keyboard-targets.json"), JSON.stringify(await browser.execute((selector) => {
+      const root = document.querySelector(selector);
+      if (!root) throw new Error("Comparison missing");
+      const origin = root.getBoundingClientRect();
+      const bounds = (selector: string) => {
+        const button = root.querySelector(selector);
+        if (!button) throw new Error(`Shortcut target missing: ${selector}`);
+        const rect = button.getBoundingClientRect();
+        return [rect.left - origin.left, rect.top - origin.top, rect.right - origin.left, rect.bottom - origin.top].map(Math.round);
+      };
+      return { save: bounds(".file-diff-sbs-save-action"), undo: bounds("button[aria-keyshortcuts='Ctrl+Z']"),
+        previous: bounds("button[aria-keyshortcuts='Alt+ArrowUp']"), next: bounds("button[aria-keyshortcuts='Alt+ArrowDown']"),
+        accept: bounds(".file-diff-sbs-active-change button[aria-keyshortcuts='Alt+ArrowRight']"),
+        ignore: bounds(".file-diff-sbs-active-change button[aria-keyshortcuts='Alt+ArrowLeft']") };
+    }, view), null, 2));
     await $(`${view} .file-diff-sbs-direction-button`).click();
     await $(`${view} .file-diff-sbs-direction-button`).click();
     await expect($(`${view} .file-diff-sbs-change-position`)).not.toExist();
@@ -199,6 +215,21 @@ describe("documentation screenshots (opt-in)", () => {
       raw: { width: first.info.width, height: first.info.height * frames.length, channels: 4, pageHeight: first.info.height },
     }).webp({ quality: 85, loop: 0, delay: [1800, 2200, 1800, 2200] }).toFile(join(output, "comparsion-record1.webp"));
     captured.add("comparsion-record1.webp");
+    await obsidianPage.write(left, "# Notes\nA clearer sentence.\nReview before saving.\n");
+    await obsidianPage.write(right, "# Notes\nAn older sentence.\nKeep the previous draft.\n");
+    await browser.execute((selector) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error("Comparison missing");
+      element.style.width = "390px";
+    }, view);
+    await expect($(`${view} .file-diff-sbs-root`)).toHaveAttribute("data-layout", "single-column");
+    await expect($$(accept)).toBeElementsArrayOfSize(2);
+    await expect($(`${view} .file-diff-sbs-group-header`)).toBeDisplayed();
+    assert.equal(await browser.execute((selector) => {
+      const group = document.querySelector(`${selector} .file-diff-sbs-group`);
+      return group?.lastElementChild?.classList.contains("file-diff-sbs-group-header");
+    }, view), true);
+    await capture("single-column.webp");
     assert.deepEqual([...captured].sort(), assets.map(asset => asset.filename).sort());
     // This marker is written last; the publisher requires it before updating any tracked asset.
     await writeFile(join(output, "manifest.json"), JSON.stringify({

@@ -2,8 +2,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
-// Coordinates refer to the 1x `active-change.webp` capture (936 × 643). Adjust them when the captured layout moves.
-const EXPECTED_SIZE = { width: 936, height: 643 };
+// Coordinates refer to the 1x `active-change.webp` capture (936 × 722). Adjust them when the captured layout moves.
+const EXPECTED_SIZE = { width: 936, height: 722 };
 const FONT = "DejaVu Sans, Verdana, sans-serif";
 const KEY_FONT_SIZE = 11.5;
 const LABEL_FONT_SIZE = 11;
@@ -24,34 +24,34 @@ const COLORS = {
 /** @type {Array<{ target: [number, number, number, number], pill: { x: number, y: number, anchor: "left" | "right", label?: string, keys: string[] }, line: (pill: { left: number, top: number, right: number }) => [number, number, number, number] }>} */
 const CALLOUTS = [
   {
-    target: [770, 23, 877, 51],
-    pill: { x: 752, y: 37, anchor: "right", label: "Save", keys: ["Ctrl/Cmd", "S"] },
-    line: (pill) => [pill.right, 37, 767, 37],
+    target: [770, 22, 877, 52],
+    pill: { x: 752, y: 11, anchor: "right", label: "Save", keys: ["Ctrl/Cmd", "S"] },
+    line: (pill) => [pill.right, 11, 767, 19],
   },
   {
-    target: [28, 152, 49, 174],
-    pill: { x: 64, y: 163, anchor: "left", label: "Undo", keys: ["Ctrl/Cmd", "Z"] },
-    line: (pill) => [52, 163, pill.left, 163],
+    target: [25, 165, 53, 189],
+    pill: { x: 68, y: 177, anchor: "left", label: "Undo", keys: ["Ctrl/Cmd", "Z"] },
+    line: (pill) => [56, 177, pill.left, 177],
   },
   {
-    target: [852, 152, 874, 174],
-    pill: { x: 856, y: 212, anchor: "right", keys: ["Alt", "↑"] },
-    line: (pill) => [831, pill.top, 861, 177],
+    target: [849, 165, 877, 189],
+    pill: { x: 856, y: 225, anchor: "right", keys: ["Alt", "↑"] },
+    line: (pill) => [831, pill.top, 863, 192],
   },
   {
-    target: [886, 152, 908, 174],
-    pill: { x: 862, y: 212, anchor: "left", keys: ["Alt", "↓"] },
-    line: (pill) => [890, pill.top, 897, 177],
+    target: [883, 165, 911, 189],
+    pill: { x: 862, y: 225, anchor: "left", keys: ["Alt", "↓"] },
+    line: (pill) => [890, pill.top, 897, 192],
   },
   {
-    target: [451, 340, 467, 356],
-    pill: { x: 442, y: 326, anchor: "right", label: "Accept", keys: ["Alt", "→"] },
-    line: (pill) => [pill.right, 326, 456, 337],
+    target: [425, 375, 469, 407],
+    pill: { x: 416, y: 360, anchor: "right", label: "Accept", keys: ["Alt", "→"] },
+    line: (pill) => [pill.right, 360, 447, 372],
   },
   {
-    target: [470, 340, 487, 356],
-    pill: { x: 498, y: 326, anchor: "left", label: "Ignore", keys: ["Alt", "←"] },
-    line: (pill) => [pill.left, 326, 481, 337],
+    target: [469, 375, 513, 407],
+    pill: { x: 526, y: 360, anchor: "left", label: "Ignore", keys: ["Alt", "←"] },
+    line: (pill) => [pill.left, 360, 491, 372],
   },
 ];
 

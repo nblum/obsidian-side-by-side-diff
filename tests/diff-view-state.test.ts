@@ -14,7 +14,8 @@ test("parses only supported persisted comparison state", () => {
 		editRight: true,
 		mode: "accept",
 		direction: "left-to-right",
-		originalSide: "left"
+		originalSide: "left",
+		layout: "auto"
 	});
 
 	assert.deepEqual(parseDiffViewState({ mode: "unknown", editRight: "true" }), {
@@ -23,7 +24,8 @@ test("parses only supported persisted comparison state", () => {
 		editRight: false,
 		mode: "compare",
 		direction: "left-to-right",
-		originalSide: "left"
+		originalSide: "left",
+		layout: "auto"
 	});
 });
 
@@ -34,7 +36,8 @@ test("swaps paths and proposal direction while leaving edit mode disabled", () =
 		editRight: false,
 		mode: "accept",
 		direction: "left-to-right",
-		originalSide: "right"
+		originalSide: "right",
+		layout: "auto"
 	});
 });
 
@@ -45,7 +48,8 @@ test("keeps regular comparisons regular when swapping panes", () => {
 		editRight: false,
 		mode: "compare",
 		direction: "left-to-right",
-		originalSide: "right"
+		originalSide: "right",
+		layout: "auto"
 	});
 });
 
@@ -56,7 +60,8 @@ test("restores a safe empty state for malformed workspace data", () => {
 		editRight: false,
 		mode: "compare",
 		direction: "left-to-right",
-		originalSide: "left"
+		originalSide: "left",
+		layout: "auto"
 	});
 });
 

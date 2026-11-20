@@ -1,5 +1,7 @@
-import { FileSystemAdapter, ItemView, Menu, Notice, TFile, setIcon, setTooltip } from "obsidian";
-import { join, relative } from "node:path";
+import { FileSystemAdapter, ItemView, Menu, Notice, Platform, TFile, setIcon, setTooltip } from "obsidian";
+import { getDesktopPaths } from "./desktop-capabilities";
+import { getNextDiffLayout, resolveDiffLayout, SINGLE_COLUMN_BREAKPOINT, type DiffLayout } from "./diff-layout";
+import { DIFF_LAYOUT_ICONS } from "./layout-icons";
 import type { TAbstractFile, ViewStateResult, WorkspaceLeaf } from "obsidian";
 import { applyAlignedRowChange, convertLineEndings, getDiffRowKey, getDiffRowType, getIgnoredDiffRow, getInlineDiffTokens, getLineSyncPlan, joinLines, serializeEditableLines, splitLines, swapDiffRowKey, type DiffDirection, type IndexedDiffRow, type InlineDiffToken } from "./diff-core";
 import { createComparisonModelFromLines, type ComparisonOptions, type ComparisonRowModel } from "./diff-model";
@@ -61,7 +63,7 @@ interface ChangeActions {
 
 interface DiffViewPlugin {
   readonly language: Language;
-  readonly settings: { autoAdvanceAfterChange: boolean; defaultApplyDirection: DiffDirection; alignMarkdownByHeadings: boolean; changeCopySuffix: string; recentRightFilePaths: string[] };
+  readonly settings: { autoAdvanceAfterChange: boolean; defaultApplyDirection: DiffDirection; defaultLayout?: DiffLayout; alignMarkdownByHeadings: boolean; changeCopySuffix: string; recentRightFilePaths: string[] };
   translate(key: string, variables?: Record<string, string | number>): string;
   rememberRecentRightFile(file: TFile): Promise<void>;
 }
@@ -107,6 +109,100 @@ export class SideBySideDiffView extends ItemView {
   private directionButton: HTMLButtonElement | null = null;
   private pendingTargetPreview: PendingTargetPreview | null = null;
   private renderedPendingDeletions = new Set<number>();
+  private layoutObserver: ResizeObserver | null = null;
+  private compactGroupControls: Map<HTMLElement, HTMLElement> | null = null;
+  private composing = false;
+
+  /** Changes only presentation, retaining session state and the live editor instance. */
+  setLayout(layout: DiffLayout): void {
+    this.viewState = { ...this.viewState, layout };
+    this.updateLayout();
+    this.app.workspace.requestSaveLayout();
+  }
+
+  /** Resolves responsive presentation without reading files or replacing the editor. */
+  private updateLayout(): void {
+    if (!this.layoutObserver) return;
+    const root = this.contentEl.querySelector<HTMLElement>(".file-diff-sbs-root");
+    if (!root || this.composing) return;
+    const layout = resolveDiffLayout(this.state.layout ?? "auto", this.contentEl.clientWidth);
+    const compactHeader = this.contentEl.clientWidth > 0 && this.contentEl.clientWidth < SINGLE_COLUMN_BREAKPOINT;
+    const layoutButton = root.querySelector<HTMLButtonElement>(".file-diff-sbs-layout-button");
+    if (layoutButton) this.updateLayoutButton(layoutButton);
+    if (root.dataset.layout === layout && root.dataset.compactHeader === String(compactHeader)) return;
+    const scroll = root.querySelector<HTMLElement>(".file-diff-sbs-scroll, .file-diff-sbs-selection-scroll");
+    const scrollTop = scroll?.getBoundingClientRect().top ?? 0;
+    const rows = Array.from(root.querySelectorAll<HTMLElement>(".file-diff-sbs-row"));
+    const anchor = rows.find(row => row.getBoundingClientRect().bottom > scrollTop);
+    const offset = anchor ? anchor.getBoundingClientRect().top - scrollTop : 0;
+    const focused = this.contentEl.ownerDocument.activeElement;
+    const hadFocus = focused !== null && root.contains(focused);
+    const selection = this.contentEl.ownerDocument.getSelection();
+    if (!this.state.editRight && selection?.anchorNode && root.contains(selection.anchorNode)) selection.removeAllRanges();
+    root.dataset.layout = layout;
+    root.dataset.compactHeader = String(compactHeader);
+    // DOM order follows the stacked reading order; wide mode restores the paired order.
+    const targetSide = this.applyDirection === "left-to-right" ? "right" : "left";
+    for (const row of rows) {
+      const left = row.querySelector<HTMLElement>(".file-diff-sbs-cell[data-side='left']");
+      const right = row.querySelector<HTMLElement>(".file-diff-sbs-cell[data-side='right']");
+      const actions = row.querySelector<HTMLElement>(".file-diff-sbs-action-cell");
+      if (!left || !right || !actions) continue;
+      if (layout === "single-column") {
+        row.append(targetSide === "right" ? right : left, targetSide === "right" ? left : right, actions);
+      } else row.append(left, actions, right);
+    }
+    for (const [group, controls] of this.compactGroupControls ?? []) {
+      if (layout === "single-column") group.append(controls);
+      else controls.remove();
+    }
+    for (const group of root.querySelectorAll<HTMLElement>(".file-diff-sbs-group")) {
+      const controls = group.querySelector<HTMLElement>(".file-diff-sbs-group-header");
+      if (!controls) continue;
+      if (layout === "single-column") group.append(controls);
+      else group.prepend(controls);
+    }
+    if (hadFocus && focused.instanceOf(HTMLElement)) {
+      const nextFocus = root.contains(focused) && focused.getBoundingClientRect().height > 0 ? focused : layoutButton;
+      if (nextFocus && this.contentEl.ownerDocument.activeElement !== nextFocus) nextFocus.focus({ preventScroll: true });
+    }
+    for (const button of root.querySelectorAll<HTMLButtonElement>(".file-diff-sbs-merge-button")) {
+      const accept = button.getAttribute("aria-keyshortcuts") === "Alt+ArrowRight";
+      button.textContent = layout === "single-column" ? this.translate(accept ? "actions.acceptRow" : "actions.ignoreRow")
+        : accept ? this.applyDirection === "left-to-right" ? "→" : "←" : "×";
+    }
+    if (anchor && scroll) {
+      // Stacked headers can move the viewport itself; preserve the row's relative position.
+      scroll.scrollTop += anchor.getBoundingClientRect().top - scroll.getBoundingClientRect().top - offset;
+    }
+    const grid = root.querySelector<HTMLElement>(".file-diff-sbs-grid");
+    if (grid) {
+      if (layout === "single-column") delete grid.dataset.diffSelectionSide;
+      else grid.dataset.diffSelectionSide = targetSide;
+    }
+    if (this.rightEditorState) this.scheduleEditablePaneSync(this.rightEditorState.editor);
+  }
+
+  /** Adds an icon-only control that cycles through all three layout preferences. */
+  private buildLayoutSelector(parent: HTMLElement): void {
+    const button = parent.createEl("button", { cls: "clickable-icon file-diff-sbs-layout-button" });
+    button.setAttribute("type", "button");
+    this.updateLayoutButton(button);
+    button.addEventListener("click", () => { this.setLayout(getNextDiffLayout(this.state.layout ?? "auto")); });
+  }
+
+  /** Names the selected preference and the next action even when Auto resolves to the same layout. */
+  private updateLayoutButton(button: HTMLButtonElement): void {
+    const preference = this.state.layout ?? "auto";
+    const label = this.translate("view.layout.switch", {
+      current: this.translate(`view.layout.${preference}`),
+      next: this.translate(`view.layout.${getNextDiffLayout(preference)}`)
+    });
+    button.setAttribute("data-layout-preference", preference);
+    button.setAttribute("aria-label", label);
+    setTooltip(button, label);
+    setIcon(button, DIFF_LAYOUT_ICONS[preference]);
+  }
 
   /** Exposes the current comparison state without allowing external mutation. */
   get state(): Readonly<DiffViewState> {
@@ -186,6 +282,12 @@ export class SideBySideDiffView extends ItemView {
     this.registerDomEvent(this.contentEl, "beforeinput", (event) => { this.handleBeforeInput(event); });
     this.registerDomEvent(this.contentEl, "input", (event) => { this.handleInput(event); });
     this.registerDomEvent(this.contentEl.ownerDocument, "copy", (event) => { this.handleCopy(event); });
+    this.registerDomEvent(this.contentEl, "compositionstart", () => { this.composing = true; });
+    this.registerDomEvent(this.contentEl, "compositionend", () => {
+      this.composing = false;
+      this.updateLayout();
+      if (this.rightEditorState) this.scheduleEditablePaneSync(this.rightEditorState.editor);
+    });
     this.registerDomEvent(this.contentEl, "pointerdown", (event) => { this.handleSelectionStart(event); });
     this.registerEvent(this.app.vault.on("modify", (file) => { this.refreshForPath(file.path); }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => { this.handleRename(file, oldPath); }));
@@ -262,7 +364,7 @@ export class SideBySideDiffView extends ItemView {
       this.activeChangeRowIndex = null;
       this.retainedExternalMarkdown = leftFile instanceof TFile ? null : leftFile;
       this.externalMarkdown = rightFile instanceof TFile ? null : rightFile;
-      this.viewState = parseDiffViewState({ leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" }, this.plugin.settings.defaultApplyDirection);
+      this.viewState = parseDiffViewState({ leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" }, this.plugin.settings.defaultApplyDirection, this.state.layout ?? this.plugin.settings.defaultLayout ?? "auto");
       await this.renderDiff(null, loaded);
     } catch (error) {
       if (token !== this.dropToken) return;
@@ -284,14 +386,14 @@ export class SideBySideDiffView extends ItemView {
   getComparisonDiskPath(file: ComparisonFile): string | null {
     if (!(file instanceof TFile)) return file.diskPath;
     const adapter = this.app.vault.adapter;
-    return adapter instanceof FileSystemAdapter ? join(adapter.getBasePath(), file.path) : null;
+    return adapter instanceof FileSystemAdapter ? getDesktopPaths()?.join(adapter.getBasePath(), file.path) ?? null : null;
   }
   /** Rejects matching native paths and browser handles for the same entry. */
   async isSameComparisonFile(left: ComparisonFile, right: ComparisonFile): Promise<boolean> {
     if (left.path === right.path) return true;
     const leftPath = this.getComparisonDiskPath(left);
     const rightPath = this.getComparisonDiskPath(right);
-    if (leftPath !== null && rightPath !== null && relative(leftPath, rightPath) === "") return true;
+    if (leftPath !== null && rightPath !== null && getDesktopPaths()?.relative(leftPath, rightPath) === "") return true;
     if (!(left instanceof TFile) && !(right instanceof TFile) && left.handle !== null && right.handle !== null) {
       return left.handle.isSameEntry(right.handle);
     }
@@ -357,14 +459,14 @@ export class SideBySideDiffView extends ItemView {
     const hasExternal = externalPaths.some((path) => path !== undefined && (path === this.state.leftPath || path === this.state.rightPath));
     if (hasExternal) {
       const vaultPath = [this.state.leftPath, this.state.rightPath].find((path) => path !== null && !externalPaths.includes(path)) ?? null;
-      return { leftPath: vaultPath, rightPath: null, editRight: false, mode: "compare" };
+      return { leftPath: vaultPath, rightPath: null, editRight: false, mode: "compare", layout: this.state.layout ?? "auto" };
     }
     return { ...this.state };
   }
   /** Stores new paths and redraws the comparison. */
   override async setState(state: unknown, result: ViewStateResult): Promise<void> {
     await super.setState(state, result);
-    const nextState = parseDiffViewState(state, this.plugin.settings.defaultApplyDirection);
+    const nextState = parseDiffViewState(state, this.plugin.settings.defaultApplyDirection, this.plugin.settings.defaultLayout ?? "auto");
     if (nextState.leftPath !== this.externalMarkdown?.path && nextState.rightPath !== this.externalMarkdown?.path) this.externalMarkdown = null;
     if (nextState.leftPath !== this.retainedExternalMarkdown?.path && nextState.rightPath !== this.retainedExternalMarkdown?.path) this.retainedExternalMarkdown = null;
     this.dropToken += 1;
@@ -373,10 +475,17 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Renders the initial comparison when the leaf opens. */
   override async onOpen(): Promise<void> {
+    const windowRef = this.contentEl.ownerDocument.defaultView;
+    if (windowRef) {
+      this.layoutObserver = new windowRef.ResizeObserver(() => { this.updateLayout(); });
+      this.layoutObserver.observe(this.contentEl);
+    }
     await this.renderDiff();
   }
   /** Clears the view when its leaf closes. */
   override async onClose(): Promise<void> {
+    this.layoutObserver?.disconnect();
+    this.layoutObserver = null;
     this.dropToken += 1;
     if (this.state.editRight && this.rightEditorState?.editor) {
       this.synchronizeEditablePanes(this.rightEditorState.editor);
@@ -477,6 +586,7 @@ export class SideBySideDiffView extends ItemView {
     if (preferredIndex !== null) {
       this.pendingEditSyncPreferredIndex = preferredIndex;
     }
+    if (this.composing) return;
     if (this.editSyncFrame !== null) {
       return;
     }
@@ -486,7 +596,7 @@ export class SideBySideDiffView extends ItemView {
     }
     this.editSyncFrame = windowRef.requestAnimationFrame(() => {
       this.editSyncFrame = null;
-      if (!this.state.editRight || !editor.isConnected) {
+      if (!this.state.editRight || !editor.isConnected || this.composing) {
         return;
       }
       const snapshot = this.editInputSnapshot?.editor === editor ? this.editInputSnapshot : null;
@@ -510,13 +620,14 @@ export class SideBySideDiffView extends ItemView {
     this.pendingEditSyncPreferredIndex = null;
     this.rightEditorDirty = false;
   }
-  /** Keeps native text selection in the comparison pane where the pointer starts. */
+  /** Keeps side-by-side selection in its starting pane; stacked text remains freely selectable. */
   handleSelectionStart(event: PointerEvent): void {
     if (this.state.editRight || event.button !== 0) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
     const code = target.closest<HTMLElement>(".file-diff-sbs-code[data-diff-side]");
     const grid = code?.closest<HTMLElement>(".file-diff-sbs-grid");
+    if (code?.closest<HTMLElement>(".file-diff-sbs-root")?.dataset.layout === "single-column") return;
     const side = code?.dataset.diffSide;
     if (!grid || (side !== "left" && side !== "right") || !this.contentEl.contains(grid)) return;
     if (grid.dataset.diffSelectionSide !== side) {
@@ -524,7 +635,7 @@ export class SideBySideDiffView extends ItemView {
       grid.dataset.diffSelectionSide = side;
     }
   }
-  /** Copies a selection within one comparison side without the other file or alignment gaps. */
+  /** Copies comparison text without interface elements, respecting the current reading layout. */
   handleCopy(event: ClipboardEvent): void {
     if (this.state.editRight || !event.clipboardData) return;
     const selection = this.contentEl.ownerDocument.getSelection();
@@ -534,6 +645,10 @@ export class SideBySideDiffView extends ItemView {
     const endElement = range.endContainer.nodeType === 1 ? range.endContainer as Element : range.endContainer.parentElement;
     const start = startElement?.closest<HTMLElement>(".file-diff-sbs-code");
     const end = endElement?.closest<HTMLElement>(".file-diff-sbs-code");
+    if (startElement?.closest<HTMLElement>(".file-diff-sbs-root")?.dataset.layout === "single-column") {
+      this.copySingleColumnSelection(event, range, start ?? null, end ?? null);
+      return;
+    }
     const side = start?.dataset.diffSide;
     if (!start || !end || (side !== "left" && side !== "right") || end.dataset.diffSide !== side || !this.contentEl.contains(start) || !this.contentEl.contains(end)) return;
     const codes = Array.from(this.contentEl.querySelectorAll<HTMLElement>(`.file-diff-sbs-code[data-diff-side='${side}']`));
@@ -556,6 +671,25 @@ export class SideBySideDiffView extends ItemView {
       return;
     }
     event.clipboardData.setData("text/plain", lines.join("\n"));
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  /** Copies selected text in stacked reading order, with shared rows once and both changed variants. */
+  private copySingleColumnSelection(event: ClipboardEvent, range: Range, start: HTMLElement | null, end: HTMLElement | null): void {
+    if (!this.contentEl.contains(range.startContainer) || !this.contentEl.contains(range.endContainer)) return;
+    const targetSide = this.applyDirection === "left-to-right" ? "right" : "left";
+    const codes = Array.from(this.contentEl.querySelectorAll<HTMLElement>(".file-diff-sbs-grid .file-diff-sbs-code"));
+    const lines: string[] = [];
+    for (const code of codes) {
+      const shared = code.dataset.diffShared === "true";
+      if (code.dataset.diffPresent !== "true" || (shared && code.dataset.diffSide !== targetSide) || !range.intersectsNode(code)) continue;
+      const part = range.cloneRange();
+      part.selectNodeContents(code);
+      if (code === start) part.setStart(range.startContainer, range.startOffset);
+      if (code === end) part.setEnd(range.endContainer, range.endOffset);
+      lines.push(part.toString());
+    }
+    event.clipboardData?.setData("text/plain", lines.join("\n"));
     event.preventDefault();
     event.stopPropagation();
   }
@@ -582,7 +716,7 @@ export class SideBySideDiffView extends ItemView {
       }
       return;
     }
-    if (this.state.editRight && event.key === "Enter" && this.insertEditableLineBreak()) {
+    if (this.state.editRight && event.key === "Enter" && this.getEditableEditor(event.target) !== null && this.insertEditableLineBreak()) {
       event.preventDefault();
       event.stopImmediatePropagation();
       return;
@@ -635,6 +769,7 @@ export class SideBySideDiffView extends ItemView {
     this.nextChangeButton = null;
     this.directionButton = null;
     this.reviewFeedbackEl = null;
+    this.compactGroupControls = null;
     this.changeActions.clear();
     this.contentEl.empty();
     this.contentEl.addClass("file-diff-sbs-view");
@@ -658,6 +793,7 @@ export class SideBySideDiffView extends ItemView {
       if (rightPath === null) {
         if (!(leftFile instanceof TFile)) leftFile.content = storedLeftContent;
         this.buildSelectionLayout(leftFile, splitLines(leftContent));
+        this.updateLayout();
         this.restoreScrollPosition(scrollPosition);
         return;
       }
@@ -686,6 +822,7 @@ export class SideBySideDiffView extends ItemView {
         }
       }
       this.buildLayout(leftFile, rightFile, leftLines, rightLines);
+      this.updateLayout();
       this.restoreScrollPosition(scrollPosition);
     } catch (error) {
       console.error("Side-by-Side Diff konnte die Dateien nicht lesen.", error);
@@ -817,7 +954,7 @@ export class SideBySideDiffView extends ItemView {
   /** Applies the selected right file and redraws the comparison view. */
   async applyRightFile(leftFile: ComparisonFile, rightFile: TFile): Promise<void> {
     this.dropToken += 1;
-    const nextState = parseDiffViewState({ leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" }, this.plugin.settings.defaultApplyDirection);
+    const nextState = parseDiffViewState({ leftPath: leftFile.path, rightPath: rightFile.path, editRight: false, mode: "compare" }, this.plugin.settings.defaultApplyDirection, this.state.layout ?? this.plugin.settings.defaultLayout ?? "auto");
     this.viewState = nextState;
     this.activeChangeRowIndex = null;
     this.session.reset();
@@ -1086,6 +1223,7 @@ export class SideBySideDiffView extends ItemView {
       leftLine.setCssProps({ "--file-diff-sbs-line-min-height": "" });
       rightLine.setCssProps({ "--file-diff-sbs-line-min-height": "" });
     }
+    if (resolveDiffLayout(this.state.layout ?? "auto", this.contentEl.clientWidth) === "single-column") return;
     // Measure every natural height before applying any paired minimums.
     const heights = Array.from({ length: lineCount }, (_, index) => Math.max(
       leftLines[index]?.getBoundingClientRect().height ?? 0,
@@ -1135,6 +1273,7 @@ export class SideBySideDiffView extends ItemView {
   /** Creates a blank read-only line that preserves source-pane vertical alignment. */
   createEditableLeftGap(parent: HTMLElement): HTMLElement {
     const cell = parent.createDiv({ cls: "file-diff-sbs-cell file-diff-sbs-edit-gap" });
+    cell.dataset.referencePresent = "false";
     cell.createSpan({ cls: "file-diff-sbs-line-number" });
     cell.createSpan({ cls: "file-diff-sbs-code", text: " " });
     return cell;
@@ -1388,7 +1527,9 @@ export class SideBySideDiffView extends ItemView {
       cls: "file-diff-sbs-title-main"
     });
     title.createEl("small", { text: this.translate("view.selection.leftFixed") });
-    toolbar.createDiv({ cls: "file-diff-sbs-summary", text: this.translate("view.selection.none") });
+    const actions = toolbar.createDiv({ cls: "file-diff-sbs-toolbar-actions" });
+    actions.createDiv({ cls: "file-diff-sbs-summary", text: this.translate("view.selection.none") });
+    this.buildLayoutSelector(actions);
     const header = root.createDiv({ cls: "file-diff-sbs-header" });
     this.buildFileHeader(header, leftFile, this.translate("view.labels.original"));
     const rightHeader = header.createDiv({ cls: "file-diff-sbs-file-header" });
@@ -1407,6 +1548,7 @@ export class SideBySideDiffView extends ItemView {
       cls: "mod-cta"
     });
     chooseButton.addEventListener("click", () => { this.selectRightFile(leftFile); });
+    if (typeof Platform !== "undefined" && Platform.isMobileApp) return;
     const dropCard = rightPane.createDiv({ cls: "file-diff-sbs-picker-card file-diff-sbs-drop-card" });
     dropCard.createEl("h3", { text: this.translate("view.selection.dropFiles") });
     dropCard.createEl("p", { text: this.translate("view.dropMarkdown") });
@@ -1481,6 +1623,7 @@ export class SideBySideDiffView extends ItemView {
     title.createSpan({ text: this.translate("commands.compareTwoFiles"), cls: "file-diff-sbs-title-main" });
     toolbar.addClass("file-diff-sbs-comparison-toolbar");
     const actions = toolbar.createDiv({ cls: "file-diff-sbs-toolbar-actions" });
+    this.buildLayoutSelector(actions);
     const saveButton = actions.createEl("button", {
       text: this.translate(this.state.editRight ? "actions.saveRight" : "actions.savePending"),
       cls: "mod-cta file-diff-sbs-save-action"
@@ -1518,6 +1661,7 @@ export class SideBySideDiffView extends ItemView {
     }
     const header = root.createDiv({ cls: "file-diff-sbs-header" });
     header.addClass("file-diff-sbs-comparison-header");
+    if (leftFile.name === rightFile.name) header.addClass("file-diff-sbs-ambiguous-files");
     const leftToRight = this.applyDirection === "left-to-right";
     const leftHeader = header.createDiv({ cls: "file-diff-sbs-header-file file-diff-sbs-left-file" });
     this.buildFileHeader(leftHeader, leftFile, paneLabels.left, this.state.editRight ? leftToRight ? "reference" : "edit" : leftToRight ? "source" : "target");
@@ -1543,6 +1687,7 @@ export class SideBySideDiffView extends ItemView {
     this.buildFileHeader(rightHeader, rightFile, paneLabels.right, this.state.editRight ? leftToRight ? "edit" : "reference" : leftToRight ? "target" : "source");
     const targetHeader = leftToRight ? rightHeader : leftHeader;
     const editButton = targetHeader.createEl("button", { cls: "clickable-icon file-diff-sbs-file-edit-button" });
+    if (this.state.editRight) editButton.addClass("file-diff-sbs-compare-mode-button");
     editButton.setAttribute("aria-label", this.translate(this.state.editRight ? "actions.compareMode" : "actions.edit"));
     setTooltip(editButton, this.translate(this.state.editRight ? "actions.compareModeTitle" : "actions.editTitle"));
     setIcon(editButton, this.state.editRight ? "columns-2" : "pencil");
@@ -1617,8 +1762,8 @@ export class SideBySideDiffView extends ItemView {
         // Once every row in the block is resolved (e.g. via "Ignore all"), stop wrapping it in a
         // group box - the underlying rows are still !equal, but there is nothing left to act on.
         const groupParent = unresolvedRowCount > 0 ? grid.createDiv({ cls: "file-diff-sbs-group" }) : grid;
-        if (unresolvedRowCount > GROUP_HEADER_THRESHOLD) {
-          this.buildGroupHeader(groupParent, rows, group, unresolvedRowCount);
+        if (unresolvedRowCount > 1) {
+          this.buildGroupHeader(groupParent, rows, group, unresolvedRowCount, unresolvedRowCount <= GROUP_HEADER_THRESHOLD);
         }
         for (let groupIndex = group.startIndex; groupIndex <= group.endIndex; groupIndex += 1) {
           this.renderDiffRow(groupParent, rows[groupIndex] ?? null, groupIndex);
@@ -1670,8 +1815,8 @@ export class SideBySideDiffView extends ItemView {
     }
     this.buildRow(parent, row, rowIndex, !row.equal);
   }
-  /** Adds a header with block-wide accept/ignore controls above a large change group. */
-  buildGroupHeader(parent: HTMLElement, rows: ComparisonRowModel[], group: ChangeRowGroup, changedRowCount: number): void {
+  /** Builds reusable block actions; small blocks expose them only in single-column mode. */
+  buildGroupHeader(parent: HTMLElement, rows: ComparisonRowModel[], group: ChangeRowGroup, changedRowCount: number, compactOnly = false): void {
     const header = parent.createDiv({ cls: "file-diff-sbs-group-header" });
     header.createSpan({
       cls: "file-diff-sbs-group-summary",
@@ -1679,12 +1824,14 @@ export class SideBySideDiffView extends ItemView {
     });
     const actions = header.createDiv({ cls: "file-diff-sbs-group-actions" });
     const acceptButton = actions.createEl("button", { text: `${this.applyDirection === "left-to-right" ? "→" : "←"} ${this.translate("actions.acceptGroup")}`, cls: "file-diff-sbs-group-button" });
+    acceptButton.setAttribute("data-review-action", "accept");
     acceptButton.disabled = !this.canApplyChange();
     acceptButton.title = this.translate("actions.acceptGroupTarget", { name: this.getApplyTargetName() });
     acceptButton.addEventListener("click", () => { void this.applyGroupChange(group.startIndex, group.endIndex, this.applyDirection); });
     const openIndexes = getActionableRowIndexes(rows, group.startIndex, group.endIndex, row => this.session.hasDismissedRow(getDiffRowKey(row)));
     if (canKeepBoth(createKeepBothPlan(rows, openIndexes, this.applyDirection))) {
       const keepBothButton = actions.createEl("button", { text: this.translate("actions.keepBothGroup"), cls: "file-diff-sbs-group-button file-diff-sbs-keep-both" });
+      keepBothButton.setAttribute("data-review-action", "keep-both");
       const label = this.translate("actions.keepBothGroupTarget", { name: this.getApplyTargetName() });
       keepBothButton.disabled = !this.canApplyChange();
       keepBothButton.title = label;
@@ -1692,9 +1839,15 @@ export class SideBySideDiffView extends ItemView {
       keepBothButton.addEventListener("click", () => { void this.applyGroupChange(group.startIndex, group.endIndex, this.applyDirection, "keep-both"); });
     }
     const dismissButton = actions.createEl("button", { text: this.translate("actions.dismissGroup"), cls: "file-diff-sbs-group-button" });
+    dismissButton.setAttribute("data-review-action", "ignore");
     dismissButton.title = this.translate("actions.dismissGroupTarget", { name: this.getApplyTargetName() });
     const groupRows = rows.slice(group.startIndex, group.endIndex + 1);
     dismissButton.addEventListener("click", () => { void this.dismissGroup(groupRows, group.startIndex); });
+    if (compactOnly) {
+      this.compactGroupControls ??= new Map();
+      this.compactGroupControls.set(parent, header);
+      header.remove();
+    }
   }
   /** Builds a read-only source beside the editable target without swapping physical panes. */
   buildEditableModeLayout(parent: HTMLElement, rows: IndexedDiffRow[]): void {
@@ -1703,6 +1856,13 @@ export class SideBySideDiffView extends ItemView {
     const targetOnRight = this.applyDirection === "left-to-right";
     const referencePane = targetOnRight ? leftPane : rightPane;
     const targetPane = targetOnRight ? rightPane : leftPane;
+    const referenceToggle = parent.createEl("button", { cls: "file-diff-sbs-reference-toggle", text: this.translate("view.referenceToggle") });
+    referenceToggle.setAttribute("aria-expanded", "true");
+    referenceToggle.addEventListener("click", () => {
+      const collapsed = parent.dataset.referenceCollapsed !== "true";
+      parent.dataset.referenceCollapsed = String(collapsed);
+      referenceToggle.setAttribute("aria-expanded", String(!collapsed));
+    });
     referencePane.addClass("file-diff-sbs-edit-reference-pane");
     targetPane.addClass("file-diff-sbs-edit-target-pane");
     // The existing editor engine uses logical left=reference/right=editable fields.
@@ -1747,6 +1907,7 @@ export class SideBySideDiffView extends ItemView {
   buildEditableLeftCell(parent: HTMLElement, row: IndexedDiffRow, rowIndex: number): void {
     const rowType = getDiffRowType(row);
     const cell = parent.createDiv({ cls: `file-diff-sbs-cell file-diff-sbs-${rowType}` });
+    cell.dataset.referencePresent = String(row.left !== null);
     this.markChangeTarget(cell, row, rowIndex);
     const lineNumber = cell.createSpan({ cls: "file-diff-sbs-line-number" });
     lineNumber.textContent = row.left === null ? "" : String(row.leftLineNumber);
@@ -1875,9 +2036,17 @@ export class SideBySideDiffView extends ItemView {
     labels.createSpan({ text: sideLabel, cls: "file-diff-sbs-side-label" });
     if (role !== undefined) {
       labels.createSpan({ text: this.translate(`view.roles.${role}`), cls: `file-diff-sbs-role file-diff-sbs-role-${role}` });
+      const compactRole = labels.createSpan({
+        text: this.translate(role === "target" ? "view.roles.targetCompact" : `view.roles.${role === "reference" ? "source" : role}`),
+        cls: "file-diff-sbs-compact-role"
+      });
+      compactRole.setAttribute("data-role", role);
     }
-    header.createSpan({ text: file.name, cls: "file-diff-sbs-file-name" });
+    const name = header.createSpan({ text: file.name, cls: "file-diff-sbs-file-name" });
+    name.setAttribute("title", file instanceof TFile ? file.path : file.name);
     header.createSpan({ text: file instanceof TFile ? file.path : file.name, cls: "file-diff-sbs-file-path" });
+    const folder = file instanceof TFile ? file.parent?.path ?? "" : this.translate("view.file.external");
+    header.createSpan({ text: folder === "" ? "/" : folder, cls: "file-diff-sbs-compact-folder" });
   }
 
   /** Names the target in action hints even when identical filenames appear in different folders. */
@@ -1916,6 +2085,7 @@ export class SideBySideDiffView extends ItemView {
   buildRow(parent: HTMLElement, row: IndexedDiffRow, rowIndex: number, isChange = !row.equal): void {
     const rowElement = parent.createDiv({ cls: "file-diff-sbs-row" });
     rowElement.dataset.diffRowIndex = String(rowIndex);
+    if (row.left !== null && row.left === row.right) rowElement.dataset.shared = "true";
     const reviewStatus = this.session.getReviewStatus(rowIndex);
     if (reviewStatus !== null) rowElement.dataset.reviewStatus = reviewStatus;
     if (isChange) {
@@ -1930,6 +2100,14 @@ export class SideBySideDiffView extends ItemView {
     const leftCell = this.buildCell(rowElement, row.left, row.right, row.leftLineNumber, "left", rowType, modelRow?.leftInlineTokens);
     this.buildActionCell(rowElement, row, rowIndex);
     const rightCell = this.buildCell(rowElement, row.right, row.left, row.rightLineNumber, "right", rowType, modelRow?.rightInlineTokens);
+    if (row.left !== null && row.left === row.right) {
+      for (const cell of [leftCell, rightCell]) {
+        const code = cell.querySelector<HTMLElement>(".file-diff-sbs-code");
+        if (code) code.dataset.diffShared = "true";
+        cell.createSpan({ cls: "file-diff-sbs-shared-numbers", text: `${String(row.leftLineNumber)}·${String(row.rightLineNumber)}` });
+      }
+    }
+    for (const cell of [leftCell, rightCell]) this.buildVariantLabel(cell);
     const targetOnRight = this.applyDirection === "left-to-right";
     const targetValue = targetOnRight ? row.right : row.left;
     const targetIndex = targetOnRight ? row.rightIndex : row.leftIndex;
@@ -1970,12 +2148,16 @@ export class SideBySideDiffView extends ItemView {
     }
     if (row.equal) return;
     const acceptButton = cell.createEl("button", { text: this.applyDirection === "left-to-right" ? "→" : "←", cls: "file-diff-sbs-merge-button" });
+    acceptButton.setAttribute("data-review-action", "accept");
     acceptButton.disabled = !this.canApplyChange();
     acceptButton.title = this.translate("actions.acceptTarget", { name: this.getApplyTargetName() });
+    acceptButton.setAttribute("aria-label", acceptButton.title);
     acceptButton.setAttribute("aria-keyshortcuts", "Alt+ArrowRight");
     acceptButton.addEventListener("click", () => { void this.applyRowChange(rowIndex, this.applyDirection); });
     const dismissButton = cell.createEl("button", { text: "\xD7", cls: "file-diff-sbs-merge-button" });
+    dismissButton.setAttribute("data-review-action", "ignore");
     dismissButton.title = this.translate("actions.dismissTarget", { name: this.getApplyTargetName() });
+    dismissButton.setAttribute("aria-label", dismissButton.title);
     dismissButton.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft");
     dismissButton.addEventListener("click", () => { void this.dismissRow(row, rowIndex); });
     this.changeActions.set(rowIndex, {
@@ -2053,6 +2235,9 @@ export class SideBySideDiffView extends ItemView {
   /** Renders one side of a diff row. */
   buildCell(parent: HTMLElement, value: string | null, counterpart: string | null, lineNumberValue: number | null, side: EditableSide, rowType: EditableRowType, inlineTokens?: InlineDiffToken[]): HTMLElement {
     const cell = parent.createDiv({ cls: `file-diff-sbs-cell file-diff-sbs-${rowType}` });
+    cell.dataset.side = side;
+    cell.dataset.present = String(value !== null);
+    cell.dataset.role = side === (this.applyDirection === "left-to-right" ? "right" : "left") ? "target" : "source";
     // Structural row types stay positional; review colors describe the planned merge instead.
     const sourceSide = this.applyDirection === "left-to-right" ? "left" : "right";
     cell.dataset.diffOperation = rowType === "equal" || value === null ? "none" : side === sourceSide ? "insert" : "delete";
@@ -2067,6 +2252,13 @@ export class SideBySideDiffView extends ItemView {
       appendInlineDiff(code, value, counterpart, side, inlineTokens);
     }
     return cell;
+  }
+  /** Names a stacked variant outside its selectable file text. */
+  private buildVariantLabel(cell: HTMLElement): void {
+    const side = cell.dataset.side === "left" ? "left" : "right";
+    const path = this.state[side === "left" ? "leftPath" : "rightPath"];
+    const name = path === null ? "" : this.getComparisonFile(path)?.name ?? path.split("/").pop() ?? "";
+    cell.createSpan({ cls: "file-diff-sbs-variant-label", text: `${this.translate(`view.roles.${cell.dataset.role ?? "target"}`)} · ${name}` });
   }
   /** Swaps the files while keeping the current diff view open. */
   async swapFiles(): Promise<void> {

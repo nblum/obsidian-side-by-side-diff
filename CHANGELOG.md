@@ -4,12 +4,30 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Let toolbar buttons handle Enter during direct editing instead of inserting a line into the target.
+
 ### Changed
 
+- Unify row/block review buttons with rounded outlines, theme-aware tints and keyboard-focus states. Button heights
+  follow the device rather than the comparison layout, with small vertical margins around row actions.
 - Run Linux Obsidian E2E tests and documentation captures on a private virtual display by default. Set
   `E2E_HEADED=1` for a visible debug run.
 
 ### Added
+
+- Add an icon-only Automatic / Side by side / Single column switch beside Save and a default-layout setting.
+  Automatic stacks variants below 720 pixels. Preferences persist per comparison; transitions preserve staged
+  changes, decisions, undo, scroll position, focus and the live editor.
+- In single column, show equal text once and changed target/source variants in reading order. Place row actions
+  beneath their change and block actions below the content from two open changed rows onward. Copy both selected
+  variants without interface text or hidden duplicates. Existing editors use the full width with a collapsible
+  source reference.
+- Compact narrow file headers into Source/Target rows, disambiguating matching names by folder. Keep one direction
+  control and hide Swap and the edit entry; single-column comparisons also hide the edit entry in wide views.
+- Prepare mobile runtime loading by deferring Node/Electron capabilities and skipping desktop-only hooks and drop
+  cards on mobile. The plugin remains desktop-only until Android and iOS device validation is complete.
 
 - Add **Keep both** to change-block headers with content in both versions. Stage target text first, a blank line,
   then source text in either merge direction, preserving previously resolved rows and literal whitespace. Undo

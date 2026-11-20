@@ -12,11 +12,11 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Comparison view
 
-- Two different text files are displayed in sync on the left and right.
+- In side-by-side mode, two different text files are displayed in sync on the left and right.
 - Changes are highlighted line by line and inline within changed lines. In comparison mode, green marks source
   content to be inserted, and red marks target content to be removed or replaced. Both line and inline colors follow
   the apply direction; alignment gaps and ignored changes stay neutral. Direct editing uses reference-versus-edited-content colors.
-- File text can be selected and copied directly in comparison mode. Selection stays in the pane where dragging
+- In side-by-side mode, file text can be selected and copied directly. Selection stays in the pane where dragging
   starts and copies only that file's text, preserving real blank lines and excluding line numbers, review controls,
   the other file, and visual alignment gaps.
 - When the line counts differ, visual blank lines are inserted on the shorter side at the change position so that
@@ -66,6 +66,55 @@ visible, can be reviewed and staged individually, and are written only through a
   a vault text file is active. It opens the active file on the left and the clicked file on the right without a
   picker, even if the clicked file is not open in a tab. Folders and binary files are excluded.
 
+### Comparison layouts
+
+- An icon-only toolbar button cycles **Automatic → Side by side → Single column → Automatic**, with matching
+  vector icons for A, columns, and rows. No visible Layout label or dropdown is shown. A localized tooltip and
+  accessible label name the current and next preferences. Space/Enter activate the button, including during editing.
+  Its square button matches the Save button's device-specific height, retaining its dimensions across all
+  preferences and responsive layouts. The vector icon fills the button with a small inset.
+  Automatic uses the comparison container width: single column below 720 CSS pixels, otherwise side by side. Fixed choices override
+  width. Existing workspace states without a valid preference use the configured default.
+- Each comparison persists its preference independently; changing the default affects new comparisons. Swap and
+  external-source restoration retain the preference. Layout changes reuse the session and never write files,
+  reset decisions, clear undo, refresh the baseline, or change merge direction.
+- Single column displays literal equal text once, with both line numbers. Changed rows stack target then source,
+  labeled with file name and role. Alignment gaps are hidden; intentional blank and whitespace-only lines remain.
+  Ignored variants remain visible and neutral. Row actions have visible Accept/Ignore labels and name the target
+  accessibly. Row and block actions share rounded outlines, interface typography and theme-aware semantic tints,
+  with consistent hover, keyboard-focus and disabled states. Review buttons use a 32-pixel desktop height or a
+  44-pixel mobile minimum in both layouts. Row buttons have 3-pixel top/bottom margins. Single-column Accept/Ignore actions
+  align to opposite edges beneath their change. The action strip joins the last visible variant without a divider
+  and leaves an extra 4-pixel gap below it to distinguish the next change.
+  Block actions appear below the content for groups with at least two open changed rows; side-by-side mode keeps
+  its existing header threshold. Navigation, review counts, markers, Keep both and pending previews retain their semantics.
+- Single-column copying follows the selected text in reading order, including both changed variants and shared
+  rows once. It retains partial-line boundaries, real blank lines and literal whitespace, while excluding
+  interface text, alignment gaps, hidden shared duplicates and staged deletion previews. No copy-source selector is needed.
+- Layout transitions keep the visible logical row and focused action. Comparison text selection may clear.
+  The editor instance, buffer, selection, caret, and native undo remain intact during manual and Auto changes.
+  Presentation changes wait until an active composition ends.
+- Below 720 CSS pixels, file headers use two compact rows with localized Source/Target roles and filenames,
+  with at most two visible filename lines and full paths on hover. Folder names appear only when the filenames
+  match; external files are identified as external. Hide Original/Comparison labels, repeated paths, Swap, and the
+  edit entry. Keep a 44-pixel vertical direction control, respecting read-only targets, staged changes and fixed
+  proposal direction. Desktop header controls return at 720 pixels; the edit entry remains hidden whenever
+  single-column layout is active, including in wide views.
+  An existing editor and its return-to-comparison action remain available when narrowed. Focus moves to the
+  layout control if the focused header action becomes hidden.
+- Single-column editing places a full-width target editor below a collapsible source reference. Alignment gaps
+  are hidden and line heights are natural. Returning to two columns restores aligned heights. Edit-entry
+  confirmation, source read-only behavior, target permissions, line endings, and explicit saves stay in force.
+- Initial preview and file selection stack vertically in single column. Toolbars wrap. Button sizes depend on
+  the device, not the layout: desktop controls retain their native sizes and mobile controls have at least
+  44-by-44 CSS-pixel targets. Review buttons are at least 44 pixels wide and the direction control uses a
+  44-pixel target on both devices. Layout and Save share the theme's desktop input height or a mobile minimum
+  of 44 pixels. Save, layout, navigation and review heights remain stable when switching layouts.
+  File labels remain available without hover. Desktop-only runtime modules
+  load only for desktop capabilities; optional desktop tab hooks and external-drop cards are skipped on mobile.
+  These preparations do not yet establish Android/iOS support; the plugin remains declared desktop-only pending
+  device validation.
+
 ### External Markdown sources
 
 - The initial right pane shows a **Drop files** card below **Select right file**. Drop an Obsidian vault file
@@ -114,12 +163,13 @@ visible, can be reviewed and staged individually, and are written only through a
 
 - Contiguous changed rows, and rows only separated by blank-line pairs, are grouped into one visual block instead of
   being shown as disconnected single-line edits interrupted by lonely blank rows.
-- A block with more than three changed lines shows a header with the number of changed lines and `Accept all` /
-  `Ignore all` controls that act on every changed row in the block at once.
-- The block header disappears once every row in the block has been resolved, whether through the block controls or
-  through individual per-row actions.
+- A side-by-side block with more than three open changed lines shows a header with the changed-line count and
+  `Accept all` / `Ignore all`. Single-column mode places the controls after the block content and offers them from
+  two open changed rows onward. Changing layout preserves decisions and restores the appropriate placement.
+- Block controls disappear when fewer open rows remain than the current layout requires, including after all
+  rows have been resolved through block or individual actions. Undo restores eligible controls.
 - `Accept all` never re-applies a row the user has already ignored individually within the same block.
-- The same headers offer **Keep both** when open rows contain text from both versions. For each uninterrupted
+- The same block controls offer **Keep both** when open rows contain text from both versions. For each uninterrupted
   open fragment, it stages the current target version, one additional blank line when both variants have content,
   and then the source version. Unchanged rows and previously accepted or ignored entries remain in place and
   separate fragments; unchanged blank bridges are not duplicated. Pure additions/removals use the usual controls.
@@ -174,14 +224,16 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Edit mode
 
-- In normal diff mode, only the current merge target can be edited directly via its `Edit mode` icon.
+- In wide side-by-side comparisons, the target's `Edit mode` icon opens the editor. Narrow and single-column
+  views hide the entry; an existing editor remains usable across layout changes.
 - The editor opens on the right for left-to-right merging and on the left for right-to-left merging, without moving
   the files. The source remains read-only. Save baselines, line endings, explicit saves and close-save handling all
   follow the actual target. A read-only external source does not block editing a writable vault target.
 - Pending comparison changes are saved or discarded only after confirmation when entering edit mode.
 - The edit area is a shared multi-line input field.
 - Multi-line selection, deletion, Backspace, and `Enter` for new blank lines work as expected.
-- Both sides stay aligned line by line while editing.
+- Side-by-side editing keeps both files aligned line by line; single-column editing uses a full-width target
+  and a collapsible source reference.
 - `Comparison mode` ends direct editing.
 - Saving happens via `Save changes` or `Ctrl/Cmd + S`.
 - Closing with unsaved changes prompts the plugin to ask whether to save.
@@ -255,6 +307,7 @@ Under **Settings → Side-by-Side Diff**, the following options are available:
   are replaced automatically.
 - **Automatically go to the next change**: After accepting or ignoring a change, scroll to the next open change;
   enabled by default.
+- **Default comparison layout**: Use Automatic (the default), Side by side, or Single column for new comparisons.
 - **Default apply direction**: Use **Left → right** (factory default) or **Right → left** for new vault comparisons,
   right-file selections, and external drops. Open comparisons retain their captured direction, including when
   settings or language change. Restored comparisons retain an explicit saved direction. Proposal workflows keep
