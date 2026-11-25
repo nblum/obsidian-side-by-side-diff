@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createPendingTargetPreview } from "../src/pending-diff.ts";
 
 test("pending insertions and replacements mark current target indexes and retain removed saved lines", () => {
@@ -38,4 +39,13 @@ test("repeated anchor lines preserve each pending edit at its current target ind
 	const preview = createPendingTargetPreview("same\nold\nsame\nend", "same\nnew\nsame\nextra\nend");
 	assert.deepEqual([...preview.changedLines], [1, 3]);
 	assert.deepEqual([...preview.deletions], [[1, [{ value: "old", lineNumber: 2 }]]]);
+});
+
+test("pending deletions use the text color for their strikethrough", () => {
+	const styles = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+	const declarations = styles.match(/\[data-diff-pending="delete"\][^{]*\{([^}]*)\}/u)?.[1];
+	assert.ok(declarations);
+	assert.match(declarations, /(?:^|;)\s*color:\s*var\(--color-red\)\s*;/u);
+	assert.match(declarations, /(?:^|;)\s*text-decoration:\s*line-through\s*;/u);
+	assert.doesNotMatch(declarations, /(?:^|;)\s*text-decoration-color\s*:/u);
 });

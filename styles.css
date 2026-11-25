@@ -728,7 +728,6 @@ body.is-mobile .file-diff-sbs-root {
 .file-diff-sbs-cell[data-diff-pending="delete"] .file-diff-sbs-line-number {
 	color: var(--color-red);
 	text-decoration: line-through;
-	text-decoration-color: var(--color-red);
 }
 
 .file-diff-sbs-inline-left,

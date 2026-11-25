@@ -6,6 +6,7 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Fixed
 
+- Use the text color for pending-deletion strikethroughs to avoid a CSS compatibility warning on older Obsidian versions.
 - Preserve unsaved editor text when a compared file changes externally. A conflicting save keeps the live editor
   open without overwriting the external change.
 - Let toolbar buttons handle Enter during direct editing instead of inserting a line into the target.
