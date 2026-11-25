@@ -1,10 +1,9 @@
 # Single-column layout and mobile support
 
-Status: Single-column layout implemented, pending release. Mobile runtime preparation implemented;
-Android/iOS device validation remains pending. The plugin is still declared desktop-only.
+The plugin manifest enables vault file comparisons on Android and iOS. Android and iOS device validation is
+pending. The startup check uses a mobile API stub, and the automated touch tests run in desktop Obsidian.
 
-No release version or delivery date is assigned. This document records the implemented design and the remaining
-mobile release gate; `FEATURES.md` is the reference for available behavior.
+`FEATURES.md` is the reference for available behavior.
 
 ## Scope
 
@@ -118,8 +117,8 @@ runtime graph; Node use in development tools and desktop E2E tests is unaffected
 
 Vault workflows continue to use Obsidian vault identities and APIs. Desktop external-file identity checks and
 browser handles retain their behavior. Optional desktop tab hooks and external-drop cards are skipped on mobile.
-The production bundle is smoke-tested with only the Obsidian module available; attempted Node/Electron resolution
-would fail the test. This is module-load evidence, not an Android/iOS enable-and-use test.
+The production bundle's startup test supplies only the Obsidian module. It verifies that vault commands are
+registered, desktop CLI and tab hooks are skipped, and startup never tries to resolve Node or Electron.
 
 ## Validation and implementation checklist
 
@@ -193,22 +192,68 @@ regression also failed before the fix (an unchanged document scroll position mov
 The correction calculates the row offset against the viewport's current top after changing presentation.
 This changes scrolling only; merge decisions, file contents, and static documentation captures are unaffected.
 
-## Remaining mobile release gate
+## Device acceptance checks
 
-Before changing `isDesktopOnly` or advertising mobile support:
+Run these checks in Android and iOS Obsidian on devices or emulators. Test phone portrait, phone landscape,
+and tablet widths. Record the oldest mobile app version you can test and the current public version for each OS.
 
-1. Run the production plugin in actual Android and iOS Obsidian on devices or emulators. Record app/OS version,
-   device, date, tested workflows, failures and untested combinations. Include phone portrait/landscape and tablet
-   widths, and establish which app versions can be checked against the declared minimum.
-2. Verify installation, enable/disable/reload, commands, pickers, workspace restoration, menus, settings, help,
-   introduction, proposal creation and acceptance, and unavailable desktop capabilities.
-3. Verify row/block accept/ignore, Keep both, undo, progress, navigation, native selection/clipboard, literal blank
-   lines, Markdown hard breaks, CRLF, final blank lines, and large comparisons in both directions.
-4. Verify target editing, multi-line changes, IME/composition, caret and editor undo across layout/orientation
-   changes, collapsed source reference, software keyboard, large text, long paths, translated labels, and themes.
-5. Verify explicit saves, failed/conflicting saves, pending changes when closing, vault file rename/delete,
-   suspension/resume, and changed-on-resume file baselines. Add fixes and automated regressions where possible.
-6. After these checks pass, update the availability declaration and published requirements. Change the minimum
-   app version only if the compatibility audit establishes a documented need.
+### Prepare a disposable test vault
 
-Phase 1 can ship independently. Runtime preparation does not imply that phase 2 has passed its release gate.
+Build from the checkout you intend to test. These commands copy the comparison fixtures and production plugin
+files into a temporary vault.
+
+```bash
+npm run build
+sbs_mobile_vault=$(mktemp -d "${TMPDIR:-/tmp}/sbs-mobile.XXXXXX")
+sbs_mobile_plugin="$sbs_mobile_vault/.obsidian/plugins/side-by-side-diff"
+mkdir -p "$sbs_mobile_plugin"
+cp tests/e2e/vault/*.md "$sbs_mobile_vault/"
+cp main.js manifest.json styles.css "$sbs_mobile_plugin/"
+printf '%s\n' "$sbs_mobile_vault"
+```
+
+Transfer the vault to the device, including its hidden `.obsidian` directory. Open it as a local vault and enable
+Side-by-Side Diff under **Community plugins**. Keep a clean copy of the fixture notes and restore them before
+repeating a case that changes either note. For the block and literal-text cases, also import the two
+`tests/fixtures/contiguous-block-*.md` files and prepare copies containing CRLF, an empty line, a Markdown hard
+break (two trailing spaces), and a final blank line. Compare retrieved files byte for byte for the literal-text
+checks.
+
+### Run the cases on each OS
+
+1. **Installation and entry points.** Enable the plugin and complete the introduction. Open About, Help, and
+   Settings. Run **Compare two files** through the command palette with no active note and select both fixtures
+   in the pickers. With a fixture active, use the ribbon action to pick the second file. From the file explorer,
+   choose **Compare with active file** on the other fixture and verify the comparison opens directly. Check that
+   the comparison picker omits the desktop drop card. Disable and re-enable the plugin and reopen the comparison.
+2. **Touch review and saving.** Use Automatic layout on a narrow phone. Open `Original.md` on the left and
+   `Comparison.md` on the right. Tap Next/Previous, Ignore, Undo, then Accept. Check the active change and review
+   counts after each action. Verify the target still contains its original wording before Save. Tap Save and
+   verify only the target changes. Restore the notes and repeat with the direction reversed.
+3. **Block review and proposals.** Compare the contiguous-block fixtures. Tap Accept all, Undo, Ignore all, Undo,
+   then Keep both. Check that Undo restores the entire block in one step and Keep both stages target text, one
+   blank separator, then source text. Open **Suggest changes** from an active note, edit and save its change copy,
+   then choose **Accept changes** from the original note. Verify the original changes only when explicitly saved.
+4. **Native clipboard and responsive layout.** Long-press stacked comparison text, extend the selection handles
+   across both changed variants and a shared row, and paste into a scratch note. Expect the selected variants and
+   shared text once each, in reading order, with literal whitespace and without labels, line numbers, or staged
+   deletions. Repeat with a long comparison, rotate with a staged change, and switch layouts at tablet width.
+   Check that the controls remain tappable and review state survives.
+5. **Direct editing and native keyboard.** Open target editing in a wide side-by-side view. Type multi-line text
+   with the software keyboard and compose text with an IME. Switch layouts and rotate with an active selection.
+   Check the caret, native Undo, collapsible source reference, and keyboard visibility. Leave editing and exercise
+   Cancel, Discard, and Save. Compare saved bytes for CRLF, blank lines, Markdown hard breaks, and final blank
+   lines. Repeat for the other target.
+6. **Guarded saving and lifecycle.** Stage a change, background the app, modify the target through a second
+   editor, and resume. Saving must report the conflict and preserve the newer file. Test rename and deletion
+   separately and verify that neither can cause Save to write to the wrong file or recreate a deleted target.
+   Close with an unsaved change and check the prompt. Restart Obsidian with a clean comparison open and verify
+   both files, direction, and layout preference when Obsidian restores the tab.
+7. **Themes, labels, and long paths.** Repeat the picker and touch review in light and dark themes and with a
+   translated UI. Use long filenames and identical filenames in different folders. Verify readable labels,
+   distinguishable paths, and usable file and review controls in portrait and landscape.
+
+Record one result per case and OS with the date, build commit, device or emulator model, OS version,
+Obsidian version, orientation or width, and pass, fail, or untested status. Include reproduction steps for
+failures and state why any device or app-version combination was unavailable. Update the documented compatibility
+if the results establish an app version or platform limitation.

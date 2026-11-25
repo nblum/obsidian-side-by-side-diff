@@ -149,6 +149,16 @@ CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian w
 artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
 selection/clipboard interaction, or external file drop.
 
+### Mobile tests
+
+`tests/mobile-runtime.test.ts` starts the production bundle with a mobile Obsidian API stub that rejects Node and
+Electron imports. `tests/e2e/mobile-review.e2e.ts` uses WebDriver touch input and mobile styling in desktop
+Obsidian to exercise the vault pickers, review actions, and explicit saves in both directions. Run the touch
+suite alone with `npm run test:e2e -- --spec tests/e2e/mobile-review.e2e.ts`.
+
+The [device acceptance checks](docs/concepts/single-column-and-mobile.md#device-acceptance-checks) cover the
+remaining Android and iOS validation.
+
 ### Refreshing documentation screenshots
 
 The opt-in capture suite drives real Obsidian workflows with a dedicated two-note vault. Normal `npm test`,

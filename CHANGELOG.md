@@ -4,6 +4,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Enable vault file comparisons on Android and iOS. Automated checks cover startup with a mobile API stub
+  and touch review in desktop Obsidian. Android and iOS device validation is pending.
+
 ## [0.12.0] - 2026-11-25
 
 ### Fixed

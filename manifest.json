@@ -5,5 +5,5 @@
   "minAppVersion": "1.6.6",
   "description": "Compare notes and text files side by side. A Markdown diff viewer for file comparison, highlighting differences, and selectively merging changes.",
   "author": "Nico Blum",
-  "isDesktopOnly": true
+  "isDesktopOnly": false
 }

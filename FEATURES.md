@@ -111,14 +111,13 @@ visible, can be reviewed and staged individually, and are written only through a
   44-by-44 CSS-pixel targets. Review buttons are at least 44 pixels wide and the direction control uses a
   44-pixel target on both devices. Layout and Save share the theme's desktop input height or a mobile minimum
   of 44 pixels. Save, layout, navigation and review heights remain stable when switching layouts.
-  File labels remain available without hover. Desktop-only runtime modules
-  load only for desktop capabilities; optional desktop tab hooks and external-drop cards are skipped on mobile.
-  These preparations do not yet establish Android/iOS support; the plugin remains declared desktop-only pending
-  device validation.
+  File labels remain available without hover. The manifest enables vault comparisons on Android and iOS.
+  Desktop-only runtime modules load on demand on desktop. Optional desktop tab hooks and external-drop cards
+  are skipped on mobile. Android and iOS device validation is pending.
 
 ### External Markdown sources
 
-- The initial right pane shows a **Drop files** card below **Select right file**. Drop an Obsidian vault file
+- On desktop, the initial right pane shows a **Drop files** card below **Select right file**. Drop an Obsidian vault file
   there to select it on the right, or drop one external `.md` file from the file manager into the comparison.
 - The external file opens on the right, replacing any previous right file. The selected left-hand file stays
   in place; dropping never swaps the panes automatically.

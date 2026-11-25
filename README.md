@@ -14,9 +14,10 @@ and choose which changes to keep. Use it to review a revised draft, compare vers
 - **Choose what to keep:** accept or ignore individual changes or whole blocks.
 - **Edit and save deliberately:** edit the target file directly; changes are written only when you save.
 - **Review a separate draft:** create a proposal copy and later merge selected changes back into the original.
-- **Compare external Markdown:** drop a `.md` file from your computer without importing it into your vault.
+- **Compare external Markdown:** on desktop, drop a `.md` file without importing it into your vault.
 
-Works locally, without an account or network requests. Requires **Obsidian 1.6.6 or later on desktop**.
+Works locally, without an account or network requests. Requires **Obsidian 1.6.6 or later**.
+Vault file comparisons are available on desktop, Android, and iOS. Android and iOS device validation is pending.
 
 ![Side-by-Side Diff comparison view](assets/compare-mode.webp)
 
@@ -24,10 +25,11 @@ Works locally, without an account or network requests. Requires **Obsidian 1.6.6
 
 1. [Add to Obsidian](obsidian://show-plugin?id=side-by-side-diff), or search for `Side-by-Side Diff`
    under **Settings → Community plugins → Browse**. Install and enable the plugin.
-2. Select two text files in Obsidian's file explorer, right-click, and choose `Compare files`.
+2. On desktop, select two text files in Obsidian's file explorer, right-click, and choose `Compare files`.
+   On mobile, run `Compare two files` from the command palette and select both files in the pickers.
 3. Review the highlighted differences. The arrow stages a change from **Source** into **Target** (left to right
    by default). Use `×` to ignore it; both files and their displayed text remain unchanged while the highlight clears.
-4. Click `Save changes` or press `Ctrl/Cmd+S` to write your staged changes.
+4. Choose `Save changes` to write your staged changes. On desktop, you can also press `Ctrl/Cmd+S`.
 
 Use the arrow icon between the file headers to reverse the apply direction without moving the files.
 Accepting a change does not save it immediately.
@@ -67,8 +69,8 @@ The right-file selector lists your five most recently selected right-hand files 
 
 ![Side-by-Side Diff file menu](assets/file-menu.webp)
 
-After choosing the original, its text stays visible on the left. Use **Open file search** to choose the comparison
-on the right, or use the **Drop files** card.
+After choosing the original, its text stays visible in the preview. Use **Open file search** to choose the
+comparison file. On desktop, you can also use the **Drop files** card.
 
 ![Original preview and comparison-file selector](assets/file-selection.png)
 
@@ -184,7 +186,7 @@ The [save-or-discard example](docs/visual-guide.md#handle-unsaved-changes) shows
 
 ## Compare external Markdown
 
-Open a comparison with a vault note, then drag one `.md` file from your computer into the comparison view.
+On desktop, open a comparison with a vault note, then drag one `.md` file from your computer into the comparison view.
 The dropped file opens on the **right**, replacing the previous right-hand file; the left-hand note stays in place.
 You can also drop a vault file onto the **Drop files** card below **Select right file** to select it on the right.
 
