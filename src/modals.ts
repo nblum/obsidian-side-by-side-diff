@@ -48,7 +48,7 @@ export class IntroductionModal extends Modal {
   private currentStep = 0;
 
   /** Creates the localized introduction dialog. */
-  constructor(app: App, translate: Translator) {
+  constructor(app: App, translate: Translator, private readonly showAgentInstructions: () => void) {
     super(app);
     this.translate = translate;
   }
@@ -146,6 +146,9 @@ export class IntroductionModal extends Modal {
     );
     const documentationLinks = documentation.createDiv({ cls: "file-diff-sbs-introduction-links" });
     this.appendExternalLink(documentationLinks, "modal.introduction.welcome.documentation.link", DOCUMENTATION_URL);
+    const agentSetup = this.appendIntroductionSection(parent, "agent.setup.title", "agent.setup.description");
+    const setupButton = agentSetup.createEl("button", { text: this.translate("agent.setup.openAction") });
+    setupButton.addEventListener("click", this.showAgentInstructions);
   }
   /** Describes both file-menu entry points for starting a comparison. */
   private renderStartContent(parent: HTMLElement): void {

@@ -32,6 +32,11 @@ export class FileDiffSettingsTab extends PluginSettingTab {
         action: (): void => { this.plugin.showIntroduction(); }
       },
       {
+        name: this.plugin.translate("agent.setup.title"),
+        desc: this.plugin.translate("agent.setup.description"),
+        action: (): void => { this.plugin.showAgentInstructions(); }
+      },
+      {
         name: this.plugin.translate("settings.language.name"),
         desc: this.plugin.translate("settings.language.description"),
         control: {
@@ -158,6 +163,9 @@ export class FileDiffSettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName(this.plugin.translate("settings.about.name")).setDesc(this.createAboutDescription());
     new Setting(containerEl).setName(this.plugin.translate("settings.introduction.name")).setDesc(this.plugin.translate("settings.introduction.description")).addButton((button) => {
       button.setButtonText(this.plugin.translate("settings.introduction.button")).onClick(() => { this.plugin.showIntroduction(); });
+    });
+    new Setting(containerEl).setName(this.plugin.translate("agent.setup.title")).setDesc(this.plugin.translate("agent.setup.description")).addButton(button => {
+      button.setButtonText(this.plugin.translate("agent.setup.openAction")).onClick(() => { this.plugin.showAgentInstructions(); });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.language.name")).setDesc(this.plugin.translate("settings.language.description")).addDropdown((dropdown) => {
       dropdown.addOption("auto", this.plugin.translate("settings.language.auto")).addOption("de", this.plugin.translate("settings.language.de")).addOption("en", this.plugin.translate("settings.language.en")).addOption("fr", this.plugin.translate("settings.language.fr")).addOption("it", this.plugin.translate("settings.language.it")).addOption("es", this.plugin.translate("settings.language.es")).addOption("pt-BR", this.plugin.translate("settings.language.pt-BR")).addOption("pt-PT", this.plugin.translate("settings.language.pt-PT")).addOption("nl", this.plugin.translate("settings.language.nl")).addOption("zh-CN", this.plugin.translate("settings.language.zh-CN")).setValue(this.plugin.settings.language).onChange(async (value) => {

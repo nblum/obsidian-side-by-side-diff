@@ -49,8 +49,9 @@ visible, can be reviewed and staged individually, and are written only through a
   precedence over that setting. Proposal and acceptance workflows retain their fixed direction.
 - Direction reversal is unavailable during direct editing or with pending changes. After saving or undoing pending
   changes, reversal reopens ignored rows and clears their undo history for a fresh review in the new direction.
-- `Swap` swaps both files and, for proposals, reverses the direction of acceptance. Pending changes are saved or
-  discarded only after confirmation.
+- `Swap` swaps both files and switches between proposing and accepting in the built-in change-copy workflow.
+  CLI reviews keep writing to the original after a swap. Pending changes are saved or discarded only after
+  confirmation.
 - `Refresh` is available in the file context menu and reloads an open comparison view.
 - The scroll position is preserved when staging, ignoring, or saving a change.
 - The right-file selector remembers up to five recently selected files and shows them in a separate recent-files group.
@@ -280,6 +281,34 @@ visible, can be reviewed and staged individually, and are written only through a
 - Simplified Chinese detection supports `zh`, `zh-CN`, `zh-SG`, and `zh-Hans` locales. Traditional Chinese locales
   retain the English fallback.
 - Translations live separately in `locales/`, with the same keys and placeholders across all dictionaries.
+
+### Agent support
+
+- The official desktop CLI registers `side-by-side-diff:compare left=… right=…`,
+  `side-by-side-diff:review original=… proposal=… [side=original-left|original-right]`, and
+  `side-by-side-diff:status` when the CLI plugin API is available (Obsidian 1.12.2+).
+  Enabling the current official CLI requires a compatible desktop installer. The plugin retains its existing
+  minimum Obsidian version for other features.
+- The opening commands require two distinct vault text files at exact vault-relative paths. If a file is on
+  disk, the commands briefly wait for it to appear in Obsidian's index. Ordinary comparisons respect the
+  default apply direction. New CLI reviews put the original on the right by default and stage changes toward
+  the original in either pane order. Writing to the original requires explicit Save.
+- Repeating a review for the same original and proposal focuses the matching review or acceptance tab and
+  preserves its pane order and decisions, including after a swap. JSON success responses for review include
+  `left`, `right`, `vault`, `originalSide` (`left` or `right`), and `reused`.
+- Status returns `{ ok, vault, views }`, with `left`, `right`, `mode`, `originalSide`, `counts` (open, accepted,
+  ignored), and `hasUnsavedChanges` for each open diff tab in the vault. An unset pane has a `null` path.
+  Counts reflect the current review session. After saving, accepted counts clear and ignored decisions remain.
+- The introduction's welcome page and both settings layouts offer the same agent setup dialog. It lets the
+  user choose an existing vault-root `AGENTS.md` or `CLAUDE.md`, or create `AGENTS.md` when neither exists.
+  On case-insensitive filesystems, it uses the spelling of the existing file.
+  The dialog previews the English instructions, including the actual vault name and configured copy suffix.
+- Agent setup reads the app-wide CLI toggle when the desktop runtime exposes it. If the toggle is off, the
+  dialog explains how to enable and register the CLI and can open Obsidian's General tab. The official setup
+  guide is available if the status or shortcut is unavailable. Users verify registration in their terminal.
+- The user confirms every write. Repeat setup replaces only the marked plugin section and skips an identical
+  update. Ambiguous markers prevent writing. If the selected file changes after the preview, the dialog
+  asks for confirmation again with the new preview.
 
 ## Access points in Obsidian
 

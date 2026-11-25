@@ -94,6 +94,13 @@ OBSIDIAN_VERSION=latest npm run test:e2e
 OBSIDIAN_VERSION=1.6.7 npm run test:e2e
 ```
 
+The agent CLI scenarios require both a recent app and a recent installer. To run the agent suite with the
+current public release and its installer:
+
+```bash
+OBSIDIAN_VERSION=latest OBSIDIAN_INSTALLER_VERSION=latest npm run test:e2e -- --spec tests/e2e/agent-support.e2e.ts
+```
+
 On Linux, E2E tests use a private Xvfb display with Openbox by default, even when a desktop display is available.
 Linux tests and screenshot captures also use a private runtime directory to protect the live Obsidian CLI socket.
 Install `xvfb`, `openbox`, `xauth`, and Electron's system libraries once. The runner also recognizes locally
@@ -112,6 +119,10 @@ The suite exercises both file pickers, inline differences, staging, undo, ignore
 explicit saving, external-change conflicts, the unsaved-change prompt when swapping, and direct editing and
 keyboard saving into either target pane. Saved content is checked directly on disk. Failed tests save an
 application screenshot alongside runner logs in `e2e-results/`.
+
+The agent suite checks both CLI pane orders, original identity after swapping, reuse of inactive review tabs,
+and JSON status before and after decisions, saving, and closing a tab. It also verifies which file is saved
+and which file the existing cleanup prompt offers to trash.
 
 The layout suite also exercises the narrow initial picker, the actual layout-default setting and its persisted
 value, logical scroll anchors and keyboard focus across Auto transitions, and Save/Don't save when entering the

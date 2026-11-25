@@ -4,3 +4,4 @@ export const KO_FI_URL = "https://ko-fi.com/blumnico";
 export const GITHUB_REPOSITORY_URL = "https://github.com/nblum/obsidian-side-by-side-diff";
 export const GITHUB_FEEDBACK_URL = `${GITHUB_REPOSITORY_URL}/issues/new`;
 export const DOCUMENTATION_URL = `${GITHUB_REPOSITORY_URL}/blob/main/README.md`;
+export const OBSIDIAN_CLI_GUIDE_URL = "https://obsidian.md/help/cli";

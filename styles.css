@@ -289,11 +289,51 @@ body.is-mobile .file-diff-sbs-root {
 }
 
 .file-diff-sbs-delete-actions,
+.file-diff-sbs-agent-actions,
 .file-diff-sbs-unsaved-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: 0.5rem;
 	margin-top: 1rem;
+}
+
+.file-diff-sbs-agent-actions {
+	flex-wrap: wrap;
+}
+
+.file-diff-sbs-agent-destination {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.file-diff-sbs-agent-cli {
+	margin-block: 0 1rem;
+	padding: 0.75rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+}
+
+.file-diff-sbs-agent-cli p {
+	margin-block: 0.35rem 0.65rem;
+}
+
+.file-diff-sbs-agent-cli-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.file-diff-sbs-agent-preview {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	overflow: auto;
+	max-height: 40vh;
+	padding: 0.75rem;
+	background: var(--background-secondary);
+	border-radius: var(--radius-s);
 }
 
 .file-diff-sbs-introduction-modal {

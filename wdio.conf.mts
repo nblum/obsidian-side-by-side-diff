@@ -15,7 +15,7 @@ export const config: WebdriverIO.Config = {
     "wdio:obsidianOptions": {
       // minAppVersion 1.6.6 was Insider-only; 1.6.7 is the first public release after it.
       appVersion: process.env.OBSIDIAN_VERSION ?? "1.6.7",
-      installerVersion: "earliest",
+      installerVersion: process.env.OBSIDIAN_INSTALLER_VERSION ?? "earliest",
       // Enable only after installing deterministic settings in the sandbox.
       plugins: [{ path: ".", enabled: false }],
       vault: "tests/e2e/vault",

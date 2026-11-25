@@ -48,6 +48,7 @@ Obsidian notifications.
 - [Compare external Markdown](#compare-external-markdown)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Settings and language](#settings-and-language)
+- [Review changes proposed by AI agents](#review-changes-proposed-by-ai-agents)
 - [Open a comparison with a link](#open-a-comparison-with-a-link)
 - [Manual installation](#manual-installation)
 - [Privacy and permissions](#privacy-and-permissions)
@@ -230,6 +231,40 @@ The following shortcuts are available while a comparison view has focus:
   Supported languages are English, German, French, Italian, Spanish, Brazilian Portuguese, European Portuguese,
   Dutch, and Simplified Chinese. `Automatic` follows your Obsidian language, with English as the fallback.
   Traditional Chinese currently falls back to English.
+
+## Review changes proposed by AI agents
+
+Open **Settings → Side-by-Side Diff → Set up agent instructions**, or use **Set up** on the introduction’s
+welcome page. Preview the instructions before adding them to an existing vault-root `AGENTS.md` or
+`CLAUDE.md`. If neither exists, the plugin offers to create `AGENTS.md`.
+
+The setup dialog shows whether the Obsidian CLI is turned on. If it is off, choose **Open General settings**
+to turn it on and complete registration. The dialog also links to the official CLI setup guide.
+
+Run Obsidian with the [official CLI](https://obsidian.md/help/cli) enabled and a desktop installer version
+of **1.12.7 or later**. Check that the running app recognizes the command with
+`obsidian vault="Research" help side-by-side-diff:review`. An agent can then write its proposed revision
+to a separate vault file and open it for review:
+
+```bash
+obsidian vault="Research" side-by-side-diff:review \
+  original="Notes/Plan.md" proposal="Notes/Plan_changes_20261120-143000.md"
+```
+
+The original opens on the right by default. Pass `side=original-left` to open it on the left, or
+`side=original-right` to select the default explicitly. Accept the changes you want, then save them into
+the original. Opening the same review again focuses its existing tab and keeps its pane order and decisions.
+The JSON response includes the displayed `left` and `right` paths, `originalSide`, and `reused`.
+
+Run `obsidian vault="Research" side-by-side-diff:status` to see the paths, mode, review counts, and unsaved
+state of open diff tabs. Counts describe the current session. Saving clears accepted counts and retains
+ignored decisions. For an ordinary comparison, use `side-by-side-diff:compare left=… right=…`. Use exact
+paths relative to the vault, including file extensions.
+
+If the CLI cannot connect, enable **Command line interface** under **Settings → General → Advanced** and
+complete Obsidian's CLI registration. On Linux, use `~/.local/bin/obsidian` if `obsidian` on your PATH
+resolves to a desktop launcher. If the registered CLI still cannot connect while the app is running, save
+any pending work, fully quit and reopen Obsidian, then retry the help command.
 
 ## Open a comparison with a link
 

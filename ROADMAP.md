@@ -46,6 +46,15 @@ for implementation. Once shipped, update the feature reference and changelog and
   layout alone does not establish mobile support.
 - **Reference:** [Single-column layout and mobile support plan](docs/concepts/single-column-and-mobile.md).
 
+### Agent support
+
+- **Status:** Implemented; pending release.
+- **Benefit:** Agents can hand off an edited draft directly to the user's diff view.
+- **Scope:** Official Obsidian CLI commands for comparisons and proposal reviews within a vault, including
+  pane order, review tab reuse, and open diff status. Optional agent instructions are available from settings
+  and the introduction.
+- **Reference:** [Agent support requirements](FEATURES.md#agent-support).
+
 ## Later
 
 ### Mobile support

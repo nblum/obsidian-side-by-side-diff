@@ -624,6 +624,19 @@ test("proposal workflows cannot reverse merging and direct editing follows the s
 	assert.equal(view.targetPath, "left.md");
 });
 
+test("a review with its original on the left accepts individual and grouped changes only into the original", async () => {
+	const { view, session } = createView(["Left 1", "Left 2", "Left 3"], ["Right 1", "Right 2", "Right 3"]);
+	await view.setState({ ...view.state, mode: "review", originalSide: "left" }, { history: false });
+	await view.applyRowChange(0, "left-to-right");
+	await view.applyGroupChange(0, 2, "left-to-right");
+	assert.equal(session.hasPendingChanges(), false);
+	await view.applyRowChange(0, "right-to-left");
+	assert.deepEqual(session.getReviewCounts(), { open: 2, accepted: 1, ignored: 0 });
+	await view.applyGroupChange(1, 2, "right-to-left");
+	assert.deepEqual(session.getReviewCounts(), { open: 0, accepted: 3, ignored: 0 });
+	assert.deepEqual(session.getPendingChanges(), [{ path: "left.md", content: "Right 1\nRight 2\nRight 3" }]);
+});
+
 test("row buttons and keyboard acceptance use the displayed direction and target", async () => {
 	const { view, rendered } = createView(["old"], ["new"]);
 	await view.setState({ ...view.state, direction: "right-to-left" }, { history: false });

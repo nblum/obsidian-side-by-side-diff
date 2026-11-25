@@ -14,7 +14,7 @@ test("parses only supported persisted comparison state", () => {
 		editRight: true,
 		mode: "accept",
 		direction: "left-to-right",
-		originalSide: "left",
+		originalSide: "right",
 		layout: "auto"
 	});
 
@@ -39,6 +39,27 @@ test("swaps paths and proposal direction while leaving edit mode disabled", () =
 		originalSide: "right",
 		layout: "auto"
 	});
+});
+
+test("restores legacy acceptance tabs with the original on the right before and after swapping", () => {
+	const state = parseDiffViewState({ leftPath: "draft.md", rightPath: "original.md", mode: "accept", originalSide: "left" });
+	assert.equal(state.originalSide, "right");
+	const swapped = swapDiffViewState(state);
+	assert.equal(swapped.mode, "proposal");
+	assert.equal(swapped.leftPath, "original.md");
+	assert.equal(swapped.originalSide, "left");
+});
+
+test("keeps a CLI review pointed at its original when switching panes", () => {
+	const state = parseDiffViewState({ leftPath: "draft.md", rightPath: "original.md", mode: "review" }, "right-to-left");
+	assert.equal(state.direction, "left-to-right");
+	assert.equal(state.originalSide, "right");
+	const swapped = swapDiffViewState(state);
+	assert.equal(swapped.mode, "review");
+	assert.equal(swapped.leftPath, "original.md");
+	assert.equal(swapped.originalSide, "left");
+	assert.equal(swapped.direction, "right-to-left");
+	assert.deepEqual(parseDiffViewState(swapped), swapped);
 });
 
 test("keeps regular comparisons regular when swapping panes", () => {

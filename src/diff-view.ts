@@ -21,6 +21,7 @@ import { parseDiffViewState, swapDiffViewState, type DiffViewState } from "./dif
 import { writePendingChanges, type FileSaveResult, type PendingSaveResult } from "./pending-save";
 import { createPendingTargetPreview, type PendingTargetPreview } from "./pending-diff";
 import type { Language } from "./i18n";
+import type { ReviewCounts } from "./review-state";
 import { HelpModal } from "./help-modal";
 
 export type { PaneMode } from "./diff-view-state";
@@ -211,7 +212,7 @@ export class SideBySideDiffView extends ItemView {
 
   /** Keeps proposal workflows fixed while allowing ordinary comparisons to merge either way. */
   get applyDirection(): DiffDirection {
-    return this.state.mode === "compare" && this.state.direction === "right-to-left" ? "right-to-left" : "left-to-right";
+    return this.state.direction ?? "left-to-right";
   }
 
   /** Resolves the current target without changing either file's physical position. */
@@ -1001,6 +1002,10 @@ export class SideBySideDiffView extends ItemView {
     const editorChanged = this.state.editRight && this.rightEditorState !== null && this.serializeRightEditor(this.rightEditorState.editor) !== this.rightEditorState.initialValue;
     return hasUnsavedComparisonChanges(editorChanged, this.hasPendingChanges());
   }
+  /** Returns the current session's changed-line counts for the toolbar and CLI. */
+  getReviewCounts(): ReviewCounts {
+    return this.session.getReviewCounts();
+  }
   /** Writes all current changes without rebuilding the view during close. */
   async saveChangesBeforeClose(): Promise<boolean> {
     try {
@@ -1403,7 +1408,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Stages one changed aligned row for saving instead of modifying a file immediately. */
   async applyRowChange(rowIndex: number, direction: DiffDirection): Promise<void> {
-    if (this.state.mode !== "compare" && direction !== "left-to-right") return;
+    if (this.state.mode !== "compare" && direction !== this.applyDirection) return;
     const scrollPosition = this.getScrollPosition();
     const targetPosition = this.getChangeTargetPosition(rowIndex);
     const leftPath = this.state.leftPath;
@@ -1444,7 +1449,7 @@ export class SideBySideDiffView extends ItemView {
       this.session.stageChange(targetFile.path, joinLines(targetLines, targetContent), targetBaseline, [rowIndex]);
       await this.renderDiff(scrollPosition);
       this.showReviewFeedback("notice.staged");
-      if (this.state.mode === "accept" && direction === "left-to-right") {
+      if (this.state.mode === "accept" || this.state.mode === "review") {
         this.session.markProposalChangeAccepted();
       }
       this.advanceAfterResolvedChange(targetPosition);
@@ -1455,7 +1460,7 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Stages every changed row inside a bridged block at once, in the same direction. */
   async applyGroupChange(startIndex: number, endIndex: number, direction: DiffDirection, action: "accept" | "keep-both" = "accept"): Promise<void> {
-    if (this.state.mode !== "compare" && direction !== "left-to-right") return;
+    if (this.state.mode !== "compare" && direction !== this.applyDirection) return;
     const scrollPosition = this.getScrollPosition();
     const targetPosition = this.getChangeTargetPosition(startIndex);
     const leftPath = this.state.leftPath;
@@ -1504,7 +1509,7 @@ export class SideBySideDiffView extends ItemView {
       }
       await this.renderDiff(scrollPosition);
       this.showReviewFeedback("notice.staged");
-      if (this.state.mode === "accept" && direction === "left-to-right") {
+      if (this.state.mode === "accept" || this.state.mode === "review") {
         this.session.markProposalChangeAccepted();
       }
       this.advanceAfterResolvedChange(targetPosition);
@@ -1574,21 +1579,11 @@ export class SideBySideDiffView extends ItemView {
   }
   /** Returns pane labels for proposal, acceptance and regular comparison modes. */
   getPaneLabels(): { left: string; right: string } {
-    if (this.state.mode === "proposal") {
-      return {
-        left: this.translate("view.labels.original"),
-        right: this.translate("view.labels.proposal")
-      };
-    }
-    if (this.state.mode === "accept") {
-      return {
-        left: this.translate("view.labels.proposal"),
-        right: this.translate("view.labels.original")
-      };
-    }
+    const original = this.translate("view.labels.original");
+    const other = this.translate(this.state.mode === "compare" ? "view.labels.comparison" : "view.labels.proposal");
     return {
-      left: this.translate(this.state.originalSide === "right" ? "view.labels.comparison" : "view.labels.original"),
-      right: this.translate(this.state.originalSide === "right" ? "view.labels.original" : "view.labels.comparison")
+      left: this.state.originalSide === "right" ? other : original,
+      right: this.state.originalSide === "right" ? original : other
     };
   }
   /** Renders one file without diff decorations while the other pane is pending. */
@@ -1616,7 +1611,7 @@ export class SideBySideDiffView extends ItemView {
       ? createComparisonModelFromLines(leftLines, rightLines, this.comparisonOptions).rows
       : this.session.getReviewRows(leftLines, rightLines, this.comparisonOptions, this.applyDirection);
     const changedRows = rows.filter((row) => !row.equal);
-    const counts = this.session.getReviewCounts();
+    const counts = this.getReviewCounts();
     const visibleChangedCount = counts.open;
     const summary = this.state.editRight
       ? this.translate(changedRows.length === 1 ? "view.summary.changedOne" : "view.summary.changedMany", { count: changedRows.length })
@@ -2016,20 +2011,20 @@ export class SideBySideDiffView extends ItemView {
     if (!this.session.hasEqualContents() || this.session.hasShownProposalCleanupPrompt() || !shouldOfferProposalCleanup(this.state.mode, this.session.hasAcceptedProposalChanges(), this.session.getDismissedRowCount(), this.hasPendingChanges())) {
       return;
     }
-    const leftPath = this.state.leftPath;
-    const rightPath = this.state.rightPath;
-    if (leftPath === null || rightPath === null) {
+    const originalPath = this.targetPath;
+    const proposalPath = this.applyDirection === "left-to-right" ? this.state.leftPath : this.state.rightPath;
+    if (originalPath === null || proposalPath === null) {
       return;
     }
-    const leftFile = this.getComparisonFile(leftPath);
-    const rightFile = this.getComparisonFile(rightPath);
-    if (!(leftFile instanceof TFile) || !(rightFile instanceof TFile) || !this.isChangeCopyFile(leftFile, rightFile)) {
+    const originalFile = this.getComparisonFile(originalPath);
+    const proposalFile = this.getComparisonFile(proposalPath);
+    if (!(proposalFile instanceof TFile) || !(originalFile instanceof TFile) || !this.isChangeCopyFile(proposalFile, originalFile)) {
       return;
     }
     this.session.markProposalCleanupPromptShown();
-    this.confirmDeleteChangeCopy(leftFile);
+    this.confirmDeleteChangeCopy(proposalFile);
   }
-  /** Checks whether the left file is the configured suffix copy of the original. */
+  /** Checks whether the file is the configured suffix copy of the original. */
   isChangeCopyFile(file: TFile, originalFile: TFile): boolean {
     const expectedPrefix = `${originalFile.basename}${this.plugin.settings.changeCopySuffix}`;
     return file.path !== originalFile.path

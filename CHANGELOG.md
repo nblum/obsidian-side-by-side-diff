@@ -10,6 +10,11 @@ All notable changes to Side-by-Side Diff are documented here.
 - Preserve unsaved editor text when a compared file changes externally. A conflicting save keeps the live editor
   open without overwriting the external change.
 - Let toolbar buttons handle Enter during direct editing instead of inserting a line into the target.
+- Keep the reported Original pane consistent with acceptance view labels when opening and swapping the files.
+- Wait briefly for newly written files to appear in the vault index before opening CLI comparisons or reviews.
+  Reuse swapped acceptance tabs and refresh CLI help after a plugin language change.
+- Use existing instruction filenames on case-insensitive filesystems, handle pending index conflicts, and
+  recognize managed markers with trailing whitespace. Close the setup dialog when General settings opens.
 - Remove the isolated Obsidian test runtime directory when the runner receives SIGINT or SIGTERM.
 
 ### Changed
@@ -23,6 +28,11 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Added
 
+- Open comparisons and proposal reviews directly from the official Obsidian CLI. Set up vault instructions
+  for AI agents from settings or the introduction, with a preview before creating or updating the file.
+- Choose the Original pane when opening a CLI review. Reopen the same pair to focus its existing tab, and
+  query open diff tabs and review progress as JSON.
+- Show whether the Obsidian CLI is on during agent setup, with a shortcut to General settings and a setup guide.
 - Add an icon-only Automatic / Side by side / Single column switch beside Save and a default-layout setting.
   Automatic stacks variants below 720 pixels. Preferences persist per comparison; transitions preserve staged
   changes, decisions, undo, scroll position, focus and the live editor.

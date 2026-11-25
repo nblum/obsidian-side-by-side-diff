@@ -1,5 +1,5 @@
 import { Notice, Platform, Plugin, TFile, addIcon, moment, requireApiVersion } from "obsidian";
-import type { Command, Menu, TAbstractFile } from "obsidian";
+import type { CliData, CliFlags, CliHandler, Command, Menu, TAbstractFile } from "obsidian";
 import { FilePickerModal, IntroductionModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
 import { isTextFile, VIEW_TYPE } from "./file-utils";
@@ -11,7 +11,13 @@ import { rememberRecentFilePath } from "./recent-files";
 import { validateComparisonProtocolRequest } from "./protocol";
 import { extendTabMenus } from "./tab-context-menu";
 import { registerDiffLayoutIcons } from "./layout-icons";
+import { AGENT_CLI_COMMANDS, getAgentCliFlags, matchesAgentReview, parseAgentCliPaths, updateAgentCliHelp } from "./agent-cli";
+import type { AgentAction, AgentCliError } from "./agent-cli";
+import { AgentInstructionsModal } from "./agent-instructions-modal";
+import { parseDiffViewState, type OriginalSide } from "./diff-view-state";
 const ICON_ID = "square-split-horizontal";
+const AGENT_VAULT_INDEX_WAIT_MS = 1_000;
+const AGENT_VAULT_INDEX_CHECK_MS = 50;
 
 /** Formats a timestamp for deterministic change-copy names. */
 function formatCopyTimestamp(date: Date): string {
@@ -25,6 +31,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
   translator: Translator = createTranslator("en");
   ribbonIconEl: HTMLElement | null = null;
   commandEntries: Command[] = [];
+  private agentReviewQueue: Promise<void> = Promise.resolve();
+  private refreshAgentCliHelp?: () => void;
 
   /** Loads settings and registers the view, commands and ribbon action. */
   override async onload(): Promise<void> {
@@ -34,6 +42,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
     this.registerObsidianProtocolHandler("side-by-side-diff", (params) => {
       void this.openProtocolComparison(params);
     });
+    this.registerAgentCli();
     this.ribbonIconEl = this.addRibbonIcon(
       ICON_ID,
       this.translate("ribbon.compareTwoFiles"),
@@ -158,7 +167,11 @@ export class FileDiffSideBySidePlugin extends Plugin {
   }
   /** Opens the guided introduction after the workspace can display modal dialogs. */
   showIntroduction(): void {
-    new IntroductionModal(this.app, this.translator).open();
+    new IntroductionModal(this.app, this.translator, () => { this.showAgentInstructions(); }).open();
+  }
+  /** Opens the same opt-in setup from settings and the introduction. */
+  showAgentInstructions(): void {
+    new AgentInstructionsModal(this.app, this.translator, this.settings.changeCopySuffix).open();
   }
   /** Saves changes in the currently active comparison view. */
   saveActiveComparison(): void {
@@ -224,6 +237,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
     const ribbonLabel = this.translate("ribbon.compareTwoFiles");
     this.ribbonIconEl?.setAttribute("aria-label", ribbonLabel);
     this.ribbonIconEl?.setAttribute("title", ribbonLabel);
+    this.refreshAgentCliHelp?.();
   }
   /** Persists the current plugin settings in the vault configuration. */
   async saveSettings(): Promise<void> {
@@ -366,26 +380,132 @@ export class FileDiffSideBySidePlugin extends Plugin {
     }
     await this.openDiffView(left, right);
   }
+  /** Registers parameterized CLI commands where the public desktop API exists. */
+  private registerAgentCli(): void {
+    if (requireApiVersion("1.12.2") && typeof this.registerCliHandler === "function" && !Platform.isMobileApp) {
+      const getFlags = (action: keyof typeof AGENT_CLI_COMMANDS): CliFlags | null => action === "status"
+        ? null : getAgentCliFlags(action, argument => this.translate(`agent.cli.${argument}`));
+      const handlers = {
+        compare: (params): Promise<string> => this.openAgentDiff("compare", params),
+        review: (params): Promise<string> => this.openAgentDiff("review", params),
+        status: (): Promise<string> => this.getAgentDiffStatus()
+      } satisfies Record<keyof typeof AGENT_CLI_COMMANDS, CliHandler>;
+      const actions = ["compare", "review", "status"] as const;
+      for (const action of actions) {
+        this.registerCliHandler(AGENT_CLI_COMMANDS[action], this.translate(`agent.cli.${action}`), getFlags(action), handlers[action]);
+      }
+      this.refreshAgentCliHelp = (): void => {
+        for (const action of actions) {
+          const description = `[${this.manifest.name}]: ${this.translate(`agent.cli.${action}`)}`;
+          updateAgentCliHelp(this.app, AGENT_CLI_COMMANDS[action], handlers[action], description, getFlags(action));
+        }
+      };
+    }
+  }
+  /** Gives externally written files a short window to appear in Obsidian's vault index. */
+  private async findAgentFile(path: string): Promise<TFile | null> {
+    const vault = this.app.vault;
+    let file = vault.getAbstractFileByPath(path);
+    if (!file) {
+      const exists = await vault.adapter.exists(path, true).catch(() => false);
+      file = vault.getAbstractFileByPath(path);
+      const deadline = performance.now() + AGENT_VAULT_INDEX_WAIT_MS;
+      while (!file && exists && performance.now() < deadline) {
+        await new Promise<void>(resolve => { setTimeout(resolve, AGENT_VAULT_INDEX_CHECK_MS); });
+        file = vault.getAbstractFileByPath(path);
+      }
+    }
+    return file instanceof TFile && file.path === path ? file : null;
+  }
+  /** Resolves both indexed vault files and returns the result to the invoking agent. */
+  private async openAgentDiff(action: AgentAction, params: CliData): Promise<string> {
+    const request = parseAgentCliPaths(action, params);
+    if (!request.ok) return JSON.stringify(request);
+    const { left, right, originalSide, arguments: [leftArg, rightArg] } = request;
+    await new Promise<void>(resolve => { this.app.workspace.onLayoutReady(resolve); });
+    const [leftFile, rightFile] = await Promise.all([this.findAgentFile(left), this.findAgentFile(right)]);
+    if (!leftFile) {
+      return JSON.stringify({ ok: false, error: "file_not_found", argument: leftArg } satisfies AgentCliError);
+    }
+    if (!rightFile) {
+      return JSON.stringify({ ok: false, error: "file_not_found", argument: rightArg } satisfies AgentCliError);
+    }
+    if (!isTextFile(leftFile) || !isTextFile(rightFile)) {
+      const argument = isTextFile(leftFile) ? rightArg : leftArg;
+      return JSON.stringify({ ok: false, error: "not_a_text_file", argument } satisfies AgentCliError);
+    }
+    if (action === "review") {
+      // Let the previous open finish publishing its view state before looking for duplicates.
+      const review = this.agentReviewQueue.then(() => this.openAgentReview(leftFile, rightFile, originalSide));
+      this.agentReviewQueue = review.then(() => undefined, () => undefined);
+      return review;
+    }
+    const opened = await this.openDiffView(leftFile, rightFile);
+    return JSON.stringify(opened
+      ? { ok: true, action, vault: this.app.vault.getName(), left, right }
+      : { ok: false, error: "view_open_failed" } satisfies AgentCliError);
+  }
+  /** Reuses a matching review without replacing its live state, or opens the requested pane order. */
+  private async openAgentReview(leftFile: TFile, rightFile: TFile, originalSide: OriginalSide): Promise<string> {
+    const workspace = this.app.workspace;
+    const [original, proposal] = originalSide === "left" ? [leftFile, rightFile] : [rightFile, leftFile];
+    const existing = workspace.getLeavesOfType(VIEW_TYPE).find(leaf =>
+      matchesAgentReview(parseDiffViewState(leaf.getViewState().state), original.path, proposal.path)
+    );
+    const success = { ok: true, action: "review", vault: this.app.vault.getName() };
+    const failure = { ok: false, error: "view_open_failed" } satisfies AgentCliError;
+    if (existing) {
+      try {
+        if (requireApiVersion("1.7.2")) await workspace.revealLeaf(existing);
+        workspace.setActiveLeaf(existing, { focus: true });
+        const state = parseDiffViewState(existing.getViewState().state);
+        return JSON.stringify({ ...success, left: state.leftPath, right: state.rightPath, originalSide: state.originalSide, reused: true });
+      } catch (error) {
+        console.error("[Side-by-Side Diff] Could not focus the review", error);
+        return JSON.stringify(failure);
+      }
+    }
+    const opened = await this.openDiffView(leftFile, rightFile, false, "review", originalSide);
+    return JSON.stringify(opened ? { ...success, left: leftFile.path, right: rightFile.path, originalSide, reused: false } : failure);
+  }
+  /** Reports session state for every open diff without changing the active tab. */
+  private async getAgentDiffStatus(): Promise<string> {
+    const workspace = this.app.workspace;
+    await new Promise<void>(resolve => { workspace.onLayoutReady(resolve); });
+    if (requireApiVersion("1.7.2")) {
+      const leaves = workspace.getLeavesOfType(VIEW_TYPE);
+      await Promise.all(leaves.map(leaf => leaf.loadIfDeferred()));
+    }
+    const views = workspace.getLeavesOfType(VIEW_TYPE).flatMap(({ view }) => {
+      if (!(view instanceof SideBySideDiffView)) return [];
+      const { leftPath, rightPath, mode, originalSide } = view.state;
+      return [{ left: leftPath, right: rightPath, mode, originalSide: originalSide ?? "left",
+        counts: view.getReviewCounts(), hasUnsavedChanges: view.hasUnsavedChanges() }];
+    });
+    return JSON.stringify({ ok: true, vault: this.app.vault.getName(), views });
+  }
   /** Opens the comparison in a new split leaf, optionally awaiting the right file. */
-  async openDiffView(leftFile: TFile, rightFile: TFile | null = null, editRight = false, mode: PaneMode = "compare"): Promise<void> {
+  async openDiffView(leftFile: TFile, rightFile: TFile | null = null, editRight = false, mode: PaneMode = "compare", originalSide?: OriginalSide): Promise<boolean> {
     if (rightFile && leftFile.path === rightFile.path) {
       new Notice(this.translate("notice.differentFiles"));
-      return;
+      return false;
     }
     try {
       const leaf = this.app.workspace.getLeaf(true);
       await leaf.setViewState({
         type: VIEW_TYPE,
         active: true,
-        state: { leftPath: leftFile.path, rightPath: rightFile === null ? null : rightFile.path, editRight, mode }
+        state: { leftPath: leftFile.path, rightPath: rightFile?.path ?? null, editRight, mode, ...(originalSide === undefined ? {} : { originalSide }) }
       });
       // Guard the foregrounding API so the declared minimum version remains supported.
       if (requireApiVersion("1.7.2")) {
         await this.app.workspace.revealLeaf(leaf);
       }
+      return true;
     } catch (error) {
       console.error("Side-by-Side Diff konnte die Ansicht nicht \xF6ffnen.", error);
       new Notice(this.translate("notice.viewOpenFailed"));
+      return false;
     }
   }
 }
