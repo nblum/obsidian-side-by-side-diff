@@ -95,6 +95,7 @@ OBSIDIAN_VERSION=1.6.7 npm run test:e2e
 ```
 
 On Linux, E2E tests use a private Xvfb display with Openbox by default, even when a desktop display is available.
+Linux tests and screenshot captures also use a private runtime directory to protect the live Obsidian CLI socket.
 Install `xvfb`, `openbox`, `xauth`, and Electron's system libraries once. The runner also recognizes locally
 extracted tools under the ignored `.obsidian-cache/headless/usr/` directory. It exits with a dependency message
 if a required tool is missing; it never falls back to opening windows on your desktop.

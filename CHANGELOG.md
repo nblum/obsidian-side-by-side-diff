@@ -10,6 +10,7 @@ All notable changes to Side-by-Side Diff are documented here.
 - Preserve unsaved editor text when a compared file changes externally. A conflicting save keeps the live editor
   open without overwriting the external change.
 - Let toolbar buttons handle Enter during direct editing instead of inserting a line into the target.
+- Remove the isolated Obsidian test runtime directory when the runner receives SIGINT or SIGTERM.
 
 ### Changed
 

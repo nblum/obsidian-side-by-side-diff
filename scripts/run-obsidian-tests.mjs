@@ -1,10 +1,11 @@
-import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { delimiter, resolve } from "node:path";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Runs Obsidian on an isolated display by default on Linux, with an explicit visible debug mode. */
-export function runObsidianTests(args = process.argv.slice(2)) {
+export async function runObsidianTests(args = process.argv.slice(2)) {
   const wdio = resolve("node_modules/@wdio/cli/bin/wdio.js");
   const command = [wdio, "run", ...args];
   const env = { ...process.env };
@@ -37,9 +38,46 @@ export function runObsidianTests(args = process.argv.slice(2)) {
       "obsidian-tests", process.execPath, ...command,
     ];
   }
-  const result = spawnSync(executable, childArgs, { env, stdio: "inherit" });
-  if (result.error) console.error(result.error.message);
-  return result.status ?? 1;
+  // Even a capture with an older installer can bind Obsidian's app-wide CLI socket.
+  const runtimeDir = process.platform === "linux" ? mkdtempSync(join(tmpdir(), "sbs-obsidian-runtime-")) : null;
+  if (runtimeDir !== null) {
+    if (env.E2E_HEADED === "1" && env.XDG_RUNTIME_DIR && env.WAYLAND_DISPLAY && !isAbsolute(env.WAYLAND_DISPLAY)) {
+      env.WAYLAND_DISPLAY = join(env.XDG_RUNTIME_DIR, env.WAYLAND_DISPLAY);
+    }
+    env.XDG_RUNTIME_DIR = runtimeDir;
+  }
+  try {
+    const separateProcessGroup = process.platform !== "win32";
+    const child = spawn(executable, childArgs, { env, stdio: "inherit", detached: separateProcessGroup });
+    let interrupted;
+    const interrupt = (signal, exitCode) => {
+      interrupted ??= exitCode;
+      if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+      try {
+        // The display wrapper and Electron processes also need the signal.
+        if (separateProcessGroup) process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch (error) {
+        if (error.code !== "ESRCH") console.error(error.message);
+      }
+    };
+    const onInterrupt = () => { interrupt("SIGINT", 130); };
+    const onTerminate = () => { interrupt("SIGTERM", 143); };
+    process.on("SIGINT", onInterrupt);
+    process.on("SIGTERM", onTerminate);
+    try {
+      const status = await new Promise(resolve => {
+        child.on("error", error => { console.error(error.message); });
+        child.once("close", resolve);
+      });
+      return interrupted ?? status ?? 1;
+    } finally {
+      process.off("SIGINT", onInterrupt);
+      process.off("SIGTERM", onTerminate);
+    }
+  } finally {
+    if (runtimeDir !== null) rmSync(runtimeDir, { recursive: true, force: true });
+  }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = runObsidianTests();
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await runObsidianTests();
