@@ -4,6 +4,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-25
+
 ### Added
 
 - Enable vault file comparisons on Android and iOS. Automated checks cover startup with a mobile API stub
