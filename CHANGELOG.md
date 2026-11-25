@@ -4,6 +4,8 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-25
+
 ### Fixed
 
 - Refresh open settings immediately after changing language and reject invalid proposal-copy suffixes consistently
