@@ -6,13 +6,14 @@ Contributions should therefore stay small, reviewable, and focused on the compar
 ## Development environment
 
 - Obsidian `1.6.6` or later for manual UI checks
-- Node.js 22.6 or later for `node:test` with TypeScript support
+- The Node.js version pinned in [`.nvmrc`](.nvmrc), shared by local builds and CI
 - npm for building, type-checking, linting, and testing
 
-Install the local development dependencies once:
+Install the locked development dependencies:
 
 ```bash
-npm install
+nvm use
+npm ci
 ```
 
 Development happens directly in the plugin folder. For a manual check, the folder must live as
@@ -21,10 +22,13 @@ files in `src/`, run `npm run build` first, then reload the plugin view or Obsid
 
 ## Before making a change
 
-1. Read [README.md](README.md) for an overview and [FEATURES.md](FEATURES.md) for the current scope.
-2. Check `git status` to see whether the working tree already has changes.
-3. Look for existing tests and similar flows before adding new logic.
-4. Keep the change limited to the affected area.
+1. Read the shared Obsidian plugin checklist at the absolute path stored in the local
+   `.obsidian-plugin-rules` file. Put that path on one line when setting up a checkout. The reference is ignored by
+   Git. Ask for the note's location if the reference or its target is missing.
+2. Read [README.md](README.md) for an overview and [FEATURES.md](FEATURES.md) for the current scope.
+3. Check `git status` to see whether the working tree already has changes.
+4. Look for existing tests and similar flows before adding new logic.
+5. Keep the change limited to the affected area.
 
 Use the [implementation checklist](docs/implementation-checklist.md) to track coding, styles, existing and new
 tests, and reviews of the changelog, feature reference, README, and roadmap.
@@ -82,7 +86,7 @@ npm run test:e2e
 This builds the production plugin, then uses
 [WDIO Obsidian Service](https://jesse-r-s-hines.github.io/wdio-obsidian-service/wdio-obsidian-service/README.html)
 to download Obsidian and its matching WebDriver into the ignored `.obsidian-cache/` directory. The first run
-requires network access. Use a current Node.js 22.x or 24.x release for the WebdriverIO dependencies.
+requires network access. Use the pinned Node.js version for the WebdriverIO dependencies.
 Every test opens a fresh temporary copy of `tests/e2e/vault/` with isolated application configuration and English
 plugin settings. Tests never open your personal vault or modify the committed fixtures.
 
@@ -90,7 +94,7 @@ By default the suite uses Obsidian `1.6.7`, the oldest public release after the 
 `1.6.6`. No Insider account is needed. To check the latest stable app or another public version instead (POSIX shell):
 
 ```bash
-OBSIDIAN_VERSION=latest npm run test:e2e
+OBSIDIAN_VERSION=latest OBSIDIAN_INSTALLER_VERSION=latest npm run test:e2e
 OBSIDIAN_VERSION=1.6.7 npm run test:e2e
 ```
 
@@ -141,7 +145,7 @@ Regression checks hide the edit entry in every single-column view and compare Sa
 across all preferences at narrow and wide widths, separately for desktop and mobile styling.
 Edit-exit checks exercise Save/Discard in both directions, Cancel/Escape preserving the same editor, and an
 external modification during confirmation refusing to save while retaining the edited text.
-CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian, uploading failure
+CI runs the suite on Linux against both `1.6.7` and the latest stable Obsidian with its current installer, uploading failure
 artifacts. These checks complement the manual checklist below; they do not cover every platform, theme,
 selection/clipboard interaction, or external file drop.
 
@@ -285,6 +289,21 @@ Update the documentation whenever a visible flow, command, setting, or requireme
 - `FEATURES.md` describes the full feature scope and acceptance criteria.
 - `CONTRIBUTING.md` describes the development and review workflow.
 - `locales/` holds the UI translations for all supported languages.
+
+## Releasing
+
+Read the full Obsidian plugin checklist via `.obsidian-plugin-rules` before each release and complete the applicable
+pre-publication checks. Use a clean `main` that matches `origin/main` and authenticate GitHub CLI for the CI lookup.
+
+1. Run `npm run release -- <version>` with the exact `x.y.z` version. It synchronizes release metadata and
+   changelog notes, keeps the compatibility history, runs local checks, and pushes the release commit to `main`.
+   If the push fails after the commit is created, retry the push with `git push origin main`.
+2. After CI passes on that commit, run `npm run release -- <version> --publish`. The command checks the latest
+   push CI result for that SHA before creating and pushing the annotated tag. If the tag push fails, retry this
+   command with the same version.
+3. Check the release workflow and the resulting GitHub release. The workflow independently checks the tag,
+   metadata, and CI result, attests the public build, and verifies the published notes and all three asset bytes.
+   Complete any remaining post-publication checks from the shared checklist.
 
 ## Contribution checklist
 

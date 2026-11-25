@@ -9,6 +9,7 @@ Use this skill in the Side-by-Side Diff repository for requested feature impleme
 
 ## Shared checklist
 
+Read the shared Obsidian plugin checklist via `.obsidian-plugin-rules` before editing the plugin.
 Read [docs/implementation-checklist.md](../../docs/implementation-checklist.md) before changing files and use it
 as the source of truth for coding, styles, existing tests, new tests, changelog, features, README, and roadmap work.
 Read the validation commands and relevant manual checks in [CONTRIBUTING.md](../../CONTRIBUTING.md).

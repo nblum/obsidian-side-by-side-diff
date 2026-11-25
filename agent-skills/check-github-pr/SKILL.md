@@ -21,6 +21,7 @@ issues with evidence.
 
 ## Inspect the Actual Change
 
+- Read the shared Obsidian plugin checklist via the local `.obsidian-plugin-rules` reference.
 - Read applicable repository instructions and contribution guidance, then compare the PR head with its merge base
   against the recorded base SHA. Review the whole PR rather than just the latest commit or the local working diff.
 - Read surrounding implementation, relevant callers, and affected tests to establish the runtime impact of each

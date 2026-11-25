@@ -19,6 +19,7 @@ pushes, tags, or publishes a release.
 
 ## Project Checks
 
+- Read the shared Obsidian plugin checklist via the local `.obsidian-plugin-rules` reference.
 - For TypeScript or test changes, run at least the affected tests. For broader changes, use the repository scripts
   for type checking, linting, and tests.
 - For user-visible behavior changes, check whether `README.md`, `FEATURES.md`, `CHANGELOG.md`, or translations need

@@ -5,6 +5,10 @@
 This file contains project-specific guidance. Keep general, cross-project behavior in the user's global agent
 instructions and keep task-specific procedures in `agent-skills/`.
 
+Before working on the plugin, read the shared Obsidian plugin checklist at the absolute path stored in the local
+`.obsidian-plugin-rules` file. If the reference is missing or the note cannot be opened, ask for its location.
+Keep cross-plugin rules in that note and Side-by-Side Diff rules in this repository.
+
 ## Language
 
 - Write agent instructions, skills, and project process documentation in English.

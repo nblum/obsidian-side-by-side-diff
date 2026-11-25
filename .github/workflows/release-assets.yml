@@ -2,50 +2,112 @@ name: Build and publish release
 
 on:
   push:
-    tags:
-      - '*.*.*'
+    tags: ['*.*.*']
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: release-${{ github.ref }}
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
 
 jobs:
-  release-assets:
-    name: Build and upload plugin assets
-    runs-on: ubuntu-latest
+  build:
+    name: Verify CI and build tagged source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
 
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.x
-          cache: npm
+          node-version-file: .nvmrc
+
+      - name: Verify the annotated tag and its CI run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          node scripts/release.mjs "$RELEASE_TAG" --check
+          node scripts/release.mjs "$RELEASE_TAG" --notes > release-notes.md
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate release version
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: node -e "const fs = require('node:fs'); const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8')); if (manifest.version !== process.env.RELEASE_TAG) throw new Error('Release tag must match manifest.json version');"
-
       - name: Build production bundle
         run: npm run build
 
-      - name: Generate artifact attestations
-        uses: actions/attest@v4
+      - name: Store verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-assets
+          path: |
+            main.js
+            manifest.json
+            styles.css
+            release-notes.md
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+
+  publish:
+    name: Publish and verify the release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download the verified release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-assets
+
+      - name: Attest the build artifacts for this public repository
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
             main.js
             manifest.json
             styles.css
 
-      - name: Create GitHub release and upload plugin assets
+      - name: Publish and verify the notes and assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" main.js manifest.json styles.css --verify-tag --generate-notes --title "Release $RELEASE_TAG"
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" main.js manifest.json styles.css \
+              --verify-tag --notes-file release-notes.md --title "Release $RELEASE_TAG"
+          fi
+          gh release view "$RELEASE_TAG" --json body,isDraft,tagName,assets |
+            jq -e --arg tag "$RELEASE_TAG" --rawfile notes release-notes.md '
+              def trim_end: sub("[\\r\\n]+$"; "");
+              .isDraft == false and .tagName == $tag and
+              (.body | trim_end) == ($notes | trim_end) and
+              ([.assets[] | .name] | sort) == ["main.js", "manifest.json", "styles.css"]
+            '
+          gh release download "$RELEASE_TAG" --dir uploaded \
+            --pattern main.js --pattern manifest.json --pattern styles.css
+          for asset in main.js manifest.json styles.css; do
+            cmp "$asset" "uploaded/$asset"
+          done

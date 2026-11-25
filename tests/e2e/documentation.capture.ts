@@ -80,7 +80,7 @@ describe("documentation screenshots (opt-in)", () => {
     // Invalidate an earlier run before any capture; a failed run must not be publishable.
     await rm(join(output, "manifest.json"), { force: true });
     await rm(join(output, "index.html"), { force: true });
-    await browser.reloadObsidian({ vault: "tests/e2e/documentation-vault" });
+    // The capture configuration already starts with a fresh copy of the documentation vault.
     await writeFile(join(obsidianPage.getVaultPath(), ".obsidian/plugins/side-by-side-diff/data.json"), JSON.stringify({
       language: "en", introductionSeen: true, defaultApplyDirection: "left-to-right",
       autoAdvanceAfterChange: false, alignMarkdownByHeadings: false,

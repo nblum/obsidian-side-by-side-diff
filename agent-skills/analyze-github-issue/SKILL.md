@@ -21,6 +21,7 @@ Return the analysis in chat by default. Analysis alone does not authorize implem
 
 ## Investigate Without Implementing
 
+- Read the shared Obsidian plugin checklist via the local `.obsidian-plugin-rules` reference.
 - Read `AGENTS.md`, `README.md`, `FEATURES.md`, `CONTRIBUTING.md`, and
   [the implementation checklist](../../docs/implementation-checklist.md). Check `git status` and identify the
   revision being inspected. Preserve the user's working tree and index.

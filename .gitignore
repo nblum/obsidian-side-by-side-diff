@@ -6,3 +6,5 @@ main.js
 data.json
 .obsidian-cache/
 e2e-results/
+/.obsidian/
+/.obsidian-plugin-rules

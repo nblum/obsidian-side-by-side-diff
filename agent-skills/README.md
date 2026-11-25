@@ -3,6 +3,9 @@
 This directory contains workflows specific to Side-by-Side Diff. `AGENTS.md` remains a concise project map and
 directs an agent here only when a task matches a documented workflow.
 
+Before applying any project skill, read the shared Obsidian plugin checklist via the local
+`.obsidian-plugin-rules` reference. Ask for the location if the reference or its target is missing.
+
 ## Layout
 
 ```text

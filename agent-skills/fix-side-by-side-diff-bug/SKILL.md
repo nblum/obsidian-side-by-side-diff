@@ -10,6 +10,7 @@ features or refactors.
 
 ## Diagnose
 
+- Read the shared Obsidian plugin checklist via the local `.obsidian-plugin-rules` reference.
 - Reproduce the reported bug against the current `src/` behavior before changing code.
 - Identify the root cause; do not patch symptoms.
 

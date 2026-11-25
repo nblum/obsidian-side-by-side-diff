@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.join(scriptDirectory, "..");
 const RELEASE_FILES = ["CHANGELOG.md", "manifest.json", "package-lock.json", "package.json", "versions.json"];
+const RELEASE_BRANCH = "main";
 
 /** Returns whether parsed JSON is a mutable key-value object. */
 function isRecord(value) {
@@ -50,11 +51,22 @@ function runCommand(command, args, options = {}) {
 
 /** Parses a strict three-component release version. */
 function parseVersion(version) {
-  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  const match = version.match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
   if (match === null) {
     throw new Error("Version must use x.y.z format, for example 0.1.3.");
   }
   return match.slice(1).map(Number);
+}
+
+/** Returns the exact published notes from a prepared changelog section. */
+function getReleaseNotes(changelog, version) {
+  parseVersion(version);
+  const lines = changelog.split(/\r?\n/u);
+  const start = lines.findIndex(line => line.startsWith(`## [${version}] - `));
+  const end = lines.findIndex((line, index) => index > start && line.startsWith("## ["));
+  const notes = start < 0 ? "" : lines.slice(start + 1, end < 0 ? undefined : end).join("\n").trim();
+  if (notes.length === 0) throw new Error(`CHANGELOG.md has no release notes for ${version}.`);
+  return notes;
 }
 
 /** Returns whether the target version is newer than the current version. */
@@ -178,16 +190,29 @@ function updateReleaseFiles(version) {
   writeJson("versions.json", versions);
 }
 
+/** Checks every prepared version and its compatibility entry before a tag or release can be published. */
+function getPreparedNotes(version) {
+  const manifest = readJson("manifest.json");
+  const metadata = readJson("package.json");
+  const lock = readJson("package-lock.json");
+  const versions = readJson("versions.json");
+  if ([manifest.version, metadata.version, lock.version, lock.packages?.[""]?.version].some(value => value !== version)
+    || versions[version] !== manifest.minAppVersion) {
+    throw new Error(`Release metadata is not synchronized for ${version}.`);
+  }
+  return getReleaseNotes(readFile("CHANGELOG.md"), version);
+}
+
 /** Verifies a clean synchronized branch before creating release mutations. */
-function prepareRepository(version) {
+function requireSynchronizedBranch() {
   if (runCommand("git", ["status", "--porcelain"], { capture: true }).length > 0) {
     throw new Error("Working tree must be clean before creating a release.");
   }
   // Historical tag conflicts must not block synchronization of the release branch.
   runCommand("git", ["fetch", "--no-tags", "origin"]);
   const branch = runCommand("git", ["branch", "--show-current"], { capture: true });
-  if (branch.length === 0) {
-    throw new Error("Release must run from a branch, not a detached HEAD.");
+  if (branch !== RELEASE_BRANCH) {
+    throw new Error(`Run the release from ${RELEASE_BRANCH}.`);
   }
   const upstream = runCommand(
     "git",
@@ -205,16 +230,28 @@ function prepareRepository(version) {
   if (divergence !== "0\t0" && divergence !== "0 0") {
     throw new Error(`Branch must match ${upstream} before releasing; divergence is ${divergence}.`);
   }
-  assertLocalTagAvailable(version);
-  assertRemoteTagAvailable(version);
-  return branch;
 }
 
-/** Runs release checks, commits metadata, tags the commit, and pushes atomically. */
-function createRelease(version) {
-  parseVersion(version);
-  const branch = prepareRepository(version);
+/** Checks that the latest push CI run for the exact commit succeeded. */
+function requireGreenCi(commit) {
+  const response = runCommand("gh", [
+    "api", "--method", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "event=push", "-f", `branch=${RELEASE_BRANCH}`, "-f", `head_sha=${commit}`
+  ], { capture: true });
+  const run = JSON.parse(response).workflow_runs?.[0];
+  if (run?.head_sha !== commit || run?.head_branch !== RELEASE_BRANCH || run?.event !== "push"
+    || run.status !== "completed" || run.conclusion !== "success") {
+    throw new Error(`CI must pass on origin/${RELEASE_BRANCH} for ${commit}. Check the CI workflow, then retry. ${run?.html_url ?? ""}`.trim());
+  }
+}
+
+/** Runs local release checks and pushes the metadata commit so CI can validate it. */
+function prepareRelease(version) {
+  requireSynchronizedBranch();
+  assertLocalTagAvailable(version);
+  assertRemoteTagAvailable(version);
   updateReleaseFiles(version);
+  getPreparedNotes(version);
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   runCommand(npmCommand, ["run", "validate:manifest"], {
     env: { ...process.env, RELEASE_TAG: version }
@@ -225,21 +262,54 @@ function createRelease(version) {
   runCommand("git", ["diff", "--check"]);
   runCommand("git", ["add", "--", ...RELEASE_FILES]);
   runCommand("git", ["commit", "-m", `chore: release ${version}`]);
-  runCommand("git", ["tag", "-a", version, "-m", `Release ${version}`]);
-  runCommand("git", ["push", "--atomic", "origin", `HEAD:${branch}`, `refs/tags/${version}`]);
+  runCommand("git", ["push", "origin", `HEAD:refs/heads/${RELEASE_BRANCH}`]);
+  console.log(`After CI passes, run npm run release -- ${version} --publish.`);
+}
+
+/** Tags the successful release commit, reusing an identical tag after a failed push. */
+function publishRelease(version) {
+  requireSynchronizedBranch();
+  getPreparedNotes(version);
+  assertRemoteTagAvailable(version);
+  const commit = runCommand("git", ["rev-parse", "HEAD"], { capture: true });
+  requireGreenCi(commit);
+  const tagRef = `refs/tags/${version}`;
+  const tag = runCommand("git", ["for-each-ref", "--format=%(refname) %(objecttype) %(*objectname)", tagRef], { capture: true });
+  if (tag === "") {
+    runCommand("git", ["tag", "-a", version, commit, "-m", `Release ${version}`]);
+  } else if (tag !== `${tagRef} tag ${commit}`) {
+    throw new Error(`Local tag ${version} is not an annotated tag for the CI-verified commit.`);
+  }
+  runCommand("git", ["push", "origin", tagRef]);
 }
 
 /** Parses the CLI request and starts one release. */
 function main() {
-  const version = process.argv[2];
+  const [version, mode, ...extra] = process.argv.slice(2);
+  const usage = "Usage: npm run release -- <x.y.z> [--publish]";
   if (version === "--help" || version === "-h") {
-    console.log("Usage: npm run release -- <x.y.z>");
+    console.log(usage);
     return;
   }
-  if (version === undefined || process.argv.length > 3) {
-    throw new Error("Usage: npm run release -- <x.y.z>");
+  if (version === undefined || extra.length > 0) throw new Error(usage);
+  parseVersion(version);
+  switch (mode) {
+    case undefined:
+      prepareRelease(version);
+      break;
+    case "--publish":
+      publishRelease(version);
+      break;
+    case "--check":
+      getPreparedNotes(version);
+      requireGreenCi(runCommand("git", ["rev-parse", "HEAD"], { capture: true }));
+      break;
+    case "--notes":
+      console.log(getPreparedNotes(version));
+      break;
+    default:
+      throw new Error(usage);
   }
-  createRelease(version);
 }
 
 const invokedScript = process.argv[1];
