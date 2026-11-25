@@ -6,6 +6,9 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Fixed
 
+- Refresh open settings immediately after changing language and reject invalid proposal-copy suffixes consistently
+  across Obsidian versions.
+
 - Use the text color for pending-deletion strikethroughs to avoid a CSS compatibility warning on older Obsidian versions.
 - Preserve unsaved editor text when a compared file changes externally. A conflicting save keeps the live editor
   open without overwriting the external change.
@@ -19,6 +22,12 @@ All notable changes to Side-by-Side Diff are documented here.
 
 ### Changed
 
+- Add a localized quick guide to comparison Help and use text with theme colors for status messages.
+- Use a branded 4:3 teaser in the introduction.
+
+- Refresh the introduction with a welcome teaser and feedback, bug report, and documentation cards. Alternate
+  screenshots and text on the start page, explain drag and drop and tab comparisons, and offer agent setup on
+  the final page.
 - Use a Leave edit mode text button with Save, Discard changes and Cancel for unsaved edits. Escape keeps editing;
   failed saves preserve the editor and its text.
 - Unify row/block review buttons with rounded outlines, theme-aware tints and keyboard-focus states. Button heights
@@ -27,6 +36,8 @@ All notable changes to Side-by-Side Diff are documented here.
   `E2E_HEADED=1` for a visible debug run.
 
 ### Added
+
+- Show the installed plugin version and author in settings and in an About dialog accessible from the command palette.
 
 - Open comparisons and proposal reviews directly from the official Obsidian CLI. Set up vault instructions
   for AI agents from settings or the introduction, with a preview before creating or updating the file.

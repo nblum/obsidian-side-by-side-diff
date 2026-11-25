@@ -20,6 +20,7 @@ class LegacyControl {
 }
 
 const legacySettings: LegacySetting[] = [];
+const manifest = { name: "Side-by-Side Diff", author: "Nico Blum", version: "0.11.0", description: "Compare text files." };
 /** Supplies Obsidian's fluent control builder while retaining rendered dropdowns. */
 class LegacySetting {
   name = "";
@@ -27,6 +28,7 @@ class LegacySetting {
   constructor() { legacySettings.push(this); }
   setName(name: string): this { this.name = name; return this; }
   setDesc(): this { return this; }
+  setHeading(): this { return this; }
   addDropdown(callback: (control: LegacyControl) => void): this {
     this.control = new LegacyControl();
     callback(this.control);
@@ -42,7 +44,7 @@ assert.ok(bundle.outputFiles?.[0]);
 const module = { exports: {} as { FileDiffSettingsTab: typeof FileDiffSettingsTab } };
 runInNewContext(bundle.outputFiles[0].text, {
   module, exports: module.exports,
-  require: () => ({ PluginSettingTab: class {}, Setting: LegacySetting }),
+  require: () => ({ PluginSettingTab: class {}, Setting: LegacySetting, Modal: class {}, requireApiVersion: () => true }),
   createFragment: (callback: (fragment: { appendText: () => void; createEl: () => void }) => void) => {
     const fragment = { appendText: () => {}, createEl: () => {} };
     callback(fragment);
@@ -58,6 +60,7 @@ test("legacy settings render the saved direction and persist changes through the
     Object.assign(tab, {
       containerEl: { empty: () => { legacySettings.length = 0; } },
       plugin: {
+        manifest, language: "en",
         settings,
         translate: (key: string) => key,
         saveSettings: () => { persisted.push(settings.defaultApplyDirection); return Promise.resolve(); }
@@ -88,6 +91,7 @@ test("the default-direction setting offers both directions and persists only val
   const persisted: string[] = [];
   const tab = Object.create(module.exports.FileDiffSettingsTab.prototype) as FileDiffSettingsTab;
   Object.assign(tab, { plugin: {
+    manifest, language: "en",
     settings,
     translate: (key: string) => key,
     saveSettings: () => { persisted.push(settings.defaultApplyDirection); return Promise.resolve(); }
@@ -118,6 +122,7 @@ test("the legacy ribbon toggle restores its value, updates visibility and persis
     Object.assign(tab, {
       containerEl: { empty: () => { legacySettings.length = 0; } },
       plugin: {
+        manifest, language: "en",
         settings,
         translate: (key: string) => key,
         updateRibbonVisibility: () => { visible.push(settings.showRibbonIcon); },
@@ -150,6 +155,7 @@ test("both settings renderers offer layout defaults and persist only valid selec
     Object.assign(tab, {
       containerEl: { empty: () => { legacySettings.length = 0; } },
       plugin: {
+        manifest, language: "en",
         settings, translate: (key: string) => key,
         saveSettings: () => { persisted.push(settings.defaultLayout); return Promise.resolve(); }
       }

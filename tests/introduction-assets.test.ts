@@ -8,10 +8,11 @@ const INTRODUCTION_ASSET_NAMES = [
 	"file-menu.webp",
 	"file-selection.png",
 	"grouped-changes.png",
-	"keyboard-shortcuts.webp"
+	"keyboard-shortcuts.webp",
+	"teaser.png"
 ] as const;
 
-test("embeds all introduction screenshots in the plugin bundle", async () => {
+test("embeds all introduction images in the plugin bundle", async () => {
 	const buildResult = await esbuild.build({
 		...PLUGIN_BUNDLE_OPTIONS,
 		outfile: "main.js",
@@ -23,6 +24,6 @@ test("embeds all introduction screenshots in the plugin bundle", async () => {
 	const bundle = outputFile.text;
 	assert.doesNotMatch(bundle, /getResourcePath\(/);
 	const embeddedImages = bundle.match(/data:image\/(?:png|webp);base64,/g) ?? [];
-	// Help reuses all introduction assets and adds five README illustrations.
+	// Help can reuse introduction assets and adds five README illustrations.
 	assert.equal(embeddedImages.length, INTRODUCTION_ASSET_NAMES.length + 5);
 });

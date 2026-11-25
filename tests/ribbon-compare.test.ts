@@ -142,6 +142,7 @@ async function loadPlugin(activeFile: TestFile | null, stored: Partial<PluginSet
     }
   };
   Object.assign(plugin, {
+    manifest: { name: "Side-by-Side Diff", version: "0.11.0", description: "", author: "Nico Blum" },
     app: { pickers, vault: {
       getFiles: () => [...vaultFiles.values()],
       getAbstractFileByPath: (path: string) => vaultFiles.get(path) ?? null,

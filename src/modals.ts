@@ -122,10 +122,12 @@ export class IntroductionModal extends Modal {
     }
     this.renderThankYouContent(parent);
   }
-  /** Adds feedback, bug-report, and documentation sections to the welcome page. */
+  /** Shows the teaser and cards for feedback, bug reports, and documentation. */
   private renderWelcomeContent(parent: HTMLElement): void {
+    this.appendImage(parent, "teaser.png", "modal.introduction.welcome.teaserAlt").addClass("file-diff-sbs-introduction-teaser");
+    const cards = parent.createDiv({ cls: "file-diff-sbs-introduction-cards" });
     const feedback = this.appendIntroductionSection(
-      parent,
+      cards,
       "modal.introduction.welcome.feedback.title",
       "modal.introduction.welcome.feedback.description"
     );
@@ -133,22 +135,19 @@ export class IntroductionModal extends Modal {
     this.appendExternalLink(feedbackLinks, "settings.about.star", GITHUB_REPOSITORY_URL);
     this.appendExternalLink(feedbackLinks, "settings.about.feedback", GITHUB_FEEDBACK_URL);
     const bugReport = this.appendIntroductionSection(
-      parent,
+      cards,
       "modal.introduction.welcome.reportBug.title",
       "modal.introduction.welcome.reportBug.description"
     );
     const bugReportLinks = bugReport.createDiv({ cls: "file-diff-sbs-introduction-links" });
     this.appendExternalLink(bugReportLinks, "modal.introduction.welcome.reportBug.link", GITHUB_FEEDBACK_URL);
     const documentation = this.appendIntroductionSection(
-      parent,
+      cards,
       "modal.introduction.welcome.documentation.title",
       "modal.introduction.welcome.documentation.description"
     );
     const documentationLinks = documentation.createDiv({ cls: "file-diff-sbs-introduction-links" });
     this.appendExternalLink(documentationLinks, "modal.introduction.welcome.documentation.link", DOCUMENTATION_URL);
-    const agentSetup = this.appendIntroductionSection(parent, "agent.setup.title", "agent.setup.description");
-    const setupButton = agentSetup.createEl("button", { text: this.translate("agent.setup.openAction") });
-    setupButton.addEventListener("click", this.showAgentInstructions);
   }
   /** Describes both file-menu entry points for starting a comparison. */
   private renderStartContent(parent: HTMLElement): void {
@@ -168,9 +167,14 @@ export class IntroductionModal extends Modal {
       "modal.introduction.start.multiple.imageAlt"
     );
   }
-  /** Shows the right-file selection screen used after starting with one file. */
+  /** Shows the right-file picker, drag-and-drop, and the direct tab comparison. */
   private renderFileSelectionContent(parent: HTMLElement): void {
     this.appendImage(parent, "file-selection.png", "modal.introduction.selection.imageAlt");
+    const hints = parent.createDiv({ cls: "file-diff-sbs-introduction-hints" });
+    this.appendIntroductionSection(hints, "modal.introduction.selection.drop.title", "modal.introduction.selection.drop.description", {
+      target: this.translate("view.selection.dropFiles")
+    });
+    this.appendIntroductionSection(hints, "menu.compareWithActiveFile", "modal.introduction.selection.activeTab.description");
   }
   /** Lists the most useful navigation and review shortcuts. */
   private renderTipsContent(parent: HTMLElement): void {
@@ -179,7 +183,7 @@ export class IntroductionModal extends Modal {
     const groups = this.appendTip(parent, "modal.introduction.tips.groups.title", "modal.introduction.tips.groups.description");
     this.appendImage(groups, "grouped-changes.png", "modal.introduction.tips.groups.imageAlt");
   }
-  /** Adds the closing note and links for the developer, feedback, and support. */
+  /** Adds the closing note, support links, and optional agent setup. */
   private renderThankYouContent(parent: HTMLElement): void {
     const note = parent.createEl("p", { text: this.translate("modal.introduction.thanks.websitePrefix") });
     note.appendText(" ");
@@ -191,17 +195,22 @@ export class IntroductionModal extends Modal {
     feedback.appendText(".");
     const support = parent.createEl("p");
     this.appendExternalLink(support, "settings.about.kofi", KO_FI_URL);
+    const agentSetup = this.appendIntroductionSection(parent, "agent.setup.title", "agent.setup.description");
+    agentSetup.addClass("file-diff-sbs-introduction-agent");
+    const setupButton = agentSetup.createEl("button", { text: this.translate("agent.setup.openAction") });
+    setupButton.addEventListener("click", this.showAgentInstructions);
   }
   /** Adds one illustrated comparison-start workflow. */
   private appendWorkflow(parent: HTMLElement, titleKey: string, descriptionKey: string, assetName: IntroductionAssetName, imageAltKey: string): void {
     const workflow = parent.createEl("article", { cls: "file-diff-sbs-introduction-workflow" });
-    workflow.createEl("h4", { text: this.translate(titleKey) });
-    workflow.createEl("p", { text: this.translate(descriptionKey) });
+    const text = workflow.createDiv();
+    text.createEl("h4", { text: this.translate(titleKey) });
+    text.createEl("p", { text: this.translate(descriptionKey) });
     this.appendImage(workflow, assetName, imageAltKey);
   }
-  /** Adds a screenshot from the plugin's bundled assets. */
-  private appendImage(parent: HTMLElement, assetName: IntroductionAssetName, altKey: string): void {
-    parent.createEl("img", {
+  /** Adds an image from the plugin's bundled assets. */
+  private appendImage(parent: HTMLElement, assetName: IntroductionAssetName, altKey: string): HTMLImageElement {
+    return parent.createEl("img", {
       cls: "file-diff-sbs-introduction-image",
       attr: {
         src: getIntroductionAssetUrl(assetName),
@@ -210,13 +219,13 @@ export class IntroductionModal extends Modal {
     });
   }
   /** Adds a titled introduction section and returns it for supplementary links or images. */
-  private appendIntroductionSection(parent: HTMLElement, titleKey: string, descriptionKey: string): HTMLElement {
+  private appendIntroductionSection(parent: HTMLElement, titleKey: string, descriptionKey: string, variables?: Parameters<Translator>[1]): HTMLElement {
     const section = parent.createEl("section", { cls: "file-diff-sbs-introduction-section" });
     section.createEl("h4", { text: this.translate(titleKey) });
-    section.createEl("p", { text: this.translate(descriptionKey) });
+    section.createEl("p", { text: this.translate(descriptionKey, variables) });
     return section;
   }
-  /** Adds a titled tip section to the final page. */
+  /** Adds a titled tip section to the tips page. */
   private appendTip(parent: HTMLElement, titleKey: string, descriptionKey: string): HTMLElement {
     const tip = this.appendIntroductionSection(parent, titleKey, descriptionKey);
     tip.addClass("file-diff-sbs-introduction-tip");

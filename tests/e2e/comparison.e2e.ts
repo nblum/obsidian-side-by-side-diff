@@ -122,7 +122,8 @@ describe("comparison in Obsidian", () => {
     });
   }
 
-  it("shows the Ko-fi support link in About settings", async () => {
+  it("shows manifest information and opens About from settings and the command palette", async () => {
+    const about = ".file-diff-sbs-about-modal";
     const mainWindow = await browser.getWindowHandle();
     await browser.executeObsidianCommand("app:open-settings");
     // Recent Obsidian versions open Settings in a separate window.
@@ -130,29 +131,156 @@ describe("comparison in Obsidian", () => {
     if (settingsWindow !== undefined) await browser.switchToWindow(settingsWindow);
     try {
       await $(".vertical-tab-nav-item=Side-by-Side Diff").click();
-      const link = $(".vertical-tab-content a[href='https://ko-fi.com/blumnico']");
+      const settings = $(".vertical-tab-content");
+      await expect(settings).toHaveText(expect.stringContaining("Compare notes and text files side by side."));
+      await expect(settings).toHaveText(expect.stringMatching(/Version \d+\.\d+\.\d+ · Author Nico Blum/u));
+      await expect(settings.$("a=Documentation")).toHaveAttribute("href", expect.stringContaining("/blob/main/README.md"));
+      const link = settings.$("a[href='https://ko-fi.com/blumnico']");
       await expect(link).toBeDisplayed();
       await expect(link).toHaveText("Buy me a coffee");
       await expect(link).toHaveAttribute("target", "_blank");
       await expect(link).toHaveAttribute("rel", "noopener");
+      const legacy = settings.$("button=Open About");
+      if (await legacy.isExisting()) await legacy.click();
+      else await settings.$(".setting-item-name=About the plugin").click();
+      if (!(await $(about).isExisting()) && settingsWindow !== undefined) await browser.switchToWindow(mainWindow);
+      await expect($(about)).toHaveText(expect.stringContaining("About Side-by-Side Diff"));
+      await expect($(about).$("a=Repository")).toBeDisplayed();
+      await browser.keys("Escape");
+      await expect($(about)).not.toExist();
+    } finally {
+      if (settingsWindow !== undefined) {
+        await browser.switchToWindow(settingsWindow);
+        await browser.closeWindow();
+        await browser.switchToWindow(mainWindow);
+      } else if (await $(".vertical-tab-content").isDisplayed()) {
+        await browser.keys("Escape");
+      }
+    }
+    await browser.executeObsidianCommand("side-by-side-diff:show-about");
+    await expect($(about).$("a=Documentation")).toBeDisplayed();
+  });
+
+  it("finds and saves settings, rejects an invalid suffix and refreshes the open tab after a language change", async () => {
+    const settingsPath = ".obsidian/plugins/side-by-side-diff/data.json";
+    const readSettings = async (): Promise<{ changeCopySuffix?: string; language?: string }> =>
+      JSON.parse(await readSaved(settingsPath)) as { changeCopySuffix?: string; language?: string };
+    const declarative = await browser.executeObsidian(({ obsidian }) => obsidian.requireApiVersion("1.13.0"));
+    const mainWindow = await browser.getWindowHandle();
+    await browser.executeObsidianCommand("app:open-settings");
+    const settingsWindow = (await browser.getWindowHandles()).find(handle => handle !== mainWindow);
+    if (settingsWindow !== undefined) await browser.switchToWindow(settingsWindow);
+    try {
+      if (declarative) {
+        await $("input[type=search]").setValue("Change-copy suffix");
+        await $('//div[contains(@class, "vertical-tab-nav-item-title") and normalize-space(.)="Change-copy suffix"]').click();
+      } else {
+        await $(".vertical-tab-nav-item=Side-by-Side Diff").click();
+      }
+      const settings = $(".vertical-tab-content");
+      const suffixRow = settings.$(".setting-item-name=Change-copy suffix").parentElement().parentElement();
+      const suffix = suffixRow.$("input");
+      await suffix.setValue("_review_check_");
+      await browser.keys("Tab");
+      await browser.waitUntil(async () => (await readSettings()).changeCopySuffix === "_review_check_");
+      await suffix.setValue("/bad");
+      await browser.keys("Tab");
+      if (declarative) {
+        await expect(suffixRow).toHaveText(expect.stringContaining("Use a non-empty suffix with valid file-name characters."));
+      } else {
+        assert.equal(await suffix.getProperty("validationMessage"), "Use a non-empty suffix with valid file-name characters.");
+        await expect(suffix).toHaveAttribute("aria-invalid", "true");
+      }
+      assert.equal((await readSettings()).changeCopySuffix, "_review_check_");
+
+      const language = settings.$(".setting-item-name=Language").parentElement().parentElement().$("select");
+      await language.selectByAttribute("value", "de");
+      await browser.waitUntil(async () => (await readSettings()).language === "de");
+      await expect(settings.$(".setting-item-name=Sprache")).toBeDisplayed();
+      await expect(settings.$(".setting-item-name=Suffix für Änderungskopien").parentElement().parentElement().$("input"))
+        .toHaveValue("_review_check_");
+      assert.equal((await readSettings()).language, "de");
     } finally {
       if (settingsWindow !== undefined) {
         await browser.closeWindow();
         await browser.switchToWindow(mainWindow);
+      } else {
+        await browser.keys("Escape");
       }
     }
+
+    await $(`${view} button[aria-label='Dateiaktionen']`).click();
+    await $(".menu-item-title=Hilfe").click();
+    const help = $(".file-diff-sbs-help-modal");
+    await expect(help.$("summary")).toHaveText("Vollständige Anleitung (Englisch)");
+    await expect(help.$("h3")).toHaveText(expect.stringContaining("vergleichen"));
+    await expect(help.$("h1=Side-by-Side Diff")).not.toBeDisplayed();
+    await help.$("summary").click();
+    await expect(help.$("h1=Side-by-Side Diff")).toBeDisplayed();
   });
 
-  it("offers coffee support on the introduction's thank-you step", async () => {
+  it("walks through the illustrated introduction and offers support and agent setup on the last step", async () => {
     await browser.executeObsidianCommand("side-by-side-diff:show-introduction");
     const modal = ".file-diff-sbs-introduction-modal";
     const continueButton = $(`${modal} .file-diff-sbs-introduction-actions .mod-cta`);
+    const agentSetup = $(modal).$("button=Set up");
     const link = $(`${modal} a[href='https://ko-fi.com/blumnico']`);
     await expect(link).not.toExist();
-    for (let step = 0; step < 4; step += 1) {
-      await continueButton.click();
-    }
+    await expect(agentSetup).not.toExist();
+    const teaser = $(`${modal} .file-diff-sbs-introduction-teaser`);
+    await expect(teaser).toBeDisplayed();
+    await expect(teaser).toHaveAttribute("src", expect.stringContaining("data:image/png;base64,"));
+    await browser.waitUntil(async () => Number(await teaser.getProperty("naturalWidth")) === 480);
+    assert.equal(Number(await teaser.getProperty("naturalHeight")), 360);
+    const cards = $(`${modal} .file-diff-sbs-introduction-cards`);
+    await expect(cards.$$("section")).toBeElementsArrayOfSize(3);
+    await expect(cards.$("h4=Feedback")).toBeDisplayed();
+    await expect(cards.$("h4=Bug report")).toBeDisplayed();
+    await expect(cards.$("h4=Documentation")).toBeDisplayed();
+
+    await continueButton.click();
+    await expect($(`${modal} h3`)).toHaveText("How to start");
+    await expect(agentSetup).not.toExist();
+    const workflowImages = $$(`${modal} .file-diff-sbs-introduction-workflow img`);
+    await expect(workflowImages).toBeElementsArrayOfSize(2);
+    const placement = () => browser.execute(() => Array.from(document.querySelectorAll(".file-diff-sbs-introduction-workflow"), workflow => {
+      const text = workflow.firstElementChild?.getBoundingClientRect();
+      const image = workflow.querySelector("img");
+      if (!text || !image || image.naturalWidth === 0) return null;
+      const bounds = image.getBoundingClientRect();
+      if (bounds.top >= text.bottom) return "below";
+      return bounds.left < text.x ? "left" : "right";
+    }));
+    await browser.waitUntil(async () => (await placement()).join(",") === "left,right");
+    await browser.executeObsidian(({ require }) => {
+      const remote = require("@electron/remote") as { getCurrentWindow(): {
+        setMinimumSize(width: number, height: number): void; setSize(width: number, height: number): void;
+      } };
+      const window = remote.getCurrentWindow();
+      window.setMinimumSize(480, 600);
+      window.setSize(540, 900);
+    });
+    await browser.waitUntil(async () => (await placement()).join(",") === "below,below");
+    await browser.executeObsidian(({ require }) => {
+      const remote = require("@electron/remote") as { getCurrentWindow(): { setSize(width: number, height: number): void } };
+      remote.getCurrentWindow().setSize(1440, 1000);
+    });
+
+    await continueButton.click();
+    await expect($(`${modal} h3`)).toHaveText("Select the second file");
+    const hints = $(`${modal} .file-diff-sbs-introduction-hints`);
+    await expect(hints.$("h4=Drag and drop")).toBeDisplayed();
+    await expect(hints.$("h4=Compare with active file")).toBeDisplayed();
+    await expect(hints).toHaveText(expect.stringContaining("Drop files"));
+    await expect(hints).toHaveText(expect.stringContaining("right-click the other file’s tab"));
+    await expect(agentSetup).not.toExist();
+
+    await continueButton.click();
+    await expect($(`${modal} h3`)).toHaveText("Tips and tricks");
+    await expect(agentSetup).not.toExist();
+    await continueButton.click();
     await expect($(`${modal} h3`)).toHaveText("Thank you");
+    await expect(agentSetup).toBeDisplayed();
     await expect(link).toBeDisplayed();
     await expect(link).toHaveText("Buy me a coffee");
     await expect(link).toHaveAttribute("target", "_blank");
@@ -230,6 +358,7 @@ describe("comparison in Obsidian", () => {
     await expect($(progress)).toHaveText("Open: 0 · Accepted: 0 · Ignored: 0");
     await expect($(`${view} [data-review-status]`)).not.toExist();
     await expect($(".notice-container")).toHaveText(expect.stringContaining("Changes saved."));
+    await expect($(".notice [data-file-diff-status=success]")).toHaveText("Changes saved.");
     await expect($(`${view} [data-diff-pending]`)).not.toExist();
     assert.equal(await readSaved("Original.md"), original);
   });

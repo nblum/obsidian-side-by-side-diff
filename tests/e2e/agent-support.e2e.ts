@@ -21,7 +21,13 @@ function vaultPath(path: string): string {
 
 async function openIntroSetup(): Promise<void> {
   await browser.executeObsidianCommand("side-by-side-diff:show-introduction");
-  await $(".file-diff-sbs-introduction-modal").$("button=Set up").click();
+  const intro = $(".file-diff-sbs-introduction-modal");
+  const next = intro.$(".file-diff-sbs-introduction-actions .mod-cta");
+  for (let step = 0; step < 4; step += 1) {
+    await next.click();
+  }
+  await expect(intro.$("h3")).toHaveText("Thank you");
+  await intro.$("button=Set up").click();
   await expect($(preview)).toBeDisplayed();
 }
 
@@ -164,7 +170,38 @@ describe("agent support in Obsidian", () => {
     });
     await $(setup).$("button=Create file").click();
     await expect($(`${setup} [role=status]`)).toHaveText(expect.stringContaining("read AGENTS.md"));
+    await expect($(`${setup} [data-file-diff-status=error]`)).toBeDisplayed();
     await expect($(setup).$("button=Create file")).not.toExist();
+  });
+
+  it("shows progress during an instruction write, a failure, and success after retry", async () => {
+    await openIntroSetup();
+    await browser.executeObsidian(({ app }) => {
+      const create = app.vault.create.bind(app.vault);
+      let fail = true;
+      app.vault.create = async (path, data, options) => {
+        if (path === "AGENTS.md" && fail) {
+          fail = false;
+          await new Promise<void>(resolve => { setTimeout(resolve, 1500); });
+          throw new Error("Simulated test-vault write failure.");
+        }
+        return create(path, data, options);
+      };
+    });
+    const create = $(setup).$("button=Create file");
+    await create.click();
+    const progress = $(`${setup} [data-file-diff-status=progress]`);
+    await expect(progress).toHaveText("Saving agent instructions to AGENTS.md…");
+    const progressColor = await progress.getCSSProperty("border-left-color");
+    const error = $(`${setup} [data-file-diff-status=error]`);
+    await expect(error).toHaveText("Could not write AGENTS.md.");
+    assert.notEqual((await error.getCSSProperty("border-left-color")).value, progressColor.value);
+    await assert.rejects(readFile(vaultPath("AGENTS.md")), { code: "ENOENT" });
+    await create.click();
+    await expect($(setup)).not.toExist();
+    const success = $(".notice [data-file-diff-status=success]");
+    await expect(success).toHaveText("Agent instructions saved to AGENTS.md.");
+    assert.match(await readFile(vaultPath("AGENTS.md"), "utf8"), /side-by-side-diff:agent-instructions:start/u);
   });
 
   it("guides users to the live CLI toggle and sees the updated status after they turn it on", async function () {

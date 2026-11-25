@@ -121,6 +121,31 @@ body.is-mobile .file-diff-sbs-root {
 	display: none;
 }
 
+[data-file-diff-status="success"] {
+	--file-diff-status-color: var(--color-green);
+}
+
+[data-file-diff-status="progress"] {
+	--file-diff-status-color: var(--color-blue);
+}
+
+[data-file-diff-status="warning"] {
+	--file-diff-status-color: var(--color-yellow);
+}
+
+[data-file-diff-status="error"] {
+	--file-diff-status-color: var(--color-red);
+}
+
+[data-file-diff-status]:not(:empty) {
+	border-inline-start: 3px solid var(--file-diff-status-color);
+	padding-inline-start: var(--size-4-2);
+}
+
+[data-file-diff-status]:empty {
+	display: none;
+}
+
 .file-diff-sbs-review-feedback {
 	flex: 1 1 10rem;
 	min-width: 0;
@@ -370,7 +395,33 @@ body.is-mobile .file-diff-sbs-root {
 	margin-top: 1rem;
 }
 
-.file-diff-sbs-introduction-section + .file-diff-sbs-introduction-section {
+.file-diff-sbs-introduction-cards,
+.file-diff-sbs-introduction-hints {
+	margin-top: 1.25rem;
+}
+
+.file-diff-sbs-introduction-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+	gap: 0.75rem;
+}
+
+.file-diff-sbs-introduction-cards > section {
+	display: flex;
+	flex-direction: column;
+	padding: 0.85rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary-alt);
+}
+
+.file-diff-sbs-introduction-cards .file-diff-sbs-introduction-links {
+	margin-top: auto;
+}
+
+.file-diff-sbs-introduction > .file-diff-sbs-introduction-section + .file-diff-sbs-introduction-section,
+.file-diff-sbs-introduction-hints > .file-diff-sbs-introduction-section + .file-diff-sbs-introduction-section,
+.file-diff-sbs-introduction-agent {
 	margin-top: 1.25rem;
 	padding-top: 1.25rem;
 	border-top: 1px solid var(--background-modifier-border);
@@ -409,6 +460,33 @@ body.is-mobile .file-diff-sbs-root {
 	border-radius: var(--radius-m);
 	background: var(--background-primary-alt);
 	object-fit: contain;
+}
+
+.file-diff-sbs-introduction-teaser {
+	max-height: 22rem;
+	margin-inline: auto;
+}
+
+@media (min-width: 38rem) {
+	.file-diff-sbs-introduction-workflow {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		align-items: center;
+		gap: 1.25rem;
+	}
+
+	.file-diff-sbs-introduction-workflow > .file-diff-sbs-introduction-image {
+		justify-self: center;
+		margin-top: 0;
+	}
+
+	.file-diff-sbs-introduction-workflow:first-child > .file-diff-sbs-introduction-image {
+		grid-area: 1 / 1;
+	}
+
+	.file-diff-sbs-introduction-workflow:first-child > div {
+		grid-area: 1 / 2;
+	}
 }
 
 .file-diff-sbs-introduction-actions {

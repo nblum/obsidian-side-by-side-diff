@@ -1,8 +1,8 @@
-import { PluginSettingTab, Setting } from "obsidian";
+import { PluginSettingTab, Setting, requireApiVersion } from "obsidian";
 import type { App, SettingDefinitionItem } from "obsidian";
 import type FileDiffSideBySidePlugin from "./main";
 import { DEFAULT_SETTINGS, isDiffDirection, isLanguagePreference, sanitizeCopySuffix } from "./settings-model";
-import { AUTHOR_WEBSITE_URL, GITHUB_FEEDBACK_URL, GITHUB_REPOSITORY_URL, KO_FI_URL } from "./external-links";
+import { createAboutDetails } from "./about-modal";
 import { isDiffLayout } from "./diff-layout";
 
 export { DEFAULT_SETTINGS, isLanguagePreference, normalizePluginSettings, sanitizeCopySuffix } from "./settings-model";
@@ -22,9 +22,13 @@ export class FileDiffSettingsTab extends PluginSettingTab {
   override getSettingDefinitions(): SettingDefinitionItem[] {
     return [
       {
-        name: this.plugin.translate("settings.about.name"),
-        desc: this.createAboutDescription(),
+        name: this.plugin.manifest.name,
+        desc: createAboutDetails(this.plugin.manifest, this.plugin.translate.bind(this.plugin), this.plugin.language),
         searchable: false
+      },
+      {
+        name: this.plugin.translate("settings.about.name"),
+        action: (): void => { this.plugin.showAbout(); }
       },
       {
         name: this.plugin.translate("settings.introduction.name"),
@@ -39,23 +43,13 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       {
         name: this.plugin.translate("settings.language.name"),
         desc: this.plugin.translate("settings.language.description"),
-        control: {
-          type: "dropdown",
-          key: "language",
-          defaultValue: DEFAULT_SETTINGS.language,
-          options: {
-            auto: this.plugin.translate("settings.language.auto"),
-            de: this.plugin.translate("settings.language.de"),
-            en: this.plugin.translate("settings.language.en"),
-            fr: this.plugin.translate("settings.language.fr"),
-            it: this.plugin.translate("settings.language.it"),
-            es: this.plugin.translate("settings.language.es"),
-            "pt-BR": this.plugin.translate("settings.language.pt-BR"),
-            "pt-PT": this.plugin.translate("settings.language.pt-PT"),
-            nl: this.plugin.translate("settings.language.nl"),
-            "zh-CN": this.plugin.translate("settings.language.zh-CN")
-          }
-        }
+        // Native controls retain their existing label while focused during update().
+        render: (setting): void => { this.renderLanguageDropdown(setting); }
+      },
+      {
+        name: this.plugin.translate("settings.comparison.heading"),
+        searchable: false,
+        render: (setting): void => { setting.setHeading(); }
       },
       {
         name: this.plugin.translate("settings.ribbon.name"),
@@ -119,11 +113,7 @@ export class FileDiffSettingsTab extends PluginSettingTab {
           key: "changeCopySuffix",
           defaultValue: DEFAULT_SETTINGS.changeCopySuffix,
           placeholder: "_changes_",
-          validate: (value: string): string | undefined => {
-            if (value.length === 0 || sanitizeCopySuffix(value) !== value) {
-              return this.plugin.translate("settings.suffix.invalid");
-            }
-          }
+          validate: (value: string): string | undefined => this.validateSuffix(value)
         }
       }
     ];
@@ -144,12 +134,16 @@ export class FileDiffSettingsTab extends PluginSettingTab {
       this.plugin.settings.defaultLayout = value;
     } else if (key === "alignMarkdownByHeadings" && typeof value === "boolean") {
       this.plugin.settings.alignMarkdownByHeadings = value;
-    } else if (key === "changeCopySuffix" && typeof value === "string") {
-      this.plugin.settings.changeCopySuffix = sanitizeCopySuffix(value) || DEFAULT_SETTINGS.changeCopySuffix;
+    } else if (key === "changeCopySuffix" && typeof value === "string" && this.validateSuffix(value) === undefined) {
+      this.plugin.settings.changeCopySuffix = value;
     } else {
       return;
     }
     await this.plugin.saveSettings();
+    if (key === "language") {
+      if (requireApiVersion("1.13.0")) this.update();
+      else this.renderLegacySettings();
+    }
   }
   /** Renders the legacy settings UI for Obsidian versions before declarative settings. */
   override display(): void {
@@ -160,25 +154,23 @@ export class FileDiffSettingsTab extends PluginSettingTab {
   private renderLegacySettings(): void {
     const { containerEl } = this;
     containerEl.empty();
-    new Setting(containerEl).setName(this.plugin.translate("settings.about.name")).setDesc(this.createAboutDescription());
+    new Setting(containerEl).setName(this.plugin.manifest.name)
+      .setDesc(createAboutDetails(this.plugin.manifest, this.plugin.translate.bind(this.plugin), this.plugin.language));
+    new Setting(containerEl).setName(this.plugin.translate("settings.about.name")).addButton(button => {
+      button.setButtonText(this.plugin.translate("settings.about.open")).onClick(() => { this.plugin.showAbout(); });
+    });
     new Setting(containerEl).setName(this.plugin.translate("settings.introduction.name")).setDesc(this.plugin.translate("settings.introduction.description")).addButton((button) => {
       button.setButtonText(this.plugin.translate("settings.introduction.button")).onClick(() => { this.plugin.showIntroduction(); });
     });
     new Setting(containerEl).setName(this.plugin.translate("agent.setup.title")).setDesc(this.plugin.translate("agent.setup.description")).addButton(button => {
       button.setButtonText(this.plugin.translate("agent.setup.openAction")).onClick(() => { this.plugin.showAgentInstructions(); });
     });
-    new Setting(containerEl).setName(this.plugin.translate("settings.language.name")).setDesc(this.plugin.translate("settings.language.description")).addDropdown((dropdown) => {
-      dropdown.addOption("auto", this.plugin.translate("settings.language.auto")).addOption("de", this.plugin.translate("settings.language.de")).addOption("en", this.plugin.translate("settings.language.en")).addOption("fr", this.plugin.translate("settings.language.fr")).addOption("it", this.plugin.translate("settings.language.it")).addOption("es", this.plugin.translate("settings.language.es")).addOption("pt-BR", this.plugin.translate("settings.language.pt-BR")).addOption("pt-PT", this.plugin.translate("settings.language.pt-PT")).addOption("nl", this.plugin.translate("settings.language.nl")).addOption("zh-CN", this.plugin.translate("settings.language.zh-CN")).setValue(this.plugin.settings.language).onChange(async (value) => {
-        this.plugin.updateLanguage(value);
-        await this.plugin.saveSettings();
-        this.renderLegacySettings();
-      });
-    });
+    this.renderLanguageDropdown(new Setting(containerEl).setName(this.plugin.translate("settings.language.name"))
+      .setDesc(this.plugin.translate("settings.language.description")));
+    new Setting(containerEl).setName(this.plugin.translate("settings.comparison.heading")).setHeading();
     new Setting(containerEl).setName(this.plugin.translate("settings.ribbon.name")).setDesc(this.plugin.translate("settings.ribbon.description")).addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.showRibbonIcon).onChange(async (value) => {
-        this.plugin.settings.showRibbonIcon = value;
-        this.plugin.updateRibbonVisibility();
-        await this.plugin.saveSettings();
+        await this.setControlValue("showRibbonIcon", value);
       });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.applyDirection.name")).setDesc(this.plugin.translate("settings.applyDirection.description")).addDropdown((dropdown) => {
@@ -198,51 +190,45 @@ export class FileDiffSettingsTab extends PluginSettingTab {
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.autoAdvance.name")).setDesc(this.plugin.translate("settings.autoAdvance.description")).addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.autoAdvanceAfterChange).onChange(async (value) => {
-        this.plugin.settings.autoAdvanceAfterChange = value;
-        await this.plugin.saveSettings();
+        await this.setControlValue("autoAdvanceAfterChange", value);
       });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.headingAlignment.name")).setDesc(this.plugin.translate("settings.headingAlignment.description")).addToggle((toggle) => {
       toggle.setValue(this.plugin.settings.alignMarkdownByHeadings).onChange(async (value) => {
-        this.plugin.settings.alignMarkdownByHeadings = value;
-        await this.plugin.saveSettings();
+        await this.setControlValue("alignMarkdownByHeadings", value);
       });
     });
     new Setting(containerEl).setName(this.plugin.translate("settings.suffix.name")).setDesc(this.plugin.translate("settings.suffix.description")).addText((text) => {
       text.setPlaceholder("_changes_").setValue(this.plugin.settings.changeCopySuffix).onChange(async (value) => {
-        this.plugin.settings.changeCopySuffix = sanitizeCopySuffix(value) || DEFAULT_SETTINGS.changeCopySuffix;
-        text.setValue(this.plugin.settings.changeCopySuffix);
-        await this.plugin.saveSettings();
+        const error = this.validateSuffix(value);
+        text.inputEl.setCustomValidity(error ?? "");
+        if (error !== undefined) {
+          text.inputEl.setAttribute("aria-invalid", "true");
+          text.inputEl.reportValidity();
+        } else {
+          text.inputEl.removeAttribute("aria-invalid");
+          await this.setControlValue("changeCopySuffix", value);
+        }
       });
     });
   }
 
-  /** Builds the localized about text and its external links. */
-  private createAboutDescription(): DocumentFragment {
-    return createFragment((fragment) => {
-      fragment.appendText(this.plugin.translate("settings.about.description"));
-      fragment.createEl("br");
-      fragment.appendText(this.plugin.translate("settings.about.support"));
-      fragment.createEl("br");
-      this.appendExternalLink(fragment, this.plugin.translate("settings.about.website"), AUTHOR_WEBSITE_URL);
-      fragment.appendText(" · ");
-      this.appendExternalLink(fragment, this.plugin.translate("settings.about.star"), GITHUB_REPOSITORY_URL);
-      fragment.appendText(" · ");
-      this.appendExternalLink(fragment, this.plugin.translate("settings.about.feedback"), GITHUB_FEEDBACK_URL);
-      fragment.appendText(" · ");
-      this.appendExternalLink(fragment, this.plugin.translate("settings.about.kofi"), KO_FI_URL);
+  /** Shares the language selector across both settings renderers. */
+  private renderLanguageDropdown(setting: Setting): void {
+    setting.addDropdown(dropdown => {
+      for (const value of ["auto", "de", "en", "fr", "it", "es", "pt-BR", "pt-PT", "nl", "zh-CN"]) {
+        dropdown.addOption(value, this.plugin.translate(`settings.language.${value}`));
+      }
+      dropdown.setValue(this.plugin.settings.language).onChange(async value => {
+        await this.setControlValue("language", value);
+      });
     });
   }
 
-  /** Appends an external link that opens without access to the Obsidian window. */
-  private appendExternalLink(parent: DocumentFragment, label: string, href: string): void {
-    parent.createEl("a", {
-      text: label,
-      href,
-      attr: {
-        target: "_blank",
-        rel: "noopener"
-      }
-    });
+  /** Shares validation between the native declarative control and its legacy counterpart. */
+  private validateSuffix(value: string): string | undefined {
+    if (value.length === 0 || sanitizeCopySuffix(value) !== value) {
+      return this.plugin.translate("settings.suffix.invalid");
+    }
   }
 }

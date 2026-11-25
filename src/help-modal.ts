@@ -1,6 +1,6 @@
 import { Component, MarkdownRenderer, Modal } from "obsidian";
 import type { App } from "obsidian";
-import type { Translator } from "./i18n";
+import type { Language, Translator } from "./i18n";
 import { HELP_MARKDOWN, helpHeadingId } from "./help-content";
 
 /** Displays the bundled README using Obsidian's Markdown renderer. */
@@ -9,7 +9,7 @@ export class HelpModal extends Modal {
   private renderComponent: Component | null = null;
 
   /** Creates the help dialog with localized window text. */
-  constructor(app: App, translate: Translator) {
+  constructor(app: App, translate: Translator, private readonly language: Language) {
     super(app);
     this.translate = translate;
   }
@@ -18,7 +18,13 @@ export class HelpModal extends Modal {
   override async onOpen(): Promise<void> {
     this.modalEl.addClass("file-diff-sbs-help-modal");
     this.setTitle(this.translate("menu.help"));
-    const content = this.contentEl.createDiv({ cls: "file-diff-sbs-help-content markdown-rendered" });
+    let guideParent: HTMLElement = this.contentEl;
+    if (this.language !== "en") {
+      this.renderQuickGuide();
+      guideParent = this.contentEl.createEl("details");
+      guideParent.createEl("summary", { text: this.translate("help.englishGuide") });
+    }
+    const content = guideParent.createDiv({ cls: "file-diff-sbs-help-content markdown-rendered" });
     const component = new Component();
     this.renderComponent = component;
     component.load();
@@ -33,6 +39,15 @@ export class HelpModal extends Modal {
       heading?.scrollIntoView({ block: "start" });
     }, { capture: true });
     await MarkdownRenderer.render(this.app, HELP_MARKDOWN, content, "", component);
+  }
+
+  /** Uses the introduction's localized instructions for the core workflows. */
+  private renderQuickGuide(): void {
+    this.contentEl.createEl("p", { text: this.translate("modal.introduction.welcome.description") });
+    for (const section of ["start.single", "start.multiple", "tips.keyboard", "tips.groups"] as const) {
+      this.contentEl.createEl("h3", { text: this.translate(`modal.introduction.${section}.title`) });
+      this.contentEl.createEl("p", { text: this.translate(`modal.introduction.${section}.description`) });
+    }
   }
 
   /** Releases Markdown children and event handlers when the dialog closes. */

@@ -1,4 +1,5 @@
-import { FileSystemAdapter, ItemView, Menu, Notice, Platform, TFile, setIcon, setTooltip } from "obsidian";
+import { FileSystemAdapter, ItemView, Menu, Platform, TFile, setIcon, setTooltip } from "obsidian";
+import { showStatusNotice } from "./status-message";
 import { getDesktopPaths } from "./desktop-capabilities";
 import { getNextDiffLayout, resolveDiffLayout, SINGLE_COLUMN_BREAKPOINT, type DiffLayout } from "./diff-layout";
 import { DIFF_LAYOUT_ICONS } from "./layout-icons";
@@ -235,7 +236,7 @@ export class SideBySideDiffView extends ItemView {
   async reverseApplyDirection(): Promise<void> {
     if (this.state.mode !== "compare" || this.state.editRight || this.state.rightPath === null) return;
     if (this.hasUnsavedChanges()) {
-      new Notice(this.translate("notice.saveFirst"));
+      showStatusNotice(this.translate("notice.saveFirst"), "warning");
       return;
     }
     const scrollPosition = this.getScrollPosition();
@@ -298,17 +299,17 @@ export class SideBySideDiffView extends ItemView {
   async dropVaultFile(leftFile: ComparisonFile, text: string): Promise<void> {
     const link = parseDroppedVaultLink(text, this.app.vault.getName());
     if (link === null) {
-      new Notice(this.translate("notice.selectedFileLoadFailed"));
+      showStatusNotice(this.translate("notice.selectedFileLoadFailed"), "error");
       return;
     }
     const file = this.app.vault.getAbstractFileByPath(link)
       ?? this.app.metadataCache.getFirstLinkpathDest(link, leftFile.path);
     if (!isTextFile(file)) {
-      new Notice(this.translate("notice.selectedFileLoadFailed"));
+      showStatusNotice(this.translate("notice.selectedFileLoadFailed"), "error");
       return;
     }
     if (file.path === leftFile.path) {
-      new Notice(this.translate("notice.differentFiles"));
+      showStatusNotice(this.translate("notice.differentFiles"), "warning");
       return;
     }
     const token = ++this.dropToken;
@@ -320,7 +321,7 @@ export class SideBySideDiffView extends ItemView {
   async dropMarkdown(files: readonly File[], droppedHandle: Promise<ExternalFileHandle | null> = Promise.resolve(null)): Promise<void> {
     const file = files[0];
     if (files.length !== 1 || !file || !/\.md$/i.test(file.name)) {
-      new Notice(this.translate("notice.dropMarkdownOnly"));
+      showStatusNotice(this.translate("notice.dropMarkdownOnly"), "warning");
       return;
     }
     const token = ++this.dropToken;
@@ -335,7 +336,7 @@ export class SideBySideDiffView extends ItemView {
       const sameFile = await this.isSameComparisonFile(leftFile, rightFile);
       if (token !== this.dropToken) return;
       if (sameFile) {
-        new Notice(this.translate("notice.differentFiles"));
+        showStatusNotice(this.translate("notice.differentFiles"), "warning");
         return;
       }
       let loaded = await this.loadComparison(leftFile, rightFile);
@@ -348,7 +349,7 @@ export class SideBySideDiffView extends ItemView {
           const sameFileNow = await this.isSameComparisonFile(leftFile, rightFile);
           if (token !== this.dropToken) return false;
           if (sameFileNow) {
-            new Notice(this.translate("notice.differentFiles"));
+            showStatusNotice(this.translate("notice.differentFiles"), "warning");
             return false;
           }
         }
@@ -370,7 +371,7 @@ export class SideBySideDiffView extends ItemView {
     } catch (error) {
       if (token !== this.dropToken) return;
       console.error("Side-by-Side Diff could not read dropped Markdown", error);
-      new Notice(this.translate("notice.dropReadFailed"));
+      showStatusNotice(this.translate("notice.dropReadFailed"), "error");
     }
   }
   /** Converts drops within the desktop vault to the existing Obsidian file object. */
@@ -415,7 +416,7 @@ export class SideBySideDiffView extends ItemView {
     const changed = !(left instanceof TFile) && loaded.leftContent !== left.content ? left
       : !(right instanceof TFile) && loaded.rightContent !== right.content ? right : null;
     if (changed !== null) {
-      new Notice(this.translate("notice.comparisonChanged", { name: changed.name }));
+      showStatusNotice(this.translate("notice.comparisonChanged", { name: changed.name }), "warning");
       await this.renderDiff(this.getScrollPosition());
       return null;
     }
@@ -827,7 +828,7 @@ export class SideBySideDiffView extends ItemView {
       this.updateLayout();
       this.restoreScrollPosition(scrollPosition);
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die Dateien nicht lesen.", error);
+      console.error("Side-by-Side Diff: Could not read the comparison files.", error);
       this.renderMessage(this.translate("view.readFailed"));
     }
   }
@@ -964,8 +965,8 @@ export class SideBySideDiffView extends ItemView {
     try {
       await this.renderDiff();
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die Auswahl nicht anwenden.", error);
-      new Notice(this.translate("notice.selectedFileLoadFailed"));
+      console.error("Side-by-Side Diff: Could not apply the selected file.", error);
+      showStatusNotice(this.translate("notice.selectedFileLoadFailed"), "error");
     }
   }
   /** Enables direct editing for the current target while keeping the source read-only. */
@@ -1013,12 +1014,12 @@ export class SideBySideDiffView extends ItemView {
         const editor = this.rightEditorState.editor;
         const rightPath = this.targetPath;
         if (rightPath === null) {
-          new Notice(this.translate("view.targetUnavailable"));
+          showStatusNotice(this.translate("view.targetUnavailable"), "error");
           return false;
         }
         const rightFile = this.getComparisonFile(rightPath);
         if (rightFile === null) {
-          new Notice(this.translate("view.targetUnavailable"));
+          showStatusNotice(this.translate("view.targetUnavailable"), "error");
           return false;
         }
         const saved = await this.processUnchangedFile(rightFile, (currentContent) => {
@@ -1033,7 +1034,7 @@ export class SideBySideDiffView extends ItemView {
       if (this.hasPendingChanges()) {
         const result = await this.writePendingChanges();
         if (result === "unavailable") {
-          new Notice(this.translate("notice.pendingFileUnavailable"));
+          showStatusNotice(this.translate("notice.pendingFileUnavailable"), "error");
         }
         if (result !== "saved") {
           return false;
@@ -1042,8 +1043,8 @@ export class SideBySideDiffView extends ItemView {
       this.session.clearUndoStack();
       return true;
     } catch (error) {
-      console.error("Side-by-Side Diff konnte \xC4nderungen vor dem Schlie\xDFen nicht speichern.", error);
-      new Notice(this.translate("notice.saveFailed"));
+      console.error("Side-by-Side Diff: Could not save changes before closing.", error);
+      showStatusNotice(this.translate("notice.saveFailed"), "error");
       return false;
     }
   }
@@ -1055,12 +1056,12 @@ export class SideBySideDiffView extends ItemView {
     const scrollPosition = this.getScrollPosition();
     const rightPath = this.targetPath;
     if (rightPath === null) {
-      new Notice(this.translate("view.targetUnavailable"));
+      showStatusNotice(this.translate("view.targetUnavailable"), "error");
       return false;
     }
     const rightFile = this.getComparisonFile(rightPath);
     if (rightFile === null) {
-      new Notice(this.translate("view.targetUnavailable"));
+      showStatusNotice(this.translate("view.targetUnavailable"), "error");
       return false;
     }
     try {
@@ -1075,12 +1076,12 @@ export class SideBySideDiffView extends ItemView {
         return false;
       }
       this.session.removePendingChange(rightFile.path);
-      new Notice(this.translate("notice.saved"));
+      showStatusNotice(this.translate("notice.saved"), "success");
       await this.renderDiff(scrollPosition);
       return true;
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die rechten \xC4nderungen nicht speichern.", error);
-      new Notice(this.translate("notice.saveFailed"));
+      console.error("Side-by-Side Diff: Could not save target edits.", error);
+      showStatusNotice(this.translate("notice.saveFailed"), "error");
       return false;
     }
   }
@@ -1357,7 +1358,7 @@ export class SideBySideDiffView extends ItemView {
         // A second explicit Save retries against the content the user was warned about.
         this.session.refreshSaveBaseline(file.path, observedContent);
       }
-      new Notice(this.translate("notice.externalChange", { name: file.name }));
+      showStatusNotice(this.translate("notice.externalChange", { name: file.name }), "warning");
       return "conflict";
     }
     this.session.removeSaveBaseline(file.path);
@@ -1387,22 +1388,22 @@ export class SideBySideDiffView extends ItemView {
     try {
       const result = await this.writePendingChanges();
       if (result === "unavailable") {
-        new Notice(this.translate("notice.pendingFileUnavailable"));
+        showStatusNotice(this.translate("notice.pendingFileUnavailable"), "error");
       }
       if (result !== "saved") {
         return false;
       }
       this.session.clearUndoStack();
       this.session.commitReview();
-      new Notice(this.translate("notice.saved"));
+      showStatusNotice(this.translate("notice.saved"), "success");
       await this.renderDiff(scrollPosition);
       if (promptForProposalCleanup) {
         this.maybePromptDeleteChangeCopy();
       }
       return true;
     } catch (error) {
-      console.error("Side-by-Side Diff konnte vorgemerkte \xC4nderungen nicht speichern.", error);
-      new Notice(this.translate("notice.saveFailed"));
+      console.error("Side-by-Side Diff: Could not save staged changes.", error);
+      showStatusNotice(this.translate("notice.saveFailed"), "error");
       return false;
     }
   }
@@ -1414,13 +1415,13 @@ export class SideBySideDiffView extends ItemView {
     const leftPath = this.state.leftPath;
     const rightPath = this.state.rightPath;
     if (leftPath === null || rightPath === null) {
-      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      showStatusNotice(this.translate("notice.comparedFilesUnavailable"), "error");
       return;
     }
     const leftFile = this.getComparisonFile(leftPath);
     const rightFile = this.getComparisonFile(rightPath);
     if (leftFile === null || rightFile === null) {
-      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      showStatusNotice(this.translate("notice.comparedFilesUnavailable"), "error");
       return;
     }
     try {
@@ -1454,8 +1455,8 @@ export class SideBySideDiffView extends ItemView {
       }
       this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die \xC4nderung nicht \xFCbernehmen.", error);
-      new Notice(this.translate("notice.changeFailed"));
+      console.error("Side-by-Side Diff: Could not stage the change.", error);
+      showStatusNotice(this.translate("notice.changeFailed"), "error");
     }
   }
   /** Stages every changed row inside a bridged block at once, in the same direction. */
@@ -1466,13 +1467,13 @@ export class SideBySideDiffView extends ItemView {
     const leftPath = this.state.leftPath;
     const rightPath = this.state.rightPath;
     if (leftPath === null || rightPath === null) {
-      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      showStatusNotice(this.translate("notice.comparedFilesUnavailable"), "error");
       return;
     }
     const leftFile = this.getComparisonFile(leftPath);
     const rightFile = this.getComparisonFile(rightPath);
     if (leftFile === null || rightFile === null) {
-      new Notice(this.translate("notice.comparedFilesUnavailable"));
+      showStatusNotice(this.translate("notice.comparedFilesUnavailable"), "error");
       return;
     }
     try {
@@ -1514,8 +1515,8 @@ export class SideBySideDiffView extends ItemView {
       }
       this.advanceAfterResolvedChange(targetPosition);
     } catch (error) {
-      console.error("Side-by-Side Diff konnte den Block nicht \xFCbernehmen.", error);
-      new Notice(this.translate("notice.changeFailed"));
+      console.error("Side-by-Side Diff: Could not stage the change block.", error);
+      showStatusNotice(this.translate("notice.changeFailed"), "error");
     }
   }
   /** Shows a short error message inside the view. */
@@ -1648,7 +1649,7 @@ export class SideBySideDiffView extends ItemView {
       });
       menu.addItem((item) => {
         item.setTitle(this.translate("menu.help")).setIcon("circle-help").onClick(() => {
-          new HelpModal(this.app, (key, variables) => this.translate(key, variables)).open();
+          new HelpModal(this.app, (key, variables) => this.translate(key, variables), this.plugin.language).open();
         });
       });
       menu.showAtMouseEvent(event);
@@ -2063,11 +2064,11 @@ export class SideBySideDiffView extends ItemView {
     new DeleteIdenticalFileModal(this.app, file, async () => {
       try {
         await this.app.fileManager.trashFile(file);
-        new Notice(this.translate("notice.fileTrashed", { name: file.name }));
+        showStatusNotice(this.translate("notice.fileTrashed", { name: file.name }), "success");
         this.leaf.detach();
       } catch (error) {
-        console.error("Side-by-Side Diff konnte die identische Datei nicht verschieben.", error);
-        new Notice(this.translate("notice.fileTrashFailed"));
+        console.error("Side-by-Side Diff: Could not move the identical file to the trash.", error);
+        showStatusNotice(this.translate("notice.fileTrashFailed"), "error");
       }
     }, this.translate.bind(this)).open();
   }
@@ -2076,11 +2077,11 @@ export class SideBySideDiffView extends ItemView {
     new DeleteChangeCopyModal(this.app, file, async () => {
       try {
         await this.app.fileManager.trashFile(file);
-        new Notice(this.translate("notice.changeCopyTrashed", { name: file.name }));
+        showStatusNotice(this.translate("notice.changeCopyTrashed", { name: file.name }), "success");
         this.leaf.detach();
       } catch (error) {
-        console.error("Side-by-Side Diff konnte die Änderungskopie nicht verschieben.", error);
-        new Notice(this.translate("notice.changeCopyTrashFailed"));
+        console.error("Side-by-Side Diff: Could not move the change copy to the trash.", error);
+        showStatusNotice(this.translate("notice.changeCopyTrashFailed"), "error");
       }
     }, this.translate.bind(this)).open();
   }

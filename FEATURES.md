@@ -256,14 +256,19 @@ visible, can be reviewed and staged individually, and are written only through a
 
 ### Other actions
 
-- The open comparison's `…` file-actions menu offers **Help**, which renders the bundled English README in a
-  scrollable dialog using Obsidian's Markdown renderer. Screenshots work offline, section links navigate within
-  the dialog, and links to other repository files open on GitHub. Help stays available with unsaved changes and
-  preserves the comparison's staged edits and review state.
-- The plugin opens a short, five-step introduction once after an update when it has not been seen yet. It covers
-  comparison entry points, file selection, navigation, change groups, feedback, documentation, and a closing
-  thank-you note with a "Buy me a coffee" Ko-fi support link. It can be reopened through the settings page or the
-  command palette.
+- The open comparison's `…` file-actions menu offers **Help**. It shows a localized quick guide outside English
+  and provides access to the full English README in every language. Screenshots work offline, section links
+  navigate within the dialog, and links to other repository files open on GitHub. Help stays available with
+  unsaved changes and preserves the comparison's staged edits and review state.
+- The plugin opens a five-step introduction once after an update when it has not been seen yet. The welcome page
+  shows a bundled teaser image and cards for feedback, bug reports, and documentation. The start page alternates
+  screenshots and instructions in two columns when there is room. The file-selection page also explains drag and
+  drop and the tab's **Compare with active file** action. After tips for navigation and change groups, the closing
+  page offers a Ko-fi support link and optional agent setup. The introduction can be reopened through the settings
+  page or the command palette.
+- **About the plugin** opens from settings and the command palette. The top of the settings and the dialog show
+  the installed version and author from the manifest, a short description, and documentation, repository,
+  feedback, website, and support links.
 - Identical files show a dedicated message. Review completion after Keep both can leave files different and
   shows the processed-suggestions message instead. Identical-file trash actions and proposal-copy cleanup require
   equal compared content, independently of accepted/ignored review counts.
@@ -281,6 +286,11 @@ visible, can be reviewed and staged individually, and are written only through a
 - Simplified Chinese detection supports `zh`, `zh-CN`, `zh-SG`, and `zh-Hans` locales. Traditional Chinese locales
   retain the English fallback.
 - Translations live separately in `locales/`, with the same keys and placeholders across all dictionaries.
+- Obsidian 1.13 and later index the plugin settings in native settings search. A language change refreshes the
+  open settings tab on all supported versions. Both settings renderers reject an empty or invalid copy suffix
+  and preserve the last saved value.
+- Status text explains progress, success, and failure during agent setup. Comparison notices and agent setup use
+  theme colors alongside the message text.
 
 ### Agent support
 
@@ -299,7 +309,7 @@ visible, can be reviewed and staged individually, and are written only through a
 - Status returns `{ ok, vault, views }`, with `left`, `right`, `mode`, `originalSide`, `counts` (open, accepted,
   ignored), and `hasUnsavedChanges` for each open diff tab in the vault. An unset pane has a `null` path.
   Counts reflect the current review session. After saving, accepted counts clear and ignored decisions remain.
-- The introduction's welcome page and both settings layouts offer the same agent setup dialog. It lets the
+- The introduction's final page and both settings layouts offer the same agent setup dialog. It lets the
   user choose an existing vault-root `AGENTS.md` or `CLAUDE.md`, or create `AGENTS.md` when neither exists.
   On case-insensitive filesystems, it uses the spelling of the existing file.
   The dialog previews the English instructions, including the actual vault name and configured copy suffix.

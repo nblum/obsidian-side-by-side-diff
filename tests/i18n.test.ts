@@ -68,6 +68,14 @@ describe("UI translations", () => {
 		assert.equal(createTranslator("de")("commands.showIntroduction"), "Einführung anzeigen");
 	});
 
+	test("uses the localized drop-card label in the introduction hint", () => {
+		const translate = createTranslator("de");
+		const dropLabel = translate("view.selection.dropFiles");
+		const hint = translate("modal.introduction.selection.drop.description", { target: dropLabel });
+		assert.ok(hint.includes(`„${dropLabel}“`));
+		assert.ok(hint.includes(".md-Datei"));
+	});
+
 	test("distinguishes Obsidian's European and Brazilian Portuguese locale codes", () => {
 		assert.equal(resolveLanguage("auto", "pt"), "pt-PT");
 		assert.equal(resolveLanguage("auto", "pt-br"), "pt-BR");

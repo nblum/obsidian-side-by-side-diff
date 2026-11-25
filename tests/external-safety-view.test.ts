@@ -3,6 +3,7 @@ import { diskFileHandle } from "./helpers/external-file-handle.ts";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { createRequire } from "node:module";
+import { renderFragmentText } from "./helpers/obsidian-fragment.ts";
 import { mkdtemp, writeFile, readFile, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -38,7 +39,7 @@ const bundle = await esbuild.build({
 assert.ok(bundle.outputFiles?.[0]);
 const module = { exports: {} as { SideBySideDiffView: typeof SideBySideDiffView; UnsavedChangesModal: typeof import("../src/modals.ts").UnsavedChangesModal } };
 runInNewContext(bundle.outputFiles[0].text, {
-  module, exports: module.exports, TextDecoder, Buffer, URL, console,
+  module, exports: module.exports, TextDecoder, Buffer, URL, console, createFragment: renderFragmentText,
   require: (name: string) => {
     if (name === "electron") return {};
     if (name.startsWith("node:")) return createRequire(import.meta.url)(name);

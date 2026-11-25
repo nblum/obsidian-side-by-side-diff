@@ -1,10 +1,11 @@
-import { Modal, Notice, Platform, TFile, requireApiVersion } from "obsidian";
+import { Modal, Platform, TFile, requireApiVersion } from "obsidian";
 import type { App } from "obsidian";
 import { AGENT_INSTRUCTION_PATHS, buildAgentInstructions, planAgentInstructions } from "./agent-instructions";
 import type { AgentInstructionPath } from "./agent-instructions";
 import { getOpenGeneralSettings, readAgentCliStatus } from "./agent-setup-capabilities";
 import { OBSIDIAN_CLI_GUIDE_URL } from "./external-links";
 import type { Translator } from "./i18n";
+import { setStatusMessage, showStatusNotice } from "./status-message";
 
 class PreviewChangedError extends Error {}
 
@@ -54,7 +55,7 @@ export class AgentInstructionsModal extends Modal {
 		this.contentEl.empty();
 		this.renderCliStatus();
 		const status = this.contentEl.createEl("p", { attr: { role: "status" } });
-		if (changed) status.setText(this.translate("agent.setup.changed"));
+		setStatusMessage(status, this.translate("agent.setup.loading"), "progress");
 		const preview = this.contentEl.createDiv();
 		const actions = this.contentEl.createDiv({ cls: "file-diff-sbs-agent-actions" });
 		const cancel = actions.createEl("button", { text: this.translate("modal.cancel") });
@@ -73,7 +74,7 @@ export class AgentInstructionsModal extends Modal {
 			path = file?.path ?? candidate;
 			const blocked = destinations.find(destination => destination.blocked !== null);
 			if (file === null && blocked?.blocked !== undefined && blocked.blocked !== null) {
-				status.setText(this.translate(`agent.setup.${blocked.blocked}`, { path: blocked.candidate }));
+				setStatusMessage(status, this.translate(`agent.setup.${blocked.blocked}`, { path: blocked.candidate }), "error");
 				return;
 			}
 			let destination: HTMLSelectElement | undefined;
@@ -92,9 +93,10 @@ export class AgentInstructionsModal extends Modal {
 			}
 			const baseline = file ? await vault.read(file) : null;
 			if (version !== this.previewVersion) return;
+			setStatusMessage(status, changed ? this.translate("agent.setup.changed") : "", "warning");
 			const edit = planAgentInstructions(baseline, buildAgentInstructions(vault.getName(), this.suffix));
 			if (edit.kind === "invalid") {
-				status.setText(this.translate("agent.setup.invalid", { path }));
+				setStatusMessage(status, this.translate("agent.setup.invalid", { path }), "error");
 				return;
 			}
 			preview.createEl("p", { text: this.translate(`agent.setup.${edit.kind}Prompt`, { path }) });
@@ -107,10 +109,13 @@ export class AgentInstructionsModal extends Modal {
 			confirm.addEventListener("click", () => {
 				confirm.disabled = true;
 				if (destination) destination.disabled = true;
+				setStatusMessage(status, this.translate("agent.setup.saving", { path }), "progress");
 				void this.savePreview(candidate, path, file, baseline, edit.content, version, status, confirm, destination);
 			});
 		} catch {
-			if (version === this.previewVersion) status.setText(this.translate("agent.setup.readFailed", { path }));
+			if (version === this.previewVersion) {
+				setStatusMessage(status, this.translate("agent.setup.readFailed", { path }), "error");
+			}
 		}
 	}
 
@@ -167,13 +172,13 @@ export class AgentInstructionsModal extends Modal {
 			if (error instanceof PreviewChangedError || vault.getAbstractFileByPath(path) !== file) {
 				await this.renderPreview(candidate, true);
 			} else {
-				status.setText(this.translate("agent.setup.writeFailed", { path }));
+				setStatusMessage(status, this.translate("agent.setup.writeFailed", { path }), "error");
 				confirm.disabled = false;
 				if (destination) destination.disabled = false;
 			}
 			return;
 		}
 		if (version === this.previewVersion) this.close();
-		new Notice(this.translate("agent.setup.saved", { path }));
+		showStatusNotice(this.translate("agent.setup.saved", { path }), "success");
 	}
 }

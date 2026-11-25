@@ -3,6 +3,7 @@ import { diskFileHandle } from "./helpers/external-file-handle.ts";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
 import { createRequire } from "node:module";
+import { renderFragmentText } from "./helpers/obsidian-fragment.ts";
 import { mkdtemp, writeFile, readFile, rm, unlink, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -76,6 +77,7 @@ runInNewContext(output.text, {
 	URL,
 	Buffer,
 	HTMLElement: EditorElement,
+	createFragment: renderFragmentText,
 	require: (name: string) => {
 		if (name === "electron") return {};
 		if (name.startsWith("node:")) return createRequire(import.meta.url)(name);

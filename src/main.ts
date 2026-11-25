@@ -1,4 +1,5 @@
-import { Notice, Platform, Plugin, TFile, addIcon, moment, requireApiVersion } from "obsidian";
+import { Platform, Plugin, TFile, addIcon, moment, requireApiVersion } from "obsidian";
+import { showStatusNotice } from "./status-message";
 import type { CliData, CliFlags, CliHandler, Command, Menu, TAbstractFile } from "obsidian";
 import { FilePickerModal, IntroductionModal } from "./modals";
 import { SideBySideDiffView, type PaneMode } from "./diff-view";
@@ -14,6 +15,7 @@ import { registerDiffLayoutIcons } from "./layout-icons";
 import { AGENT_CLI_COMMANDS, getAgentCliFlags, matchesAgentReview, parseAgentCliPaths, updateAgentCliHelp } from "./agent-cli";
 import type { AgentAction, AgentCliError } from "./agent-cli";
 import { AgentInstructionsModal } from "./agent-instructions-modal";
+import { AboutModal } from "./about-modal";
 import { parseDiffViewState, type OriginalSide } from "./diff-view-state";
 const ICON_ID = "square-split-horizontal";
 const AGENT_VAULT_INDEX_WAIT_MS = 1_000;
@@ -138,6 +140,11 @@ export class FileDiffSideBySidePlugin extends Plugin {
         id: "show-introduction",
         name: this.translate("commands.showIntroduction"),
         callback: () => { this.showIntroduction(); }
+      }),
+      this.addCommand({
+        id: "show-about",
+        name: this.translate("commands.showAbout"),
+        callback: () => { this.showAbout(); }
       })
     ];
     this.app.workspace.onLayoutReady(() => { void this.showIntroductionIfNeeded(); });
@@ -162,12 +169,16 @@ export class FileDiffSideBySidePlugin extends Plugin {
     try {
       await this.saveSettings();
     } catch (error) {
-      console.error("Side-by-Side Diff konnte den Status der Einführung nicht speichern.", error);
+      console.error("Side-by-Side Diff: Could not save the introduction status.", error);
     }
   }
   /** Opens the guided introduction after the workspace can display modal dialogs. */
   showIntroduction(): void {
     new IntroductionModal(this.app, this.translator, () => { this.showAgentInstructions(); }).open();
+  }
+  /** Opens information about the installed plugin from settings or the command palette. */
+  showAbout(): void {
+    new AboutModal(this.app, this.manifest, this.translator, this.language).open();
   }
   /** Opens the same opt-in setup from settings and the introduction. */
   showAgentInstructions(): void {
@@ -189,7 +200,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
     try {
       await this.saveSettings();
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die zuletzt verwendete Datei nicht speichern.", error);
+      console.error("Side-by-Side Diff: Could not remember the last selected file.", error);
     }
   }
   /** Loads persisted plugin settings and applies defaults for new options. */
@@ -226,7 +237,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
       this.translate("commands.saveComparison"),
       this.translate("commands.nextChange"),
       this.translate("commands.previousChange"),
-      this.translate("commands.showIntroduction")
+      this.translate("commands.showIntroduction"),
+      this.translate("commands.showAbout")
     ];
     this.commandEntries.forEach((command, index) => {
       const commandName = commandNames[index];
@@ -256,13 +268,13 @@ export class FileDiffSideBySidePlugin extends Plugin {
       }
       matchingViewFound = true;
       if (view.hasUnsavedChanges()) {
-        new Notice(this.translate("notice.refreshUnsaved"));
+        showStatusNotice(this.translate("notice.refreshUnsaved"), "warning");
         continue;
       }
       void view.renderDiff(view.getScrollPosition());
     }
     if (!matchingViewFound) {
-      new Notice(this.translate("notice.noOpenView"));
+      showStatusNotice(this.translate("notice.noOpenView"), "warning");
     }
   }
   /** Shows or hides the plugin icon in Obsidian's left ribbon. */
@@ -283,7 +295,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
       return;
     }
     if (!isTextFile(activeFile)) {
-      new Notice(this.translate("notice.openTextFirst"));
+      showStatusNotice(this.translate("notice.openTextFirst"), "warning");
       return;
     }
     await this.openDiffView(activeFile);
@@ -292,7 +304,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
   async proposeChanges(file: TFile | null = null): Promise<void> {
     const sourceFile = file ?? this.app.workspace.getActiveFile();
     if (!isTextFile(sourceFile)) {
-      new Notice(this.translate("notice.openTextFirst"));
+      showStatusNotice(this.translate("notice.openTextFirst"), "warning");
       return;
     }
     try {
@@ -305,8 +317,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
       const copyFile = await this.app.vault.create(this.getChangeCopyPath(sourceFile), content);
       await this.openDiffView(sourceFile, copyFile, true, "proposal");
     } catch (error) {
-      console.error("Side-by-Side Diff konnte keine \xC4nderungskopie anlegen.", error);
-      new Notice(this.translate("notice.copyFailed"));
+      console.error("Side-by-Side Diff: Could not create the change copy.", error);
+      showStatusNotice(this.translate("notice.copyFailed"), "error");
     }
   }
   /** Finds the newest existing change copy next to the source file. */
@@ -364,18 +376,18 @@ export class FileDiffSideBySidePlugin extends Plugin {
   async openProtocolComparison(params: Record<string, string>): Promise<void> {
     const request = validateComparisonProtocolRequest(params, this.app.vault.getName());
     if (!request.ok) {
-      new Notice(this.translate(`notice.protocol.${request.error}`));
+      showStatusNotice(this.translate(`notice.protocol.${request.error}`), "error");
       return;
     }
     const left = this.app.vault.getAbstractFileByPath(request.left);
     const right = this.app.vault.getAbstractFileByPath(request.right);
     if (!(left instanceof TFile) || !(right instanceof TFile)) {
       const missing = !(left instanceof TFile) ? request.left : request.right;
-      new Notice(this.translate("notice.protocol.fileMissing", { path: missing }));
+      showStatusNotice(this.translate("notice.protocol.fileMissing", { path: missing }), "error");
       return;
     }
     if (!isTextFile(left) || !isTextFile(right)) {
-      new Notice(this.translate("notice.protocol.textFilesOnly"));
+      showStatusNotice(this.translate("notice.protocol.textFilesOnly"), "error");
       return;
     }
     await this.openDiffView(left, right);
@@ -487,7 +499,7 @@ export class FileDiffSideBySidePlugin extends Plugin {
   /** Opens the comparison in a new split leaf, optionally awaiting the right file. */
   async openDiffView(leftFile: TFile, rightFile: TFile | null = null, editRight = false, mode: PaneMode = "compare", originalSide?: OriginalSide): Promise<boolean> {
     if (rightFile && leftFile.path === rightFile.path) {
-      new Notice(this.translate("notice.differentFiles"));
+      showStatusNotice(this.translate("notice.differentFiles"), "warning");
       return false;
     }
     try {
@@ -503,8 +515,8 @@ export class FileDiffSideBySidePlugin extends Plugin {
       }
       return true;
     } catch (error) {
-      console.error("Side-by-Side Diff konnte die Ansicht nicht \xF6ffnen.", error);
-      new Notice(this.translate("notice.viewOpenFailed"));
+      console.error("Side-by-Side Diff: Could not open the comparison view.", error);
+      showStatusNotice(this.translate("notice.viewOpenFailed"), "error");
       return false;
     }
   }

@@ -231,11 +231,13 @@ The following shortcuts are available while a comparison view has focus:
   Supported languages are English, German, French, Italian, Spanish, Brazilian Portuguese, European Portuguese,
   Dutch, and Simplified Chinese. `Automatic` follows your Obsidian language, with English as the fallback.
   Traditional Chinese currently falls back to English.
+- **Introduction and About:** open either from the plugin settings or the command palette. The comparison's
+  **Help** menu opens an offline guide.
 
 ## Review changes proposed by AI agents
 
 Open **Settings → Side-by-Side Diff → Set up agent instructions**, or use **Set up** on the introduction’s
-welcome page. Preview the instructions before adding them to an existing vault-root `AGENTS.md` or
+final page. Preview the instructions before adding them to an existing vault-root `AGENTS.md` or
 `CLAUDE.md`. If neither exists, the plugin offers to create `AGENTS.md`.
 
 The setup dialog shows whether the Obsidian CLI is turned on. If it is off, choose **Open General settings**
@@ -283,7 +285,7 @@ links naming a different vault.
 
 Download the plugin files from the [latest release](https://github.com/nblum/obsidian-side-by-side-diff/releases/latest)
 and place them in `.obsidian/plugins/side-by-side-diff/` in your vault. The folder must contain
-`main.js`, `manifest.json`, `styles.css`, and the `locales/` directory.
+`main.js`, `manifest.json`, and `styles.css`. Translations are bundled in `main.js`.
 Then open **Settings → Community plugins** and enable `Side-by-Side Diff`.
 
 ## Privacy and permissions
@@ -319,5 +321,13 @@ appreciated.
 - [Changelog](CHANGELOG.md) – changes by release
 - [Review status concept](docs/concepts/review-statusanzeige.md) – review states, counts, and session lifecycle
 
-The plugin source is TypeScript. Build and test instructions, project structure, and contribution guidance live in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+From the repository root, use the Node.js version in [.nvmrc](.nvmrc) and install the locked dependencies.
+
+```bash
+nvm use
+npm ci
+npm run dev   # watch and rebuild while developing
+npm run build # create the production main.js
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for tests, project structure, and release instructions.
