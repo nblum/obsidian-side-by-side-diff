@@ -303,6 +303,8 @@ pre-publication checks. Use a clean `main` that matches `origin/main` and authen
    command with the same version.
 3. Check the release workflow and the resulting GitHub release. The workflow independently checks the tag,
    metadata, and CI result, attests the public build, and verifies the published notes and all three asset bytes.
+   To retry publication using an updated workflow and the existing tag, run
+   `gh workflow run release-assets.yml --ref main -f tag=<version>`.
    Complete any remaining post-publication checks from the shared checklist.
 
 ## Contribution checklist

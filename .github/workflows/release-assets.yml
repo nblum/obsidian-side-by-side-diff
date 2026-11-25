@@ -3,6 +3,12 @@ name: Build and publish release
 on:
   push:
     tags: ['*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,10 +18,10 @@ defaults:
     shell: bash
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
 
 env:
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   build:
@@ -30,6 +36,8 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The default tag-push checkout can replace the local tag object with the event's commit SHA.
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -44,6 +52,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{}")" = "$(git rev-parse HEAD)"
           node scripts/release.mjs "$RELEASE_TAG" --check
           node scripts/release.mjs "$RELEASE_TAG" --notes > release-notes.md
 
