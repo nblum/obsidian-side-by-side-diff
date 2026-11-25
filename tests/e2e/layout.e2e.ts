@@ -285,7 +285,9 @@ describe("single-column layout in Obsidian", () => {
     await $(accept).click();
     await expect($(direction)).toBeDisabled();
     await $(save).click();
-    assert.ok((await saved("Original.md")).includes("Comparison wording."));
+    await browser.waitUntil(async () => (await saved("Original.md")).includes("Comparison wording."), {
+      timeoutMsg: "Saving after reversing the comparison must write the reviewed change to Original.md."
+    });
     await browser.saveScreenshot(join(process.cwd(), "e2e-results/compact-file-header.png"));
     await setWidth(720);
     await expect($(swap)).toBeDisplayed();
